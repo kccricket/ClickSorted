@@ -2,13 +2,15 @@
 
 ClickSort is a Bukkit plugin which makes it very easy for players to sort their inventories (player/chest/dispenser) with a single or double click of the mouse. Players can sort by item ID, item name, switch between single- and double-clicking, or disable sorting entirely, all on a per-player basis and without needing any commands; it's all done with mouse clicks in inventory windows.
 
+This is a fork of the plugin developed by NewbieOrange.
+
 ## Installation
 
 Copy ClickSort.jar into your plugins/ folder.  Restart/reload your server.  Done.
 
 ## Building
 
-1) Download ClickSort: "git clone https://github.com/NewbieOrange/clicksort.git"
+1) Clone this repository.
 
 2) Build ClickSort.
 
@@ -24,4 +26,4 @@ Clicksort by Des Herriott is licensed under the [Gnu GPL v3](http://www.gnu.org/
 
 ## JetBrains Toolkit
 
-This project is developed with Intellij IDEA Ultimate from JetBrains! https://jb.gg/OpenSource
+This project has been, at times, developed with Intellij IDEA Ultimate from JetBrains! https://jb.gg/OpenSource
