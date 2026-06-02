@@ -51,6 +51,23 @@ public class PlayerSortingPrefs {
         return getPrefs(player).sortMethod;
     }
 
+    public ClickMethod getUnavailableStoredClickMethod(Player player) {
+        return jdbi.withHandle(handle ->
+            handle.createQuery("select click from sorting_prefs where player = ?")
+                .bind(0, player.getUniqueId())
+                .mapTo(String.class)
+                .findOne()
+                .map(s -> {
+                    try {
+                        ClickMethod m = ClickMethod.valueOf(s);
+                        return m.isAvailable() ? null : m;
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
+                })
+                .orElse(null));
+    }
+
     public ClickMethod getClickMethod(Player player) {
         return getPrefs(player).clickMethod;
     }

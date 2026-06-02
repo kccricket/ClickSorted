@@ -31,6 +31,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.InventoryView;
@@ -155,6 +156,17 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
      *
      * @param event the event object
      */
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        ClickMethod unavailable = sortingPrefs.getUnavailableStoredClickMethod(player);
+        if (unavailable != null) {
+            MiscUtil.alertMessage(player,
+                LanguageLoader.getColoredMessage("clickMethodNotAvailable")
+                    .replace("%method%", unavailable.toString()));
+        }
+    }
+
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onInventoryClicked(final InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) {
@@ -253,6 +265,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     }
 
     public void processConfig() {
+        validateClickMode();
         setupPurgeTask();
 
         MiscUtil.setColouredConsole(getConfig().getBoolean("coloured_console"));
@@ -271,6 +284,19 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     /**
      * Purge unseen player sorting data periodically if necessary
      */
+    private void validateClickMode() {
+        String configured = getConfig().getString("defaults.click_mode");
+        ClickMethod preferred = ClickMethod.preferredDefault();
+        try {
+            ClickMethod method = ClickMethod.valueOf(configured);
+            if (!method.isAvailable()) {
+                LogUtils.warning("Configured click_mode '" + configured + "' is not available on this server version; defaulting to " + preferred);
+            }
+        } catch (IllegalArgumentException e) {
+            LogUtils.warning("Invalid click_mode '" + configured + "' in config.yml; defaulting to " + preferred);
+        }
+    }
+
     private void setupPurgeTask() {
         if (purgeTask != null) {
             purgeTask.cancel();
