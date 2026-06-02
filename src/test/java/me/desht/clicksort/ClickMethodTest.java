@@ -88,31 +88,4 @@ class ClickMethodTest {
     // despite being unavailable. This is safe in practice since DOUBLE/SINGLE/NONE are
     // always available, but the guard is implicit rather than enforced.
 
-    @Test
-    void unavailableFor_unknownName_null() {
-        assertNull(ClickMethod.unavailableFor("BOGUS"));
-    }
-
-    @Test
-    void unavailableFor_alwaysAvailableMethod_null() {
-        assertNull(ClickMethod.unavailableFor("DOUBLE"));
-        assertNull(ClickMethod.unavailableFor("SINGLE"));
-        assertNull(ClickMethod.unavailableFor("NONE"));
-    }
-
-    @Test
-    void unavailableFor_availableMiddle_null() {
-        try (MockedStatic<CompatUtil> compat = Mockito.mockStatic(CompatUtil.class)) {
-            compat.when(CompatUtil::isMiddleClickAllowed).thenReturn(true);
-            assertNull(ClickMethod.unavailableFor("MIDDLE"));
-        }
-    }
-
-    @Test
-    void unavailableFor_unavailableMiddle_returnsMethod() {
-        try (MockedStatic<CompatUtil> compat = Mockito.mockStatic(CompatUtil.class)) {
-            compat.when(CompatUtil::isMiddleClickAllowed).thenReturn(false);
-            assertEquals(ClickMethod.MIDDLE, ClickMethod.unavailableFor("MIDDLE"));
-        }
-    }
 }

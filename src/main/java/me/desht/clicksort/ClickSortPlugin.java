@@ -159,11 +159,15 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        ClickMethod unavailable = sortingPrefs.getUnavailableStoredClickMethod(player);
-        if (unavailable != null) {
-            MiscUtil.alertMessage(player,
-                LanguageLoader.getColoredMessage("clickMethodNotAvailable")
-                    .replace("%method%", unavailable.toString()));
+        String storedMethod = sortingPrefs.getStoredClickMethodName(player);
+        if (storedMethod != null) {
+            try {
+                if (!ClickMethod.valueOf(storedMethod).isAvailable()) {
+                    MiscUtil.alertMessage(player,
+                        LanguageLoader.getColoredMessage("clickMethodNotAvailable")
+                            .replace("%method%", storedMethod));
+                }
+            } catch (IllegalArgumentException ignored) {}
         }
     }
 

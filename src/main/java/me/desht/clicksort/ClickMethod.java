@@ -65,13 +65,4 @@ public enum ClickMethod {
         }
     }
 
-    /** Returns the method if it is a known name but unavailable on this server version, otherwise null. */
-    public static ClickMethod unavailableFor(String name) {
-        try {
-            ClickMethod m = ClickMethod.valueOf(name);
-            return m.isAvailable() ? null : m;
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
 }

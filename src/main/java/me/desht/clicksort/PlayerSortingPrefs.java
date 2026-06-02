@@ -30,7 +30,9 @@ import xyz.chengzi.clicksort.util.DurationUtil;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class PlayerSortingPrefs {
@@ -39,6 +41,7 @@ public class PlayerSortingPrefs {
     private final Jdbi jdbi;
     private final long purgeAfter;
     private final ReentrantLock purgeLock = new ReentrantLock();
+    private final Map<UUID, SortPrefs> cache = new ConcurrentHashMap<>();
 
     public PlayerSortingPrefs(ClickSortPlugin plugin) {
         this.plugin = plugin;
@@ -51,14 +54,8 @@ public class PlayerSortingPrefs {
         return getPrefs(player).sortMethod;
     }
 
-    public ClickMethod getUnavailableStoredClickMethod(Player player) {
-        return jdbi.withHandle(handle ->
-            handle.createQuery("select click from sorting_prefs where player = ?")
-                .bind(0, player.getUniqueId())
-                .mapTo(String.class)
-                .findOne()
-                .map(ClickMethod::unavailableFor)
-                .orElse(null));
+    public String getStoredClickMethodName(Player player) {
+        return getPrefs(player).rawClickMethod;
     }
 
     public ClickMethod getClickMethod(Player player) {
@@ -88,18 +85,20 @@ public class PlayerSortingPrefs {
     }
 
     private SortPrefs getPrefs(Player player) {
-        return jdbi.withHandle(
-                handle -> handle.createQuery("select sort, click, shiftClick from sorting_prefs where player = ?")
-                        .bind(0, player.getUniqueId()).mapTo(SortPrefs.class).findOne().orElseGet(() -> {
+        return cache.computeIfAbsent(player.getUniqueId(), uuid ->
+            jdbi.withHandle(handle ->
+                handle.createQuery("select sort, click, shiftClick from sorting_prefs where player = ?")
+                        .bind(0, uuid).mapTo(SortPrefs.class).findOne().orElseGet(() -> {
                             SortPrefs prefs = new SortPrefs();
                             Debugger.getInstance()
-                                    .debug("initialise new sorting preferences for " + player.getUniqueId() + "("
+                                    .debug("initialise new sorting preferences for " + uuid + "("
                                             + player.getName() + "): " + prefs);
                             return prefs;
-                        }));
+                        })));
     }
 
     private void setPrefs(Player player, SortPrefs prefs) {
+        cache.put(player.getUniqueId(), prefs);
         jdbi.useHandle(handle -> {
             handle.execute("insert or replace into sorting_prefs values (?, ?, ?, ?)", player.getUniqueId(),
                     prefs.sortMethod, prefs.clickMethod, prefs.shiftClick);
@@ -123,7 +122,7 @@ public class PlayerSortingPrefs {
                 PreparedBatch batch = handle.prepareBatch("delete from sorting_prefs where player = ?");
                 handle.createQuery("select player from sorting_prefs").mapTo(UUID.class).stream()
                         .map(Bukkit::getOfflinePlayer).filter(o -> currentTimeMillis - o.getLastPlayed() >= purgeAfter)
-                        .map(OfflinePlayer::getUniqueId).forEach(batch::add);
+                        .map(OfflinePlayer::getUniqueId).peek(cache::remove).forEach(batch::add);
                 batch.execute();
                 Debugger.getInstance().debug("purged " + batch.size() + " rows of unseen player data");
             });
@@ -135,17 +134,20 @@ public class PlayerSortingPrefs {
     private class SortPrefs {
         public SortingMethod sortMethod;
         public ClickMethod clickMethod;
+        public String rawClickMethod;
         public boolean shiftClick;
 
         public SortPrefs() {
             sortMethod = plugin.getDefaultSortingMethod();
             clickMethod = plugin.getDefaultClickMethod();
+            rawClickMethod = null;
             shiftClick = plugin.getDefaultShiftClick();
         }
 
-        public SortPrefs(SortingMethod sortMethod, ClickMethod clickMethod, boolean shiftClick) {
+        public SortPrefs(SortingMethod sortMethod, ClickMethod clickMethod, String rawClickMethod, boolean shiftClick) {
             this.sortMethod = sortMethod;
             this.clickMethod = clickMethod;
+            this.rawClickMethod = rawClickMethod;
             this.shiftClick = shiftClick;
         }
 
@@ -158,8 +160,9 @@ public class PlayerSortingPrefs {
     private class SortPrefsMapper implements RowMapper<SortPrefs> {
         @Override
         public SortPrefs map(ResultSet rs, StatementContext ctx) throws SQLException {
-            return new SortPrefs(SortingMethod.parse(rs.getString("sort")), ClickMethod.parse(rs.getString("click")),
-                    rs.getBoolean("shiftClick"));
+            String rawClick = rs.getString("click");
+            return new SortPrefs(SortingMethod.parse(rs.getString("sort")), ClickMethod.parse(rawClick),
+                    rawClick, rs.getBoolean("shiftClick"));
         }
     }
 }
