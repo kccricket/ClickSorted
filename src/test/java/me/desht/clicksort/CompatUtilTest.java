@@ -42,6 +42,13 @@ class CompatUtilTest {
         assertEquals(27, CompatUtil.parseSubVersion("27.1.2-R0.1-SNAPSHOT"));
     }
 
+    @Test
+    void subVersion_malformed_singleComponent() {
+        // Bug fix: "1" with no minor component (e.g. "1-R0.1-SNAPSHOT") must not throw
+        // ArrayIndexOutOfBoundsException; instead it returns the safe default 0.
+        assertEquals(0, CompatUtil.parseSubVersion("1-R0.1-SNAPSHOT"));
+    }
+
     // Helper: stub GetMinecraftSubVersion() only, delegate everything else to real impl
     private void withSubVersion(int version, Runnable test) {
         try (MockedStatic<CompatUtil> compat = Mockito.mockStatic(CompatUtil.class, Mockito.CALLS_REAL_METHODS)) {
