@@ -57,14 +57,7 @@ public class PlayerSortingPrefs {
                 .bind(0, player.getUniqueId())
                 .mapTo(String.class)
                 .findOne()
-                .map(s -> {
-                    try {
-                        ClickMethod m = ClickMethod.valueOf(s);
-                        return m.isAvailable() ? null : m;
-                    } catch (IllegalArgumentException e) {
-                        return null;
-                    }
-                })
+                .map(ClickMethod::unavailableFor)
                 .orElse(null));
     }
 
