@@ -151,8 +151,8 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     }
 
     /**
-     * Inventory click handler. Run with priority HIGHEST - this makes it run late, giving protection plugins a chance to cancel the inventory click
-     * event first.
+     * Player join handler. Checks whether the joining player's stored click method is unavailable on this
+     * server version and warns them if so.
      *
      * @param event the event object
      */
