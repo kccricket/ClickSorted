@@ -94,6 +94,22 @@ class ClickMethodTest {
     }
 
     @Test
+    void isUnknownName_knownNames_false() {
+        assertFalse(ClickMethod.isUnknownName("MIDDLE"));
+        assertFalse(ClickMethod.isUnknownName("DOUBLE"));
+        assertFalse(ClickMethod.isUnknownName("SINGLE"));
+        assertFalse(ClickMethod.isUnknownName("SWAP"));
+        assertFalse(ClickMethod.isUnknownName("NONE"));
+    }
+
+    @Test
+    void isUnknownName_unknownName_true() {
+        assertTrue(ClickMethod.isUnknownName("BOGUS"));
+        assertTrue(ClickMethod.isUnknownName("LEFT_CLICK"));
+        assertTrue(ClickMethod.isUnknownName(""));
+    }
+
+    @Test
     void unavailableFor_alwaysAvailableMethod_null() {
         assertNull(ClickMethod.unavailableFor("DOUBLE"));
         assertNull(ClickMethod.unavailableFor("SINGLE"));
