@@ -1,8 +1,8 @@
 package me.desht.clicksort;
 
 import me.desht.dhutils.Debugger;
-import me.desht.dhutils.JARUtil;
 import me.desht.dhutils.LogUtils;
+import xyz.chengzi.clicksort.util.ResourceUpdater;
 import org.bukkit.Material;
 import org.bukkit.configuration.Configuration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -22,7 +22,7 @@ public class ItemGrouping {
         this.mapping = new HashMap<String, String>();
         this.plugin = plugin;
 
-        new JARUtil(plugin).extractResource(MAP_FILE, plugin.getDataFolder());
+        ResourceUpdater.update(plugin, MAP_FILE);
     }
 
     public void load() {

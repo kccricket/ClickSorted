@@ -18,7 +18,6 @@ package xyz.chengzi.clicksort.util;
  */
 
 import me.desht.clicksort.ClickSortPlugin;
-import me.desht.dhutils.JARUtil;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -70,8 +69,8 @@ public final class LocalUtil {
     public static void init(final Plugin plugin) {
         log = plugin.getLogger();
         if (config == null) {
-            new JARUtil(plugin).extractResource(CONFIG_NAME, plugin.getDataFolder());
-            config = YamlConfiguration.loadConfiguration(file = new File(plugin.getDataFolder(), CONFIG_NAME));
+            file = new File(plugin.getDataFolder(), CONFIG_NAME);
+            config = ResourceUpdater.update(plugin, CONFIG_NAME);
         }
     }
 
@@ -80,8 +79,8 @@ public final class LocalUtil {
     }
 
     public static void reload(final Plugin plugin) {
-        new JARUtil(plugin).extractResource(CONFIG_NAME, plugin.getDataFolder());
-        config = YamlConfiguration.loadConfiguration(file = new File(plugin.getDataFolder(), CONFIG_NAME));
+        file = new File(plugin.getDataFolder(), CONFIG_NAME);
+        config = ResourceUpdater.update(plugin, CONFIG_NAME);
     }
 
 

@@ -1,8 +1,8 @@
 package me.desht.clicksort;
 
 import me.desht.dhutils.Debugger;
-import me.desht.dhutils.JARUtil;
 import me.desht.dhutils.LogUtils;
+import xyz.chengzi.clicksort.util.ResourceUpdater;
 import org.bukkit.Material;
 import org.bukkit.configuration.Configuration;
 import org.bukkit.configuration.ConfigurationSection;
@@ -38,7 +38,7 @@ public class ItemValues {
         }
 
         // extract our own (blank-by-default) values.yml file
-        new JARUtil(plugin).extractResource(MAP_FILE, plugin.getDataFolder());
+        ResourceUpdater.update(plugin, MAP_FILE);
 
         available = false;
     }
