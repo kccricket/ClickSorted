@@ -18,7 +18,6 @@ package me.desht.clicksort;
  */
 
 import me.desht.dhutils.Debugger;
-import me.desht.dhutils.LogUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
