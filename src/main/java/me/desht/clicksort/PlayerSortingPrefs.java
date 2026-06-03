@@ -59,28 +59,6 @@ public class PlayerSortingPrefs {
         return getPrefs(player).rawClickMethod;
     }
 
-    /**
-     * Returns the raw stored click method name for the player if it is not a recognised
-     * ClickMethod constant (i.e. corrupt or legacy data), or null otherwise.
-     * Also logs a server-side warning when an unknown name is found.
-     */
-    public String getUnknownStoredClickMethodName(Player player) {
-        return jdbi.withHandle(handle ->
-            handle.createQuery("select click from sorting_prefs where player = ?")
-                .bind(0, player.getUniqueId())
-                .mapTo(String.class)
-                .findOne()
-                .filter(name -> {
-                    if (ClickMethod.isUnknownName(name)) {
-                        LogUtils.warning("Player " + player.getName() + " has unknown stored click method '"
-                                + name + "' - resetting to default");
-                        return true;
-                    }
-                    return false;
-                })
-                .orElse(null));
-    }
-
     public ClickMethod getClickMethod(Player player) {
         return getPrefs(player).clickMethod;
     }
