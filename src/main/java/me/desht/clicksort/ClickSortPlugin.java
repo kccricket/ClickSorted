@@ -32,6 +32,7 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.InventoryView;
@@ -157,20 +158,32 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        String storedMethod = sortingPrefs.getStoredClickMethodName(player);
-        if (storedMethod != null) {
-            try {
-                if (!ClickMethod.valueOf(storedMethod).isAvailable()) {
-                    MiscUtil.alertMessage(player,
-                        LanguageLoader.getColoredMessage("clickMethodNotAvailable")
-                            .replace("%method%", storedMethod));
-                }
-            } catch (IllegalArgumentException e) {
-                MiscUtil.alertMessage(player,
-                    LanguageLoader.getColoredMessage("clickMethodUnknown")
-                        .replace("%method%", storedMethod));
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+            String storedMethod = sortingPrefs.getStoredClickMethodName(player);
+            if (storedMethod == null) {
+                return;
             }
-        }
+            String messageKey;
+            try {
+                messageKey = ClickMethod.valueOf(storedMethod).isAvailable() ? null : "clickMethodNotAvailable";
+            } catch (IllegalArgumentException e) {
+                messageKey = "clickMethodUnknown";
+            }
+            if (messageKey != null) {
+                final String key = messageKey;
+                Bukkit.getScheduler().runTask(this, () -> {
+                    if (player.isOnline()) {
+                        MiscUtil.alertMessage(player,
+                            LanguageLoader.getColoredMessage(key).replace("%method%", storedMethod));
+                    }
+                });
+            }
+        });
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        sortingPrefs.unload(event.getPlayer());
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)

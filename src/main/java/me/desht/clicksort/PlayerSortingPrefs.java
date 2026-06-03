@@ -58,6 +58,10 @@ public class PlayerSortingPrefs {
         return getPrefs(player).rawClickMethod;
     }
 
+    public void unload(Player player) {
+        cache.remove(player.getUniqueId());
+    }
+
     public ClickMethod getClickMethod(Player player) {
         return getPrefs(player).clickMethod;
     }
