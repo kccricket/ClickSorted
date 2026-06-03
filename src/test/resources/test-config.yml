@@ -1,5 +1,5 @@
 # Test-only config — keeps tests hermetic and fast.
-# Disables bStats network activity and shrinks purge timers.
+# Disables bStats network activity.
 enable_metrics: false
 debug_level: 0
 drop_excess: true
@@ -13,10 +13,6 @@ defaults:
   shift_click: true
 player_sort_min: 9
 player_sort_max: 36
-# Disable the autopurge timer; purge() is called directly in tests.
-autopurge_seconds: 0
-# 1d: DurationUtil produces "P1d" which Duration.parse handles correctly on all Java versions.
-purge_after: 1d
 sortable_inventories:
   - "PLAYER"
   - "CHEST"

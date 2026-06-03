@@ -32,17 +32,14 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
 import xyz.chengzi.clicksort.util.LocalUtil;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -51,7 +48,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     private final CooldownMessager messager = new CooldownMessager();
     private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
-    private BukkitTask purgeTask;
     private ItemGrouping itemGroups;
     private ItemValues itemValues;
     private List<InventoryType> sortableInventories;
@@ -75,7 +71,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         getConfig().options().setHeader(List.of("See https://dev.bukkit.org/projects/clicksort/pages/configuration"));
         getConfig().options().copyDefaults(true);
         getConfig().set("log_level", null); // superseded by debug_level
-        getConfig().set("autosave_seconds", null); // superseded by autopurge_seconds
+        getConfig().set("autosave_seconds", null); // legacy key, no longer used
         saveConfig();
 
         Debugger.getInstance().setPrefix("[ClickSort] ");
@@ -90,7 +86,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         cmds.registerCommand(new ShiftClickCommand());
 
         sortingPrefs = new PlayerSortingPrefs(this);
-        sortingPrefs.load();
 
         itemGroups = new ItemGrouping(this);
         itemGroups.load();
@@ -104,11 +99,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        if (purgeTask != null) {
-            purgeTask.cancel();
-        }
         LocalUtil.save();
-
         instance = null;
     }
 
@@ -118,14 +109,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
     public CooldownMessager getMessager() {
         return messager;
-    }
-
-    public Path saveDefaultResource(String resourcePath) {
-        Path path = getDataFolder().toPath().resolve(resourcePath);
-        if (!path.toFile().exists()) {
-            saveResource(resourcePath, false);
-        }
-        return path;
     }
 
     /**
@@ -158,36 +141,20 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        // Capture UUID and name on the main thread; the Player object must not be
-        // dereferenced from the async lambda (Bukkit API threading contract).
-        UUID uuid = player.getUniqueId();
-        String name = player.getName();
-        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-            String storedMethod = sortingPrefs.getStoredClickMethodName(uuid, name);
-            if (storedMethod == null) {
-                return;
-            }
-            String messageKey;
-            try {
-                messageKey = ClickMethod.valueOf(storedMethod).isAvailable() ? null : "clickMethodNotAvailable";
-            } catch (IllegalArgumentException e) {
-                messageKey = "clickMethodUnknown";
-            }
-            if (messageKey != null) {
-                final String key = messageKey;
-                Bukkit.getScheduler().runTask(this, () -> {
-                    if (player.isOnline()) {
-                        MiscUtil.alertMessage(player,
-                            LanguageLoader.getColoredMessage(key).replace("%method%", storedMethod));
-                    }
-                });
-            }
-        });
-    }
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        sortingPrefs.unload(event.getPlayer());
+        String storedMethod = sortingPrefs.getStoredClickMethodName(player);
+        if (storedMethod == null) {
+            return;
+        }
+        String messageKey;
+        try {
+            messageKey = ClickMethod.valueOf(storedMethod).isAvailable() ? null : "clickMethodNotAvailable";
+        } catch (IllegalArgumentException e) {
+            messageKey = "clickMethodUnknown";
+        }
+        if (messageKey != null) {
+            MiscUtil.alertMessage(player,
+                LanguageLoader.getColoredMessage(messageKey).replace("%method%", storedMethod));
+        }
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
@@ -289,7 +256,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
     public void processConfig() {
         validateClickMode();
-        setupPurgeTask();
 
         MiscUtil.setColouredConsole(getConfig().getBoolean("coloured_console"));
 
@@ -304,28 +270,12 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         }).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
-    /**
-     * Purge unseen player sorting data periodically if necessary
-     */
     private void validateClickMode() {
         String configured = getConfig().getString("defaults.click_mode");
         if (ClickMethod.resolveAvailable(configured) == null) {
             LogUtils.warning("Configured click_mode '" + configured
                 + "' is invalid or unavailable on this server version; defaulting to "
                 + ClickMethod.preferredDefault());
-        }
-    }
-
-    private void setupPurgeTask() {
-        if (purgeTask != null) {
-            purgeTask.cancel();
-            purgeTask = null;
-        }
-
-        int period = getConfig().getInt("autopurge_seconds");
-        if (period > 0) {
-            purgeTask = getServer().getScheduler()
-                    .runTaskTimerAsynchronously(this, () -> sortingPrefs.purge(), 0L, 20L * period);
         }
     }
 
