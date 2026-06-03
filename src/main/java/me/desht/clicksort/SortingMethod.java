@@ -23,7 +23,7 @@ import org.bukkit.inventory.ItemStack;
  */
 
 public enum SortingMethod {
-    ID, NAME, GROUP, VALUE;
+    ID, NAME, GROUP;
 
     public SortingMethod next() {
         int o = (ordinal() + 1) % values().length;
@@ -34,7 +34,6 @@ public enum SortingMethod {
         return switch (this) {
             case ID -> CompatUtil.isMaterialIdAllowed();
             case GROUP -> ClickSortPlugin.getInstance().getItemGrouping().isAvailable();
-            case VALUE -> ClickSortPlugin.getInstance().getItemValues().isAvailable();
             default -> true;
         };
     }
@@ -47,9 +46,6 @@ public enum SortingMethod {
             case GROUP:
                 String grp = ClickSortPlugin.getInstance().getItemGrouping().getGroup(stack);
                 return String.format("%s-%s", grp, stack.getType());
-            case VALUE:
-                double value = ClickSortPlugin.getInstance().getItemValues().getValue(stack);
-                return String.format("%08.2f", value);
             default:
                 return "";
         }

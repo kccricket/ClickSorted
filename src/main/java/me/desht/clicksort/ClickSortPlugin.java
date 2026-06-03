@@ -51,7 +51,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
     private ItemGrouping itemGroups;
-    private ItemValues itemValues;
     private List<InventoryType> sortableInventories;
 
     private static ClickSortPlugin instance = null;
@@ -91,9 +90,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
         itemGroups = new ItemGrouping(this);
         itemGroups.load();
-        itemValues = new ItemValues(this);
-        itemValues.load();
-
         LocalUtil.init(this);
 
         processConfig();
@@ -122,10 +118,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
     public ItemGrouping getItemGrouping() {
         return itemGroups;
-    }
-
-    public ItemValues getItemValues() {
-        return itemValues;
     }
 
     public SortingMethod getDefaultSortingMethod() {
