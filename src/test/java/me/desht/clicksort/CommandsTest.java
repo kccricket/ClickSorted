@@ -41,14 +41,8 @@ class CommandsTest extends AbstractClickSortTest {
         server.dispatchCommand(player, "clicksort sort NAME");
 
         // The command sends "Sorting method has been set to: NAME" (with colour prefix).
-        boolean found = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains("NAME") || msg.contains("Sorting method")) {
-                found = true;
-            }
-        }
-        assertTrue(found, "Expected sort-mode status message");
+        assertTrue(anyMessageContains(player, "NAME", "Sorting method"),
+                "Expected sort-mode status message");
     }
 
     @Test
@@ -91,14 +85,8 @@ class CommandsTest extends AbstractClickSortTest {
 
         server.dispatchCommand(player, "clicksort click DOUBLE");
 
-        boolean found = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains("DOUBLE") || msg.contains("Click method")) {
-                found = true;
-            }
-        }
-        assertTrue(found, "Expected click-mode status message");
+        assertTrue(anyMessageContains(player, "DOUBLE", "Click method"),
+                "Expected click-mode status message");
     }
 
     // --- shiftclick ---
@@ -126,14 +114,8 @@ class CommandsTest extends AbstractClickSortTest {
 
         server.dispatchCommand(player, "clicksort shiftclick");
 
-        boolean found = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains("ENABLED") || msg.contains("DISABLED") || msg.contains("Shift-click")) {
-                found = true;
-            }
-        }
-        assertTrue(found, "Expected shift-click status message");
+        assertTrue(anyMessageContains(player, "ENABLED", "DISABLED", "Shift-click"),
+                "Expected shift-click status message");
     }
 
     // --- reload (op-only) ---
@@ -146,14 +128,8 @@ class CommandsTest extends AbstractClickSortTest {
 
         assertDoesNotThrow(() -> server.dispatchCommand(player, "clicksort reload"));
 
-        boolean found = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains("reloaded") || msg.contains("reload") || msg.contains("configurations")) {
-                found = true;
-            }
-        }
-        assertTrue(found, "Op player should receive reload-confirmation message");
+        assertTrue(anyMessageContains(player, "reloaded", "reload", "configurations"),
+                "Op player should receive reload-confirmation message");
     }
 
     @Test
@@ -165,14 +141,8 @@ class CommandsTest extends AbstractClickSortTest {
         server.dispatchCommand(player, "clicksort reload");
 
         // Should receive an error/denied message, not a reload-success message.
-        boolean reloadSuccess = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains("reloaded") || msg.contains("configurations")) {
-                reloadSuccess = true;
-            }
-        }
-        assertFalse(reloadSuccess, "Non-op player should not be able to reload");
+        assertFalse(anyMessageContains(player, "reloaded", "configurations"),
+                "Non-op player should not be able to reload");
     }
 
     // --- debug (op-only) ---
@@ -186,14 +156,8 @@ class CommandsTest extends AbstractClickSortTest {
         // Set debug level to 2.
         server.dispatchCommand(player, "clicksort debug 2");
 
-        boolean found = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains("2") || msg.contains("Debug") || msg.contains("debug")) {
-                found = true;
-            }
-        }
-        assertTrue(found, "Expected debug-level status message");
+        assertTrue(anyMessageContains(player, "2", "Debug", "debug"),
+                "Expected debug-level status message");
     }
 
     // --- getcfg (op-only) ---
@@ -207,13 +171,7 @@ class CommandsTest extends AbstractClickSortTest {
         server.dispatchCommand(player, "clicksort getcfg");
 
         // Should receive at least one line containing a config key.
-        boolean found = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains("=") || msg.contains("defaults") || msg.contains("sort") || msg.contains("click")) {
-                found = true;
-            }
-        }
-        assertTrue(found, "getcfg should output config key/value pairs");
+        assertTrue(anyMessageContains(player, "=", "defaults", "sort", "click"),
+                "getcfg should output config key/value pairs");
     }
 }

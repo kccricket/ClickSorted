@@ -1,6 +1,5 @@
 package me.desht.clicksort;
 
-import org.jdbi.v3.core.Jdbi;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
@@ -16,24 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class PlayerSortingPrefsTest extends AbstractClickSortTest {
 
-    // --- Reflection helpers ---
-
-    private Jdbi jdbi() throws Exception {
-        Field f = PlayerSortingPrefs.class.getDeclaredField("jdbi");
-        f.setAccessible(true);
-        return (Jdbi) f.get(plugin.getSortingPrefs());
-    }
-
-    private Map<UUID, ?> cache() throws Exception {
-        Field f = PlayerSortingPrefs.class.getDeclaredField("cache");
-        f.setAccessible(true);
-        //noinspection unchecked
-        return (Map<UUID, ?>) f.get(plugin.getSortingPrefs());
-    }
-
-    private void evictFromCache(UUID uuid) throws Exception {
-        cache().remove(uuid);
-    }
+    // --- Test-local helpers ---
 
     /** Returns true if the given UUID has a row in the sorting_prefs table. */
     private boolean existsInDb(UUID uuid) throws Exception {

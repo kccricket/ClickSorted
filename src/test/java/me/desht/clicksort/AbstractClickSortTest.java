@@ -8,6 +8,7 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import org.jdbi.v3.core.Jdbi;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockbukkit.mockbukkit.MockBukkit;
@@ -16,8 +17,10 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Base class for ClickSort integration tests. Loads the real plugin via MockBukkit so that
@@ -122,5 +125,42 @@ abstract class AbstractClickSortTest {
     protected void drainMessages(PlayerMock player) {
         //noinspection StatementWithEmptyBody
         while (player.nextMessage() != null) {}
+    }
+
+    // --- Reflection helpers shared by PlayerSortingPrefsTest and PlayerJoinQuitTest ---
+
+    /** Returns the {@link Jdbi} instance from the plugin's {@link PlayerSortingPrefs}. */
+    protected Jdbi jdbi() throws Exception {
+        Field f = PlayerSortingPrefs.class.getDeclaredField("jdbi");
+        f.setAccessible(true);
+        return (Jdbi) f.get(plugin.getSortingPrefs());
+    }
+
+    /** Returns the internal UUID→SortPrefs cache map. */
+    protected Map<UUID, ?> cache() throws Exception {
+        Field f = PlayerSortingPrefs.class.getDeclaredField("cache");
+        f.setAccessible(true);
+        //noinspection unchecked
+        return (Map<UUID, ?>) f.get(plugin.getSortingPrefs());
+    }
+
+    /** Evict {@code uuid} from the in-memory cache so the next access reads from the DB. */
+    protected void evictFromCache(UUID uuid) throws Exception {
+        cache().remove(uuid);
+    }
+
+    /**
+     * Drains all queued messages for {@code player} and returns {@code true} if at least one
+     * of them contains any of the given {@code keywords}.  This replaces the boilerplate
+     * while-loop/found-flag pattern that was copy-pasted throughout the test suite.
+     */
+    protected boolean anyMessageContains(PlayerMock player, String... keywords) {
+        String msg;
+        while ((msg = player.nextMessage()) != null) {
+            for (String kw : keywords) {
+                if (msg.contains(kw)) return true;
+            }
+        }
+        return false;
     }
 }

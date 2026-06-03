@@ -1,11 +1,8 @@
 package me.desht.clicksort;
 
-import org.jdbi.v3.core.Jdbi;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-import java.lang.reflect.Field;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -17,31 +14,13 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class PlayerJoinQuitTest extends AbstractClickSortTest {
 
-    // --- Reflection helpers ---
-
-    private Jdbi jdbi() throws Exception {
-        Field f = PlayerSortingPrefs.class.getDeclaredField("jdbi");
-        f.setAccessible(true);
-        return (Jdbi) f.get(plugin.getSortingPrefs());
-    }
-
-    private Map<UUID, ?> cache() throws Exception {
-        Field f = PlayerSortingPrefs.class.getDeclaredField("cache");
-        f.setAccessible(true);
-        //noinspection unchecked
-        return (Map<UUID, ?>) f.get(plugin.getSortingPrefs());
-    }
+    // --- Test-local helpers ---
 
     /** Insert a row directly into the DB, bypassing the cache. */
     private void insertRow(UUID uuid, String sort, String click, boolean shiftClick) throws Exception {
         jdbi().useHandle(h ->
                 h.execute("INSERT OR REPLACE INTO sorting_prefs VALUES (?, ?, ?, ?)",
                         uuid, sort, click, shiftClick));
-    }
-
-    /** Evict the given UUID from the in-memory cache so the next access reads the DB. */
-    private void evictFromCache(UUID uuid) throws Exception {
-        cache().remove(uuid);
     }
 
     // --- Tests ---
@@ -76,15 +55,8 @@ class PlayerJoinQuitTest extends AbstractClickSortTest {
         waitForJoinHandler();
 
         // Find the alert in the message queue (there may also be a join broadcast).
-        boolean found = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains("COMPLETELY_BOGUS_METHOD") || msg.contains("not recognised")) {
-                found = true;
-                break;
-            }
-        }
-        assertTrue(found, "Expected 'clickMethodUnknown' alert but none was received");
+        assertTrue(anyMessageContains(player, "COMPLETELY_BOGUS_METHOD", "not recognised"),
+                "Expected 'clickMethodUnknown' alert but none was received");
     }
 
     @Test

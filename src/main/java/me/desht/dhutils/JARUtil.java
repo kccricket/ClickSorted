@@ -46,14 +46,17 @@ public class JARUtil {
                         + ", file-exists=" + of.exists() + ", jar-last-mod="
                         + (jarFile != null ? jarFile.lastModified() : "n/a") + ", when=" + when);
 
-        // if the file exists and is newer than the JAR, then we'll leave it
-        // alone
-        if (of.exists() && when == ExtractWhen.IF_NOT_EXISTS) {
-            return;
-        }
-        if (jarFile != null && of.exists() && of.lastModified() > jarFile.lastModified()
-                && when != ExtractWhen.ALWAYS) {
-            return;
+        // if the file exists and we don't need to overwrite, leave it alone
+        if (of.exists() && when != ExtractWhen.ALWAYS) {
+            if (when == ExtractWhen.IF_NOT_EXISTS) {
+                return;
+            }
+            // IF_NEWER: preserve the file unless we can positively prove the JAR is newer.
+            // When jarFile == null (e.g. tests, OSGi loaders) we have no JAR timestamp, so
+            // we conservatively keep the existing file rather than clobbering user edits.
+            if (jarFile == null || of.lastModified() >= jarFile.lastModified()) {
+                return;
+            }
         }
 
         if (!from.startsWith("/")) {

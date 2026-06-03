@@ -50,19 +50,28 @@ public enum ClickMethod {
     }
 
     public static ClickMethod parse(String clickMethod) {
-        return parse(clickMethod, ClickSortPlugin.getInstance().getDefaultClickMethod());
+        ClickSortPlugin inst = ClickSortPlugin.getInstance();
+        return parse(clickMethod, inst != null ? inst.getDefaultClickMethod()
+                                               : ClickMethod.preferredDefault());
+    }
+
+    /**
+     * Returns the matching {@code ClickMethod} if {@code name} is a known, available enum
+     * constant; returns {@code null} if the name is unrecognised or the method is not
+     * available on this server version.
+     */
+    public static ClickMethod resolveAvailable(String name) {
+        try {
+            ClickMethod m = ClickMethod.valueOf(name);
+            return m.isAvailable() ? m : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public static ClickMethod parse(String clickMethod, ClickMethod defaultMethod) {
-        try {
-            ClickMethod method = ClickMethod.valueOf(clickMethod);
-            if (!method.isAvailable()) {
-                method = defaultMethod;
-            }
-            return method;
-        } catch (IllegalArgumentException e) {
-            return defaultMethod;
-        }
+        ClickMethod m = resolveAvailable(clickMethod);
+        return m != null ? m : defaultMethod;
     }
 
 }
