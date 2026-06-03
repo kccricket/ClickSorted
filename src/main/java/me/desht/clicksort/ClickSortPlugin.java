@@ -150,6 +150,21 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         return getConfig().getBoolean("defaults.shift_click");
     }
 
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+            ClickMethod unavailable = sortingPrefs.getUnavailableStoredClickMethod(player);
+            if (unavailable != null) {
+                Bukkit.getScheduler().runTask(this, () ->
+                    MiscUtil.alertMessage(player,
+                        LanguageLoader.getColoredMessage("clickMethodNotAvailable")
+                            .replace("%method%", unavailable.toString()))
+                );
+            }
+        });
+    }
+
     /**
      * Player join handler. Checks whether the joining player's stored click method is unavailable on this
      * server version and warns them if so.
