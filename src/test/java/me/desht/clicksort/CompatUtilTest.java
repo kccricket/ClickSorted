@@ -44,8 +44,6 @@ class CompatUtilTest {
 
     @Test
     void subVersion_malformed_singleComponent() {
-        // Bug fix: "1" with no minor component (e.g. "1-R0.1-SNAPSHOT") must not throw
-        // ArrayIndexOutOfBoundsException; instead it returns the safe default 0.
         assertEquals(0, CompatUtil.parseSubVersion("1-R0.1-SNAPSHOT"));
     }
 

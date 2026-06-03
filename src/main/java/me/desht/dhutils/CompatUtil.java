@@ -13,7 +13,6 @@ public class CompatUtil {
         // Old format: 1.X.Y → use X. New format: YEAR.MINOR.PATCH → use YEAR.
         if (parts[0].equals("1")) {
             if (parts.length < 2) {
-                // Malformed version string with no minor component; return safe default.
                 return 0;
             }
             return Integer.parseInt(parts[1]);

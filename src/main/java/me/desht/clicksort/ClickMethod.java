@@ -65,26 +65,4 @@ public enum ClickMethod {
         }
     }
 
-    /** Returns the method if it is a known name but unavailable on this server version, otherwise null. */
-    public static ClickMethod unavailableFor(String name) {
-        try {
-            ClickMethod m = ClickMethod.valueOf(name);
-            return m.isAvailable() ? null : m;
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    /**
-     * Returns true if the given name is not a recognised ClickMethod constant.
-     * Use this to detect corrupt or legacy stored preference values.
-     */
-    public static boolean isUnknownName(String name) {
-        try {
-            ClickMethod.valueOf(name);
-            return false;
-        } catch (IllegalArgumentException e) {
-            return true;
-        }
-    }
 }
