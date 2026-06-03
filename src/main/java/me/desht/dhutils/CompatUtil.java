@@ -11,7 +11,13 @@ public class CompatUtil {
         String minecraftVersion = versionString.split("-")[0];
         String[] parts = minecraftVersion.split("\\.");
         // Old format: 1.X.Y → use X. New format: YEAR.MINOR.PATCH → use YEAR.
-        return Integer.parseInt(parts[0].equals("1") ? parts[1] : parts[0]);
+        if (parts[0].equals("1")) {
+            if (parts.length < 2) {
+                return 0;
+            }
+            return Integer.parseInt(parts[1]);
+        }
+        return Integer.parseInt(parts[0]);
     }
 
     public static boolean isMaterialIdAllowed() {

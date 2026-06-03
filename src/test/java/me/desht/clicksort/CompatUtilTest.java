@@ -42,6 +42,11 @@ class CompatUtilTest {
         assertEquals(27, CompatUtil.parseSubVersion("27.1.2-R0.1-SNAPSHOT"));
     }
 
+    @Test
+    void subVersion_malformed_singleComponent() {
+        assertEquals(0, CompatUtil.parseSubVersion("1-R0.1-SNAPSHOT"));
+    }
+
     // Helper: stub GetMinecraftSubVersion() only, delegate everything else to real impl
     private void withSubVersion(int version, Runnable test) {
         try (MockedStatic<CompatUtil> compat = Mockito.mockStatic(CompatUtil.class, Mockito.CALLS_REAL_METHODS)) {
