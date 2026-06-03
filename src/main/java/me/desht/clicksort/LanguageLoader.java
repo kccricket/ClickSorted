@@ -1,6 +1,8 @@
 package me.desht.clicksort;
 
-import org.bukkit.ChatColor;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -10,6 +12,7 @@ import java.io.InputStreamReader;
 
 public class LanguageLoader {
     private static final String FILE_NAME = "lang.yml";
+    private static final MiniMessage MM = MiniMessage.miniMessage();
 
     private static ClickSortPlugin plugin;
     private static File configFile;
@@ -18,7 +21,6 @@ public class LanguageLoader {
     public static void init(ClickSortPlugin plugin) {
         LanguageLoader.plugin = plugin;
         configFile = new File(plugin.getDataFolder(), FILE_NAME);
-
         saveDefault();
         load();
     }
@@ -28,7 +30,6 @@ public class LanguageLoader {
     }
 
     public static void saveDefault() {
-        // Prevent Bukkit from giving out warnings
         if (!configFile.exists()) {
             plugin.saveResource(FILE_NAME, false);
         }
@@ -37,11 +38,9 @@ public class LanguageLoader {
     public static void load() {
         config = YamlConfiguration.loadConfiguration(configFile);
         InputStream defaultConfigStream = plugin.getResource(FILE_NAME);
-
         if (defaultConfigStream != null) {
             InputStreamReader configReader = new InputStreamReader(defaultConfigStream);
-            YamlConfiguration defaultConfig = YamlConfiguration
-                    .loadConfiguration(configReader);
+            YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(configReader);
             config.setDefaults(defaultConfig);
         }
     }
@@ -55,16 +54,7 @@ public class LanguageLoader {
         return msg != null ? msg : def;
     }
 
-    public static String getColoredMessage(String path) {
-        return getColoredString(getMessage(path));
-    }
-
-    public static String getColoredMessage(String path, String def) {
-        String colorMsg = getColoredString(config.getString(path));
-        return colorMsg != null ? colorMsg : def;
-    }
-
-    private static String getColoredString(String str) {
-        return str == null ? null : ChatColor.translateAlternateColorCodes('&', str);
+    public static Component getColoredMessage(String path, TagResolver... resolvers) {
+        return MM.deserialize(getMessage(path), resolvers);
     }
 }

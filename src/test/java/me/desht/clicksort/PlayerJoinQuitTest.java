@@ -5,7 +5,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockbukkit.mockbukkit.matcher.command.MessageTargetReceivedAnyMessageMatcher.hasNotReceivedAny;
 
 /**
  * Tests for ClickSortPlugin.onPlayerJoin and the interaction with PlayerSortingPrefs.
@@ -29,7 +31,7 @@ class PlayerJoinQuitTest extends AbstractClickSortTest {
         // A brand-new player with no PDC key should not receive any plugin alert on join.
         PlayerMock player = server.addPlayer("Alice");
         player.setOp(true);
-        player.assertNoMoreSaid();
+        assertThat(player, hasNotReceivedAny());
     }
 
     @Test
@@ -65,7 +67,7 @@ class PlayerJoinQuitTest extends AbstractClickSortTest {
         player.disconnect();
         player.reconnect();
 
-        player.assertNoMoreSaid();
+        assertThat(player, hasNotReceivedAny());
     }
 
     @Test
@@ -80,7 +82,7 @@ class PlayerJoinQuitTest extends AbstractClickSortTest {
         player.disconnect();
         player.reconnect();
 
-        player.assertNoMoreSaid();
+        assertThat(player, hasNotReceivedAny());
     }
 
     @Test

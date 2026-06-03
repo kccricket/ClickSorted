@@ -5,6 +5,7 @@ import me.desht.dhutils.DHUtilsException;
 import me.desht.dhutils.Debugger;
 import me.desht.dhutils.MiscUtil;
 import me.desht.dhutils.commands.AbstractCommand;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
@@ -26,14 +27,13 @@ public class DebugCommand extends AbstractCommand {
                 Debugger.getInstance().setLevel(Integer.parseInt(args[0]));
             } catch (NumberFormatException e) {
                 throw new DHUtilsException(LanguageLoader.getColoredMessage(
-                        "invaildDebugLevel").replace("%level%", args[0]));
+                        "invalidDebugLevel", Placeholder.unparsed("level", args[0])));
             }
         }
 
-        MiscUtil.statusMessage(
-                sender,
-                LanguageLoader.getColoredMessage("setDebugLevelTo").replace("%level%",
-                        String.valueOf(Debugger.getInstance().getLevel())));
+        MiscUtil.statusMessage(sender,
+                LanguageLoader.getColoredMessage("setDebugLevelTo",
+                        Placeholder.unparsed("level", String.valueOf(Debugger.getInstance().getLevel()))));
         return true;
     }
 }

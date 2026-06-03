@@ -19,6 +19,7 @@ package xyz.chengzi.clicksort.util;
 
 import me.desht.clicksort.ClickSortPlugin;
 import me.desht.dhutils.JARUtil;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
@@ -38,14 +39,14 @@ public final class LocalUtil {
     public static String getItemFullName(final ItemStack i) {
         final String name = getItemName(getItemType(i));
         if (i.hasItemMeta() && i.getItemMeta().hasDisplayName()) {
-            return name + " (" + i.getItemMeta().getDisplayName() + ")";
+            return name + " (" + PlainTextComponentSerializer.plainText().serialize(i.getItemMeta().displayName()) + ")";
         }
         return name;
     }
 
     public static String getItemName(final ItemStack i) {
         if (i.hasItemMeta() && i.getItemMeta().hasDisplayName()) {
-            return i.getItemMeta().getDisplayName();
+            return PlainTextComponentSerializer.plainText().serialize(i.getItemMeta().displayName());
         }
         return getItemName(getItemType(i));
     }

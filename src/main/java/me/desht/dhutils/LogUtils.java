@@ -1,6 +1,5 @@
 package me.desht.dhutils;
 
-import org.bukkit.ChatColor;
 import org.bukkit.plugin.Plugin;
 
 import java.util.logging.Handler;
@@ -95,7 +94,7 @@ public class LogUtils {
     }
 
     private static String getMsg(String message, Exception e) {
-        return message == null ? e.getMessage() : ChatColor.stripColor(message);
+        return message == null ? e.getMessage() : MiscUtil.toPlain(message);
     }
 
 }

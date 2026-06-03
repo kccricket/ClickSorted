@@ -8,6 +8,7 @@ import me.desht.dhutils.CompatUtil;
 import me.desht.dhutils.DHValidate;
 import me.desht.dhutils.MiscUtil;
 import me.desht.dhutils.commands.AbstractCommand;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -34,13 +35,12 @@ public class ChangeSortModeCommand extends AbstractCommand {
             PlayerSortingPrefs prefs = ((ClickSortPlugin) plugin).getSortingPrefs();
             SortingMethod sortMethod = SortingMethod.valueOf(args[0].toUpperCase());
             DHValidate.isTrue(sortMethod.isAvailable(),
-                    LanguageLoader.getColoredMessage("sortingMethodNotAvailable")
-                            .replace("%method", sortMethod.toString()));
+                    LanguageLoader.getColoredMessage("sortingMethodNotAvailable",
+                            Placeholder.unparsed("method", sortMethod.toString())));
             prefs.setSortingMethod((Player) sender, sortMethod);
-            MiscUtil.statusMessage(
-                    sender,
-                    LanguageLoader.getColoredMessage("setSortingMethodTo").replace(
-                            "%method%", sortMethod.toString()));
+            MiscUtil.statusMessage(sender,
+                    LanguageLoader.getColoredMessage("setSortingMethodTo",
+                            Placeholder.unparsed("method", sortMethod.toString())));
         } catch (IllegalArgumentException e) {
             showUsage(sender);
         }

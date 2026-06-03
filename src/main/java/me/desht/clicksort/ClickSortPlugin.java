@@ -16,9 +16,11 @@ import me.desht.clicksort.commands.*;
 import me.desht.clicksort.events.InventorySortEvent;
 import me.desht.dhutils.*;
 import me.desht.dhutils.commands.CommandManager;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -153,7 +155,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         }
         if (messageKey != null) {
             MiscUtil.alertMessage(player,
-                LanguageLoader.getColoredMessage(messageKey).replace("%method%", storedMethod));
+                LanguageLoader.getColoredMessage(messageKey, Placeholder.unparsed("method", storedMethod)));
         }
     }
 
@@ -186,19 +188,22 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
                 } while (!sortMethod.isAvailable());
                 sortingPrefs.setSortingMethod(player, sortMethod);
                 MiscUtil.statusMessage(player,
-                        LanguageLoader.getColoredMessage("sortBy").replace("%method%", sortMethod.toString())
-                                .replace("%instruction%", clickMethod.getInstruction()));
+                        LanguageLoader.getColoredMessage("sortBy",
+                                Placeholder.unparsed("method", sortMethod.toString()),
+                                Placeholder.unparsed("instruction", clickMethod.getInstruction())));
                 messager.message(player, "leftclick", 60,
-                        ChatColor.GRAY + ChatColor.ITALIC.toString() + LanguageLoader.getColoredMessage(
-                                "shiftLeftToChange"));
+                        LanguageLoader.getColoredMessage("shiftLeftToChange")
+                                .colorIfAbsent(NamedTextColor.GRAY)
+                                .decorate(TextDecoration.ITALIC));
             } else if (event.isRightClick()) {
                 // shift-right-clicking an empty slot cycles click method for the player
                 clickMethod = clickMethod.nextAvailable();
                 sortingPrefs.setClickMethod(player, clickMethod);
                 MiscUtil.statusMessage(player, clickMethod.getInstruction());
                 messager.message(player, "rightclick", 60,
-                        ChatColor.GRAY + ChatColor.ITALIC.toString() + LanguageLoader.getColoredMessage(
-                                "shiftRightToChange"));
+                        LanguageLoader.getColoredMessage("shiftRightToChange")
+                                .colorIfAbsent(NamedTextColor.GRAY)
+                                .decorate(TextDecoration.ITALIC));
             }
             return;
         }
@@ -244,7 +249,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         try {
             return cmds.dispatch(sender, command, label, args);
         } catch (DHUtilsException e) {
-            MiscUtil.errorMessage(sender, e.getMessage());
+            MiscUtil.errorMessage(sender, e.getComponentMessage());
             return true;
         }
     }
