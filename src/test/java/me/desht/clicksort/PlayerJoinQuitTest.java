@@ -72,6 +72,8 @@ class PlayerJoinQuitTest extends AbstractClickSortTest {
         // Disconnect then reconnect; reconnect fires PlayerJoinEvent again.
         player.disconnect();
         player.reconnect();
+        // Wait for the async join handler and its inner sync follow-up to complete.
+        waitForJoinHandler();
 
         // Find the alert in the message queue (there may also be a join broadcast).
         boolean found = false;
@@ -101,6 +103,7 @@ class PlayerJoinQuitTest extends AbstractClickSortTest {
         drainMessages(player);
         player.disconnect();
         player.reconnect();
+        waitForJoinHandler();
 
         // No plugin messages should be queued.
         player.assertNoMoreSaid();
@@ -121,6 +124,7 @@ class PlayerJoinQuitTest extends AbstractClickSortTest {
 
         player.disconnect();
         player.reconnect();
+        waitForJoinHandler();
 
         // The stored method "DOUBLE" is a valid, available enum value → no alert.
         player.assertNoMoreSaid();

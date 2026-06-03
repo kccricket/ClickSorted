@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
+import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 
 import java.io.InputStream;
 import java.util.HashMap;
@@ -105,6 +106,16 @@ abstract class AbstractClickSortTest {
             }
         }
         return counts;
+    }
+
+    /**
+     * Waits for any pending async tasks to finish, then performs one scheduler tick to flush
+     * any sync tasks those async tasks may have queued.  Call this after a reconnect() to let
+     * the async onPlayerJoin handler (and its inner runTask follow-up) complete before asserting.
+     */
+    protected void waitForJoinHandler() {
+        ((BukkitSchedulerMock) server.getScheduler()).waitAsyncTasksFinished();
+        server.getScheduler().performTicks(1);
     }
 
     /** Drain and discard all queued messages for the player. */
