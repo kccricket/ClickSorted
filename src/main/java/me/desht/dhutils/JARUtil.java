@@ -6,6 +6,7 @@ import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.security.CodeSource;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -43,16 +44,19 @@ public class JARUtil {
                 2,
                 "extractResource: file=" + of + ", file-last-mod=" + of.lastModified()
                         + ", file-exists=" + of.exists() + ", jar-last-mod="
-                        + jarFile.lastModified() + ", when=" + when);
+                        + (jarFile != null ? jarFile.lastModified() : "n/a") + ", when=" + when);
 
-        // if the file exists and is newer than the JAR, then we'll leave it
-        // alone
-        if (of.exists() && when == ExtractWhen.IF_NOT_EXISTS) {
-            return;
-        }
-        if (of.exists() && of.lastModified() > jarFile.lastModified()
-                && when != ExtractWhen.ALWAYS) {
-            return;
+        // if the file exists and we don't need to overwrite, leave it alone
+        if (of.exists() && when != ExtractWhen.ALWAYS) {
+            if (when == ExtractWhen.IF_NOT_EXISTS) {
+                return;
+            }
+            // IF_NEWER: preserve the file unless we can positively prove the JAR is newer.
+            // When jarFile == null (e.g. tests, OSGi loaders) we have no JAR timestamp, so
+            // we conservatively keep the existing file rather than clobbering user edits.
+            if (jarFile == null || of.lastModified() >= jarFile.lastModified()) {
+                return;
+            }
         }
 
         if (!from.startsWith("/")) {
@@ -81,7 +85,14 @@ public class JARUtil {
     }
 
     public File getJarFile() {
-        URL url = plugin.getClass().getProtectionDomain().getCodeSource().getLocation();
+        CodeSource codeSource = plugin.getClass().getProtectionDomain().getCodeSource();
+        if (codeSource == null) {
+            return null;
+        }
+        URL url = codeSource.getLocation();
+        if (url == null) {
+            return null;
+        }
         try {
             return new File(url.toURI());
         } catch (URISyntaxException e) {

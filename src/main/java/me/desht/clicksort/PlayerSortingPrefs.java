@@ -51,11 +51,20 @@ public class PlayerSortingPrefs {
     }
 
     public SortingMethod getSortingMethod(Player player) {
-        return getPrefs(player).sortMethod;
+        return getPrefs(player.getUniqueId(), player.getName()).sortMethod;
     }
 
     public String getStoredClickMethodName(Player player) {
-        return getPrefs(player).rawClickMethod;
+        return getStoredClickMethodName(player.getUniqueId(), player.getName());
+    }
+
+    /**
+     * Off-thread-safe variant: callers on async threads must capture uuid/name from the
+     * {@link Player} object on the main thread and use this overload to avoid off-thread
+     * Bukkit API access.
+     */
+    public String getStoredClickMethodName(UUID uuid, String playerName) {
+        return getPrefs(uuid, playerName).rawClickMethod;
     }
 
     public void unload(Player player) {
@@ -63,50 +72,52 @@ public class PlayerSortingPrefs {
     }
 
     public ClickMethod getClickMethod(Player player) {
-        return getPrefs(player).clickMethod;
+        return getPrefs(player.getUniqueId(), player.getName()).clickMethod;
     }
 
     public void setSortingMethod(Player player, SortingMethod sortMethod) {
-        SortPrefs prefs = getPrefs(player);
+        SortPrefs prefs = getPrefs(player.getUniqueId(), player.getName()).copy();
         prefs.sortMethod = sortMethod;
-        setPrefs(player, prefs);
+        setPrefs(player.getUniqueId(), prefs);
     }
 
     public void setClickMethod(Player player, ClickMethod clickMethod) {
-        SortPrefs prefs = getPrefs(player);
+        SortPrefs prefs = getPrefs(player.getUniqueId(), player.getName()).copy();
         prefs.clickMethod = clickMethod;
-        setPrefs(player, prefs);
+        prefs.rawClickMethod = clickMethod.name();
+        setPrefs(player.getUniqueId(), prefs);
     }
 
     public boolean getShiftClickAllowed(Player player) {
-        return getPrefs(player).shiftClick;
+        return getPrefs(player.getUniqueId(), player.getName()).shiftClick;
     }
 
     public void setShiftClickAllowed(Player player, boolean allow) {
-        SortPrefs prefs = getPrefs(player);
+        SortPrefs prefs = getPrefs(player.getUniqueId(), player.getName()).copy();
         prefs.shiftClick = allow;
-        setPrefs(player, prefs);
+        setPrefs(player.getUniqueId(), prefs);
     }
 
-    private SortPrefs getPrefs(Player player) {
-        return cache.computeIfAbsent(player.getUniqueId(), uuid ->
+    private SortPrefs getPrefs(UUID uuid, String playerName) {
+        return cache.computeIfAbsent(uuid, id ->
             jdbi.withHandle(handle ->
                 handle.createQuery("select sort, click, shiftClick from sorting_prefs where player = ?")
-                        .bind(0, uuid).mapTo(SortPrefs.class).findOne().orElseGet(() -> {
+                        .bind(0, id).mapTo(SortPrefs.class).findOne().orElseGet(() -> {
                             SortPrefs prefs = new SortPrefs();
                             Debugger.getInstance()
-                                    .debug("initialise new sorting preferences for " + uuid + "("
-                                            + player.getName() + "): " + prefs);
+                                    .debug("initialise new sorting preferences for " + id + "("
+                                            + playerName + "): " + prefs);
                             return prefs;
                         })));
     }
 
-    private void setPrefs(Player player, SortPrefs prefs) {
-        cache.put(player.getUniqueId(), prefs);
-        jdbi.useHandle(handle -> {
-            handle.execute("insert or replace into sorting_prefs values (?, ?, ?, ?)", player.getUniqueId(),
-                    prefs.sortMethod, prefs.clickMethod, prefs.shiftClick);
-        });
+    private void setPrefs(UUID uuid, SortPrefs prefs) {
+        // Write to DB first; only update the cache on success so a Jdbi failure
+        // never leaves the cache dirty relative to the stored row.
+        jdbi.useHandle(handle ->
+            handle.execute("insert or replace into sorting_prefs values (?, ?, ?, ?)",
+                    uuid, prefs.sortMethod, prefs.clickMethod, prefs.shiftClick));
+        cache.put(uuid, prefs);
     }
 
     public void load() {
@@ -153,6 +164,11 @@ public class PlayerSortingPrefs {
             this.clickMethod = clickMethod;
             this.rawClickMethod = rawClickMethod;
             this.shiftClick = shiftClick;
+        }
+
+        /** Returns a shallow copy so setters never mutate the live cached reference. */
+        public SortPrefs copy() {
+            return new SortPrefs(sortMethod, clickMethod, rawClickMethod, shiftClick);
         }
 
         @Override

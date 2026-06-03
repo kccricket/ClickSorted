@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
 public class ClickSortPlugin extends JavaPlugin implements Listener {
     private final CommandManager cmds = new CommandManager(this);
     private final CooldownMessager messager = new CooldownMessager();
-    private final Metrics metrics = new Metrics(this, 9432);
+    private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
     private BukkitTask purgeTask;
     private ItemGrouping itemGroups;
@@ -61,6 +61,10 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         instance = this;
+
+        if (getConfig().getBoolean("enable_metrics", true)) {
+            metrics = new Metrics(this, 9432);
+        }
 
         LogUtils.init(this);
         LanguageLoader.init(this);
@@ -154,8 +158,12 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        // Capture UUID and name on the main thread; the Player object must not be
+        // dereferenced from the async lambda (Bukkit API threading contract).
+        UUID uuid = player.getUniqueId();
+        String name = player.getName();
         Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-            String storedMethod = sortingPrefs.getStoredClickMethodName(player);
+            String storedMethod = sortingPrefs.getStoredClickMethodName(uuid, name);
             if (storedMethod == null) {
                 return;
             }
@@ -301,14 +309,10 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
      */
     private void validateClickMode() {
         String configured = getConfig().getString("defaults.click_mode");
-        ClickMethod preferred = ClickMethod.preferredDefault();
-        try {
-            ClickMethod method = ClickMethod.valueOf(configured);
-            if (!method.isAvailable()) {
-                LogUtils.warning("Configured click_mode '" + configured + "' is not available on this server version; defaulting to " + preferred);
-            }
-        } catch (IllegalArgumentException e) {
-            LogUtils.warning("Invalid click_mode '" + configured + "' in config.yml; defaulting to " + preferred);
+        if (ClickMethod.resolveAvailable(configured) == null) {
+            LogUtils.warning("Configured click_mode '" + configured
+                + "' is invalid or unavailable on this server version; defaulting to "
+                + ClickMethod.preferredDefault());
         }
     }
 
