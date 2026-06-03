@@ -74,4 +74,17 @@ public enum ClickMethod {
             return null;
         }
     }
+
+    /**
+     * Returns true if the given name is not a recognised ClickMethod constant.
+     * Use this to detect corrupt or legacy stored preference values.
+     */
+    public static boolean isUnknownName(String name) {
+        try {
+            ClickMethod.valueOf(name);
+            return false;
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
+    }
 }

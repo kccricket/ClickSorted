@@ -164,6 +164,13 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
             MiscUtil.alertMessage(player,
                 LanguageLoader.getColoredMessage("clickMethodNotAvailable")
                     .replace("%method%", unavailable.toString()));
+        } else {
+            String unknownName = sortingPrefs.getUnknownStoredClickMethodName(player);
+            if (unknownName != null) {
+                MiscUtil.alertMessage(player,
+                    LanguageLoader.getColoredMessage("clickMethodUnknown")
+                        .replace("%method%", unknownName));
+            }
         }
     }
 
