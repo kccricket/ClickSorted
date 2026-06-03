@@ -1,10 +1,10 @@
 package me.desht.dhutils;
 
-import org.bukkit.ChatColor;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.CommandSender;
 
 public class Debugger {
-    private static final String DEBUG_COLOR = ChatColor.DARK_GREEN.toString();
     private static Debugger instance;
     private int level;
     private CommandSender target;
@@ -47,7 +47,7 @@ public class Debugger {
 
     public void debug(int msgLevel, String message) {
         if (msgLevel <= level && target != null) {
-            target.sendMessage(DEBUG_COLOR + prefix + message);
+            target.sendMessage(Component.text(prefix + message).color(NamedTextColor.DARK_GREEN));
         }
     }
 
@@ -55,5 +55,4 @@ public class Debugger {
     public Debugger clone() throws CloneNotSupportedException {
         throw new CloneNotSupportedException();
     }
-
 }

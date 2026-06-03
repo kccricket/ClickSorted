@@ -7,7 +7,9 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockbukkit.mockbukkit.matcher.command.MessageTargetReceivedAnyMessageMatcher.hasNotReceivedAny;
 
 class CooldownMessagerTest {
 
@@ -28,7 +30,8 @@ class CooldownMessagerTest {
     private String nextText(PlayerMock player) {
         String msg = player.nextMessage();
         assertNotNull(msg, "expected a message but none was sent");
-        // Strip legacy color codes (§X) added by MiscUtil.statusMessage
+        // Strip legacy color codes (§X) produced when MockBukkit serializes the
+        // Adventure Component returned by MiscUtil.statusMessage (colorIfAbsent AQUA).
         return msg.replaceAll("§.", "");
     }
 
@@ -37,7 +40,7 @@ class CooldownMessagerTest {
         PlayerMock player = server.addPlayer("Player1");
         messager.message(player, "test", 60, "hello");
         assertEquals("hello", nextText(player));
-        player.assertNoMoreSaid();
+        assertThat(player, hasNotReceivedAny());
     }
 
     @Test
@@ -46,7 +49,7 @@ class CooldownMessagerTest {
         messager.message(player, "test", 60, "hello");
         messager.message(player, "test", 60, "hello");
         assertEquals("hello", nextText(player));
-        player.assertNoMoreSaid();
+        assertThat(player, hasNotReceivedAny());
     }
 
     @Test
@@ -60,7 +63,7 @@ class CooldownMessagerTest {
         messager.message(player, "test", 0, "second");
         assertEquals("first", nextText(player));
         assertEquals("second", nextText(player));
-        player.assertNoMoreSaid();
+        assertThat(player, hasNotReceivedAny());
     }
 
     @Test
@@ -70,7 +73,7 @@ class CooldownMessagerTest {
         messager.message(player, "key2", 60, "msg2");
         assertEquals("msg1", nextText(player));
         assertEquals("msg2", nextText(player));
-        player.assertNoMoreSaid();
+        assertThat(player, hasNotReceivedAny());
     }
 
     @Test
@@ -81,7 +84,7 @@ class CooldownMessagerTest {
         messager.message(p2, "test", 60, "msg");
         assertEquals("msg", nextText(p1));
         assertEquals("msg", nextText(p2));
-        p1.assertNoMoreSaid();
-        p2.assertNoMoreSaid();
+        assertThat(p1, hasNotReceivedAny());
+        assertThat(p2, hasNotReceivedAny());
     }
 }

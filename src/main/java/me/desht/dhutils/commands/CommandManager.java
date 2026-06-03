@@ -9,7 +9,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-import java.lang.reflect.Modifier;
 import java.util.*;
 
 public class CommandManager {
@@ -27,32 +26,13 @@ public class CommandManager {
         cmdList.add(cmd);
     }
 
-    public void registerAllCommands(String packageName) {
-        Package p = getClass().getClassLoader().getDefinedPackage(packageName);
-        if (p == null) {
-            throw new IllegalArgumentException("Unknown package: " + packageName);
-        }
-        List<Class<?>> classes = ClassEnumerator.getClassesForPackage(plugin, p);
-        for (Class<?> c : classes) {
-            if (AbstractCommand.class.isAssignableFrom(c)
-                    && !Modifier.isAbstract(c.getModifiers())) {
-                try {
-                    registerCommand((AbstractCommand) c.getDeclaredConstructor().newInstance());
-                } catch (Exception e) {
-                    LogUtils.warning("can't register command for " + c.getName() + ": "
-                            + e.getMessage());
-                }
-            }
-        }
-    }
-
     private boolean dispatch(CommandSender sender, String cmdName, String label,
                              String[] args) {
         boolean res = true;
 
         List<AbstractCommand> possibleMatches = getPossibleMatches(cmdName, args, true);
 
-        String desc = plugin.getDescription().getFullName();
+        String desc = plugin.getPluginMeta().getDisplayName();
 
         if (possibleMatches.size() == 1) {
             // good - a unique match
@@ -89,7 +69,7 @@ public class CommandManager {
         try {
             return dispatch(sender, command.getName(), label, args);
         } catch (DHUtilsException e) {
-            MiscUtil.errorMessage(sender, e.getMessage());
+            MiscUtil.errorMessage(sender, e.getComponentMessage());
             return true;
         }
     }
@@ -116,7 +96,7 @@ public class CommandManager {
                 return possibleMatches.get(0).onTabComplete(plugin, sender,
                         subRange(args, from));
             } catch (DHUtilsException e) {
-                MiscUtil.errorMessage(sender, e.getMessage());
+                MiscUtil.errorMessage(sender, e.getComponentMessage());
                 return noCompletions(sender);
             }
         } else {

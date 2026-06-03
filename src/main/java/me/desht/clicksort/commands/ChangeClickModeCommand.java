@@ -8,6 +8,7 @@ import me.desht.dhutils.CompatUtil;
 import me.desht.dhutils.DHValidate;
 import me.desht.dhutils.MiscUtil;
 import me.desht.dhutils.commands.AbstractCommand;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -37,13 +38,12 @@ public class ChangeClickModeCommand extends AbstractCommand {
             PlayerSortingPrefs prefs = ((ClickSortPlugin) plugin).getSortingPrefs();
             ClickMethod clickMethod = ClickMethod.valueOf(args[0].toUpperCase());
             DHValidate.isTrue(clickMethod.isAvailable(),
-                    LanguageLoader.getColoredMessage("clickMethodNotAvailable")
-                            .replace("%method", clickMethod.toString()));
+                    LanguageLoader.getColoredMessage("clickMethodNotAvailable",
+                            Placeholder.unparsed("method", clickMethod.toString())));
             prefs.setClickMethod((Player) sender, clickMethod);
-            MiscUtil.statusMessage(
-                    sender,
-                    LanguageLoader.getColoredMessage("setClickMethodTo").replace(
-                            "%method%", clickMethod.toString()));
+            MiscUtil.statusMessage(sender,
+                    LanguageLoader.getColoredMessage("setClickMethodTo",
+                            Placeholder.unparsed("method", clickMethod.toString())));
         } catch (IllegalArgumentException e) {
             showUsage(sender);
         }

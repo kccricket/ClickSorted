@@ -46,5 +46,4 @@ public class ReloadCommand extends AbstractCommand {
 
         return true;
     }
-
 }

@@ -17,9 +17,8 @@ package me.desht.clicksort.commands;
  along with ClickSort.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import me.desht.dhutils.MessagePager;
+import me.desht.dhutils.MiscUtil;
 import me.desht.dhutils.commands.AbstractCommand;
-import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
@@ -32,15 +31,11 @@ public class GetcfgCommand extends AbstractCommand {
 
     @Override
     public boolean execute(Plugin plugin, CommandSender commandSender, String[] strings) {
-        MessagePager pager = MessagePager.getPager(commandSender).clear()
-                .setParseColours(true);
         for (String key : plugin.getConfig().getKeys(true)) {
             if (!plugin.getConfig().isConfigurationSection(key)) {
-                pager.add(ChatColor.WHITE + key + " = " + ChatColor.YELLOW
-                        + plugin.getConfig().get(key));
+                MiscUtil.rawMessage(commandSender, key + " = " + plugin.getConfig().get(key));
             }
         }
-        pager.showPage();
         return true;
     }
 }

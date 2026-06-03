@@ -1,7 +1,15 @@
 package me.desht.dhutils;
 
+import net.kyori.adventure.text.Component;
+
 public class DHValidate {
     public static void isTrue(boolean cond, String message) {
+        if (!cond) {
+            throw new DHUtilsException(message);
+        }
+    }
+
+    public static void isTrue(boolean cond, Component message) {
         if (!cond) {
             throw new DHUtilsException(message);
         }

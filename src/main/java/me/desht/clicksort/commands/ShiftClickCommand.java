@@ -5,6 +5,7 @@ import me.desht.clicksort.LanguageLoader;
 import me.desht.clicksort.PlayerSortingPrefs;
 import me.desht.dhutils.MiscUtil;
 import me.desht.dhutils.commands.AbstractCommand;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -27,10 +28,9 @@ public class ShiftClickCommand extends AbstractCommand {
             boolean shiftClick = prefs.getShiftClickAllowed(player);
             prefs.setShiftClickAllowed(player, !shiftClick);
             String enabled = shiftClick ? "DISABLED" : "ENABLED";
-            MiscUtil.statusMessage(
-                    sender,
-                    LanguageLoader.getColoredMessage("setShiftClickStatus").replace(
-                            "%status%", enabled));
+            MiscUtil.statusMessage(sender,
+                    LanguageLoader.getColoredMessage("setShiftClickStatus",
+                            Placeholder.unparsed("status", enabled)));
             if (shiftClick) {
                 MiscUtil.statusMessage(sender,
                         LanguageLoader.getColoredMessage("tipToReEnable"));
@@ -46,5 +46,4 @@ public class ShiftClickCommand extends AbstractCommand {
 
         return true;
     }
-
 }
