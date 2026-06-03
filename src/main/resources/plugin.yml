@@ -1,11 +1,11 @@
 name: ClickSort
 main: me.desht.clicksort.ClickSortPlugin
-authors: [ desht, chengzi ]
+authors: [ desht, chengzi, kccricket ]
 version: ${project.version}
 description: Super-convenient inventory sorting
 website: https://dev.bukkit.org/projects/clicksort
 softdepend: [ Essentials, StackableItems ]
-api-version: 1.16
+api-version: 1.13
 
 commands:
   clicksort:
