@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
 public class ClickSortPlugin extends JavaPlugin implements Listener {
     private final CommandManager cmds = new CommandManager(this);
     private final CooldownMessager messager = new CooldownMessager();
-    private final Metrics metrics = new Metrics(this, 9432);
+    private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
     private BukkitTask purgeTask;
     private ItemGrouping itemGroups;
@@ -60,6 +60,10 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         instance = this;
+
+        if (getConfig().getBoolean("enable_metrics", true)) {
+            metrics = new Metrics(this, 9432);
+        }
 
         LogUtils.init(this);
         LanguageLoader.init(this);

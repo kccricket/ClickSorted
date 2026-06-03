@@ -6,6 +6,7 @@ import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.security.CodeSource;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -43,14 +44,14 @@ public class JARUtil {
                 2,
                 "extractResource: file=" + of + ", file-last-mod=" + of.lastModified()
                         + ", file-exists=" + of.exists() + ", jar-last-mod="
-                        + jarFile.lastModified() + ", when=" + when);
+                        + (jarFile != null ? jarFile.lastModified() : "n/a") + ", when=" + when);
 
         // if the file exists and is newer than the JAR, then we'll leave it
         // alone
         if (of.exists() && when == ExtractWhen.IF_NOT_EXISTS) {
             return;
         }
-        if (of.exists() && of.lastModified() > jarFile.lastModified()
+        if (jarFile != null && of.exists() && of.lastModified() > jarFile.lastModified()
                 && when != ExtractWhen.ALWAYS) {
             return;
         }
@@ -81,7 +82,14 @@ public class JARUtil {
     }
 
     public File getJarFile() {
-        URL url = plugin.getClass().getProtectionDomain().getCodeSource().getLocation();
+        CodeSource codeSource = plugin.getClass().getProtectionDomain().getCodeSource();
+        if (codeSource == null) {
+            return null;
+        }
+        URL url = codeSource.getLocation();
+        if (url == null) {
+            return null;
+        }
         try {
             return new File(url.toURI());
         } catch (URISyntaxException e) {
