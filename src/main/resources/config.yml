@@ -14,6 +14,11 @@ player_sort_max: 36
 sortable_inventories:
   - "PLAYER"
   - "CHEST"
+  - "CHEST_MINECART"
   - "ENDER_CHEST"
   - "SHULKER_BOX"
   - "BARREL"
+  - "HOPPER"
+  - "HOPPER_MINECART"
+  - "DROPPER"
+  - "DISPENSER"
