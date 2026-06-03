@@ -21,9 +21,9 @@ public class ChangeSortModeCommand extends AbstractCommand {
         super("clicksort sort", 1, 1);
         setPermissionNode("clicksort.commands.sort");
         if (CompatUtil.isMaterialIdAllowed()) {
-            setUsage("/clicksort sort <id|name|group|value>");
+            setUsage("/clicksort sort <id|name|group>");
         } else {
-            setUsage("/clicksort sort <name|group|value>");
+            setUsage("/clicksort sort <name|group>");
         }
     }
 

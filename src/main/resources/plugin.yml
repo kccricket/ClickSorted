@@ -4,8 +4,7 @@ authors: [ desht, chengzi, kccricket ]
 version: ${project.version}
 description: Super-convenient inventory sorting
 website: https://dev.bukkit.org/projects/clicksort
-softdepend: [ Essentials, StackableItems ]
-api-version: 1.14
+api-version: 1.18
 
 commands:
   clicksort:

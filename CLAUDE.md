@@ -31,7 +31,7 @@ ClickSort is a Paper/Bukkit plugin that lets players sort inventories via config
 | `ClickSortPlugin` | Event handling, onEnable/onDisable wiring, command dispatch |
 | `PlayerSortingPrefs` | Per-player state (ClickMethod, SortingMethod, shift-click flag) stored via PDC |
 | `SortKey` | `Comparable` wrapper around an ItemStack that drives all sort ordering |
-| `SortingMethod` | Enum (NAME, ID, GROUP, VALUE) controlling `SortKey.makeSortPrefix()` |
+| `SortingMethod` | Enum (NAME, ID, GROUP) controlling `SortKey.makeSortPrefix()` |
 | `ClickMethod` | Enum (SINGLE, DOUBLE, MIDDLE, SWAP, NONE) with version-aware `isAvailable()` |
 | `me.desht.dhutils.*` | Internal utility framework: `CommandManager`, `LogUtils`, `Debugger`, `MiscUtil` |
 | `xyz.chengzi.clicksort.util.LocalUtil` | Message localization backed by `lang.yml` |
@@ -40,7 +40,7 @@ ClickSort is a Paper/Bukkit plugin that lets players sort inventories via config
 
 - `config.yml` — debug level, sortable inventory types, `player_sort_min`/`player_sort_max` slot range
 - `groups.yml` — item groupings for GROUP sort method
-- `items.yml` / `values.yml` — item-worth data for VALUE sort method
+- `items.yml` — localization store for `LocalUtil` (custom item names)
 - `lang.yml` — all user-facing messages
 
 ### Testing

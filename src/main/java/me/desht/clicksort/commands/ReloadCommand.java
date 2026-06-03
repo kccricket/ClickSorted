@@ -39,7 +39,6 @@ public class ReloadCommand extends AbstractCommand {
         csPlugin.reloadConfig();
         csPlugin.processConfig();
         csPlugin.getItemGrouping().load();
-        csPlugin.getItemValues().load();
         LanguageLoader.reload();
         LocalUtil.reload(plugin);
         MiscUtil.statusMessage(sender, LanguageLoader.getColoredMessage("configReloaded"));
