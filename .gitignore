@@ -31,3 +31,5 @@
 *.ipr
 *.iws
 
+/.vscode
+/.claude/settings.local.json
