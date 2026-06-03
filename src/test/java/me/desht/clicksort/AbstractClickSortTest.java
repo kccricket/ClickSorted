@@ -8,7 +8,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
-import org.jdbi.v3.core.Jdbi;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockbukkit.mockbukkit.MockBukkit;
@@ -17,14 +16,12 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Base class for ClickSort integration tests. Loads the real plugin via MockBukkit so that
- * all @EventHandler methods, command dispatch, and the SQLite-backed preference store are
+ * all @EventHandler methods, command dispatch, and the PDC-backed preference store are
  * exercised through the same code paths as production.
  */
 abstract class AbstractClickSortTest {
@@ -34,13 +31,8 @@ abstract class AbstractClickSortTest {
 
     @BeforeEach
     void setUpServer() throws Exception {
-        // MockBukkit loads the plugin via a custom classloader that may not delegate to the
-        // test classpath for JDBC drivers.  Load the SQLite driver explicitly here, from the
-        // test classloader, so that DriverManager can find it when the plugin opens its DB.
-        Class.forName("org.sqlite.JDBC");
-
         server = MockBukkit.mock();
-        // Use the test-config.yml fixture: disables bStats, shrinks purge timers.
+        // Use the test-config.yml fixture: disables bStats.
         InputStream configStream = getClass().getClassLoader().getResourceAsStream("test-config.yml");
         plugin = MockBukkit.loadWithConfig(ClickSortPlugin.class, configStream);
     }
@@ -113,8 +105,7 @@ abstract class AbstractClickSortTest {
 
     /**
      * Waits for any pending async tasks to finish, then performs one scheduler tick to flush
-     * any sync tasks those async tasks may have queued.  Call this after a reconnect() to let
-     * the async onPlayerJoin handler (and its inner runTask follow-up) complete before asserting.
+     * any sync tasks those async tasks may have queued.
      */
     protected void waitForJoinHandler() {
         ((BukkitSchedulerMock) server.getScheduler()).waitAsyncTasksFinished();
@@ -127,32 +118,9 @@ abstract class AbstractClickSortTest {
         while (player.nextMessage() != null) {}
     }
 
-    // --- Reflection helpers shared by PlayerSortingPrefsTest and PlayerJoinQuitTest ---
-
-    /** Returns the {@link Jdbi} instance from the plugin's {@link PlayerSortingPrefs}. */
-    protected Jdbi jdbi() throws Exception {
-        Field f = PlayerSortingPrefs.class.getDeclaredField("jdbi");
-        f.setAccessible(true);
-        return (Jdbi) f.get(plugin.getSortingPrefs());
-    }
-
-    /** Returns the internal UUID→SortPrefs cache map. */
-    protected Map<UUID, ?> cache() throws Exception {
-        Field f = PlayerSortingPrefs.class.getDeclaredField("cache");
-        f.setAccessible(true);
-        //noinspection unchecked
-        return (Map<UUID, ?>) f.get(plugin.getSortingPrefs());
-    }
-
-    /** Evict {@code uuid} from the in-memory cache so the next access reads from the DB. */
-    protected void evictFromCache(UUID uuid) throws Exception {
-        cache().remove(uuid);
-    }
-
     /**
      * Drains all queued messages for {@code player} and returns {@code true} if at least one
-     * of them contains any of the given {@code keywords}.  This replaces the boilerplate
-     * while-loop/found-flag pattern that was copy-pasted throughout the test suite.
+     * of them contains any of the given {@code keywords}.
      */
     protected boolean anyMessageContains(PlayerMock player, String... keywords) {
         String msg;

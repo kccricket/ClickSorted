@@ -17,172 +17,52 @@ package me.desht.clicksort;
  along with ClickSort.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import me.desht.dhutils.Debugger;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.jdbi.v3.core.Jdbi;
-import org.jdbi.v3.core.mapper.RowMapper;
-import org.jdbi.v3.core.statement.PreparedBatch;
-import org.jdbi.v3.core.statement.StatementContext;
-import org.jdbi.v3.sqlite3.SQLitePlugin;
-import xyz.chengzi.clicksort.util.DurationUtil;
-
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
+import org.bukkit.persistence.PersistentDataType;
 
 public class PlayerSortingPrefs {
-    private static final String SORT_PREFS_FILE_NAME = "sorting_prefs.sqlite";
     private final ClickSortPlugin plugin;
-    private final Jdbi jdbi;
-    private final long purgeAfter;
-    private final ReentrantLock purgeLock = new ReentrantLock();
-    private final Map<UUID, SortPrefs> cache = new ConcurrentHashMap<>();
+    private final NamespacedKey sortKey;
+    private final NamespacedKey clickKey;
+    private final NamespacedKey shiftClickKey;
 
     public PlayerSortingPrefs(ClickSortPlugin plugin) {
         this.plugin = plugin;
-        this.jdbi = Jdbi.create("jdbc:sqlite:" + plugin.saveDefaultResource(SORT_PREFS_FILE_NAME))
-                .installPlugin(new SQLitePlugin()).registerRowMapper(new SortPrefsMapper());
-        this.purgeAfter = DurationUtil.toMillis(plugin.getConfig().getString("purge_after"));
+        this.sortKey = new NamespacedKey(plugin, "sort");
+        this.clickKey = new NamespacedKey(plugin, "click");
+        this.shiftClickKey = new NamespacedKey(plugin, "shift_click");
     }
 
     public SortingMethod getSortingMethod(Player player) {
-        return getPrefs(player.getUniqueId(), player.getName()).sortMethod;
-    }
-
-    public String getStoredClickMethodName(Player player) {
-        return getStoredClickMethodName(player.getUniqueId(), player.getName());
-    }
-
-    /**
-     * Off-thread-safe variant: callers on async threads must capture uuid/name from the
-     * {@link Player} object on the main thread and use this overload to avoid off-thread
-     * Bukkit API access.
-     */
-    public String getStoredClickMethodName(UUID uuid, String playerName) {
-        return getPrefs(uuid, playerName).rawClickMethod;
-    }
-
-    public void unload(Player player) {
-        cache.remove(player.getUniqueId());
-    }
-
-    public ClickMethod getClickMethod(Player player) {
-        return getPrefs(player.getUniqueId(), player.getName()).clickMethod;
+        String stored = player.getPersistentDataContainer().get(sortKey, PersistentDataType.STRING);
+        return stored != null ? SortingMethod.parse(stored) : plugin.getDefaultSortingMethod();
     }
 
     public void setSortingMethod(Player player, SortingMethod sortMethod) {
-        SortPrefs prefs = getPrefs(player.getUniqueId(), player.getName()).copy();
-        prefs.sortMethod = sortMethod;
-        setPrefs(player.getUniqueId(), prefs);
+        player.getPersistentDataContainer().set(sortKey, PersistentDataType.STRING, sortMethod.name());
+    }
+
+    public ClickMethod getClickMethod(Player player) {
+        String stored = player.getPersistentDataContainer().get(clickKey, PersistentDataType.STRING);
+        return stored != null ? ClickMethod.parse(stored) : plugin.getDefaultClickMethod();
     }
 
     public void setClickMethod(Player player, ClickMethod clickMethod) {
-        SortPrefs prefs = getPrefs(player.getUniqueId(), player.getName()).copy();
-        prefs.clickMethod = clickMethod;
-        prefs.rawClickMethod = clickMethod.name();
-        setPrefs(player.getUniqueId(), prefs);
+        player.getPersistentDataContainer().set(clickKey, PersistentDataType.STRING, clickMethod.name());
     }
 
     public boolean getShiftClickAllowed(Player player) {
-        return getPrefs(player.getUniqueId(), player.getName()).shiftClick;
+        Byte stored = player.getPersistentDataContainer().get(shiftClickKey, PersistentDataType.BYTE);
+        return stored != null ? stored != 0 : plugin.getDefaultShiftClick();
     }
 
     public void setShiftClickAllowed(Player player, boolean allow) {
-        SortPrefs prefs = getPrefs(player.getUniqueId(), player.getName()).copy();
-        prefs.shiftClick = allow;
-        setPrefs(player.getUniqueId(), prefs);
+        player.getPersistentDataContainer().set(shiftClickKey, PersistentDataType.BYTE, allow ? (byte) 1 : (byte) 0);
     }
 
-    private SortPrefs getPrefs(UUID uuid, String playerName) {
-        return cache.computeIfAbsent(uuid, id ->
-            jdbi.withHandle(handle ->
-                handle.createQuery("select sort, click, shiftClick from sorting_prefs where player = ?")
-                        .bind(0, id).mapTo(SortPrefs.class).findOne().orElseGet(() -> {
-                            SortPrefs prefs = new SortPrefs();
-                            Debugger.getInstance()
-                                    .debug("initialise new sorting preferences for " + id + "("
-                                            + playerName + "): " + prefs);
-                            return prefs;
-                        })));
-    }
-
-    private void setPrefs(UUID uuid, SortPrefs prefs) {
-        // Write to DB first; only update the cache on success so a Jdbi failure
-        // never leaves the cache dirty relative to the stored row.
-        jdbi.useHandle(handle ->
-            handle.execute("insert or replace into sorting_prefs values (?, ?, ?, ?)",
-                    uuid, prefs.sortMethod, prefs.clickMethod, prefs.shiftClick));
-        cache.put(uuid, prefs);
-    }
-
-    public void load() {
-        // no-op: placeholder left for future use
-    }
-
-    public void purge() {
-        Debugger.getInstance().debug("purging player prefs unseen " + purgeAfter + " milliseconds");
-        if (!purgeLock.tryLock()) {
-            Debugger.getInstance().debug("another purge is in progress, skipping");
-            return;
-        }
-
-        try {
-            long currentTimeMillis = System.currentTimeMillis();
-            jdbi.useHandle(handle -> {
-                PreparedBatch batch = handle.prepareBatch("delete from sorting_prefs where player = ?");
-                handle.createQuery("select player from sorting_prefs").mapTo(UUID.class).stream()
-                        .map(Bukkit::getOfflinePlayer).filter(o -> currentTimeMillis - o.getLastPlayed() >= purgeAfter)
-                        .map(OfflinePlayer::getUniqueId).peek(cache::remove).forEach(batch::add);
-                batch.execute();
-                Debugger.getInstance().debug("purged " + batch.size() + " rows of unseen player data");
-            });
-        } finally {
-            purgeLock.unlock();
-        }
-    }
-
-    private class SortPrefs {
-        public SortingMethod sortMethod;
-        public ClickMethod clickMethod;
-        public String rawClickMethod;
-        public boolean shiftClick;
-
-        public SortPrefs() {
-            sortMethod = plugin.getDefaultSortingMethod();
-            clickMethod = plugin.getDefaultClickMethod();
-            rawClickMethod = null;
-            shiftClick = plugin.getDefaultShiftClick();
-        }
-
-        public SortPrefs(SortingMethod sortMethod, ClickMethod clickMethod, String rawClickMethod, boolean shiftClick) {
-            this.sortMethod = sortMethod;
-            this.clickMethod = clickMethod;
-            this.rawClickMethod = rawClickMethod;
-            this.shiftClick = shiftClick;
-        }
-
-        /** Returns a shallow copy so setters never mutate the live cached reference. */
-        public SortPrefs copy() {
-            return new SortPrefs(sortMethod, clickMethod, rawClickMethod, shiftClick);
-        }
-
-        @Override
-        public String toString() {
-            return "SortPrefs [sort=" + sortMethod + " click=" + clickMethod + " shiftClick=" + shiftClick + "]";
-        }
-    }
-
-    private class SortPrefsMapper implements RowMapper<SortPrefs> {
-        @Override
-        public SortPrefs map(ResultSet rs, StatementContext ctx) throws SQLException {
-            String rawClick = rs.getString("click");
-            return new SortPrefs(SortingMethod.parse(rs.getString("sort")), ClickMethod.parse(rawClick),
-                    rawClick, rs.getBoolean("shiftClick"));
-        }
+    /** Returns the raw stored click method name from PDC, or {@code null} if never set. */
+    public String getStoredClickMethodName(Player player) {
+        return player.getPersistentDataContainer().get(clickKey, PersistentDataType.STRING);
     }
 }
