@@ -12,18 +12,16 @@ package me.desht.clicksort;
  * You should have received a copy of the GNU General Public License along with ClickSort. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import me.desht.clicksort.commands.*;
+import me.desht.clicksort.commands.ClickSortCommands;
 import me.desht.clicksort.events.InventorySortEvent;
 import me.desht.dhutils.*;
-import me.desht.dhutils.commands.CommandManager;
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -45,7 +43,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class ClickSortPlugin extends JavaPlugin implements Listener {
-    private final CommandManager cmds = new CommandManager(this);
     private final CooldownMessager messager = new CooldownMessager();
     private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
@@ -78,12 +75,8 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         Debugger.getInstance().setLevel(getConfig().getInt("debug_level"));
         Debugger.getInstance().setTarget(getServer().getConsoleSender());
 
-        cmds.registerCommand(new ChangeClickModeCommand());
-        cmds.registerCommand(new ChangeSortModeCommand());
-        cmds.registerCommand(new DebugCommand());
-        cmds.registerCommand(new GetcfgCommand());
-        cmds.registerCommand(new ReloadCommand());
-        cmds.registerCommand(new ShiftClickCommand());
+        getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
+                event.registrar().register(ClickSortCommands.build(this), "Manage the ClickSort plugin"));
 
         sortingPrefs = new PlayerSortingPrefs(this);
 
@@ -216,21 +209,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
     private static boolean isVanillaInventoryHolder(InventoryHolder inventoryHolder) {
         return inventoryHolder != null && inventoryHolder.getClass().getPackageName().startsWith("org.bukkit.");
-    }
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        try {
-            return cmds.dispatch(sender, command, label, args);
-        } catch (DHUtilsException e) {
-            MiscUtil.errorMessage(sender, e.getComponentMessage());
-            return true;
-        }
-    }
-
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
-        return cmds.onTabComplete(sender, command, label, args);
     }
 
     public void processConfig() {
