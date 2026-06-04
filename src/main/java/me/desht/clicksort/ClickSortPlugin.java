@@ -54,8 +54,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         instance = this;
 
         LogUtils.init(this);
-        Debugger.getInstance().setPrefix("[ClickSort] ");
-        Debugger.getInstance().setTarget(getServer().getConsoleSender());
 
         configManager = new ConfigManager(this);
         configManager.loadAll();
@@ -127,7 +125,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
         String playerName = player.getName();
 
-        Debugger.getInstance().debug("inventory click by player " + playerName + ": type=" + event.getClick() + " slot="
+        LogUtils.debug("inventory click by player " + playerName + ": type=" + event.getClick() + " slot="
                 + event.getSlot() + " rawslot=" + event.getRawSlot());
 
         SortingMethod sortMethod = sortingPrefs.getSortingMethod(player);
@@ -219,7 +217,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
             inv = event.getView().getBottomInventory();
         }
 
-        Debugger.getInstance().debug("clicked inventory window " + inv.getType() + ", slot " + slot);
+        LogUtils.debug("clicked inventory window " + inv.getType() + ", slot " + slot);
         int min, max; // slot range to sort
         InventoryType type = inv.getType();
         if (type == InventoryType.PLAYER) {
@@ -277,7 +275,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
             // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
             MiscUtil.alertMessage(p, configManager.lang().getColoredMessage("dropItems"));
             for (ItemStack item : sortedItems) {
-                Debugger.getInstance().debug("dropping " + item + " by player " + p.getName());
+                LogUtils.debug("dropping " + item + " by player " + p.getName());
                 p.getWorld().dropItemNaturally(p.getLocation(), item);
             }
         }
@@ -297,7 +295,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         // phase 1: extract a list of unique material/data/item-meta strings and
         // use those as keys
         // into a hash which maps items to quantities
-        Debugger.getInstance().debug("sortAndMerge: sortable = " + sortableSlots + ", size = " + items.length);
+        LogUtils.debug("sortAndMerge: sortable = " + sortableSlots + ", size = " + items.length);
         for (int i : sortableSlots) {
             ItemStack is = items[i];
             if (is != null) {
@@ -318,10 +316,10 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
         List<ItemStack> sorted = new LinkedList<>();
         for (SortKey sortKey : MiscUtil.asSortedList(amounts.keySet())) {
             int amount = amounts.get(sortKey);
-            Debugger.getInstance().debug(2, "Process item [" + sortKey + "], amount = " + amount);
+            LogUtils.trace("Process item [" + sortKey + "], amount = " + amount);
             Material mat = sortKey.getMaterial();
             int maxStack = mat.getMaxStackSize();
-            Debugger.getInstance().debug(2, "max stack size for " + mat + " = " + maxStack);
+            LogUtils.trace("max stack size for " + mat + " = " + maxStack);
             if (maxStack != 0) {
                 while (amount > maxStack) {
                     sorted.add(sortKey.toItemStack(maxStack));
