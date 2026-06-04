@@ -8,13 +8,13 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class LanguageLoaderTest extends AbstractClickSortTest {
+class LangConfigTest extends AbstractClickSortTest {
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     @Test
     void tipToReEnable_containsCommandInWhite() {
-        Component c = LanguageLoader.getColoredMessage("tipToReEnable");
+        Component c = plugin.getConfigManager().lang().getColoredMessage("tipToReEnable");
         // The <white> tag should produce a child with NamedTextColor.WHITE
         boolean foundWhite = c.children().stream()
                 .anyMatch(child -> NamedTextColor.WHITE.equals(child.color()));
@@ -25,7 +25,7 @@ class LanguageLoaderTest extends AbstractClickSortTest {
 
     @Test
     void sortBy_substitutesMethodAndInstruction() {
-        Component c = LanguageLoader.getColoredMessage("sortBy",
+        Component c = plugin.getConfigManager().lang().getColoredMessage("sortBy",
                 Placeholder.unparsed("method", "NAME"),
                 Placeholder.unparsed("instruction", "Single-click to sort."));
         String plain = PLAIN.serialize(c);

@@ -1,8 +1,8 @@
 package me.desht.dhutils;
 
+import me.desht.clicksort.ClickSortPlugin;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
-import xyz.chengzi.clicksort.util.LocalUtil;
 
 /**
  * Class to get the displayed name (as the client shows) for an item.
@@ -20,7 +20,11 @@ public class ItemNames {
             String title = bookMeta.getTitle();
             return title == null ? null : title.replaceAll("§.", "");
         }
-        return LocalUtil.getItemName(stack);
+        ClickSortPlugin inst = ClickSortPlugin.getInstance();
+        if (inst == null) {
+            return stack.getType().name();
+        }
+        return inst.getConfigManager().items().getItemName(stack);
     }
 
     /**
