@@ -17,7 +17,8 @@ public class ItemNames {
      */
     public static String lookup(ItemStack stack) {
         if (stack.getItemMeta() instanceof BookMeta bookMeta) {
-            return bookMeta.getTitle();
+            String title = bookMeta.getTitle();
+            return title == null ? null : title.replaceAll("§.", "");
         }
         return LocalUtil.getItemName(stack);
     }

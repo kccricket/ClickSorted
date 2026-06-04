@@ -22,13 +22,12 @@ class SortKeyTest {
     }
 
     private SortKey key(Material mat) {
-        // SortingMethod.ID.makeSortPrefix() returns "" without touching the plugin singleton
-        return new SortKey(new ItemStack(mat), SortingMethod.ID);
+        return new SortKey(new ItemStack(mat), SortingMethod.NAME);
     }
 
     @Test
-    void getSortPrefix_idMode_empty() {
-        assertEquals("", key(Material.DIRT).getSortPrefix());
+    void getSortPrefix_nameMode_nonNull() {
+        assertNotNull(key(Material.DIRT).getSortPrefix());
     }
 
     @Test

@@ -33,7 +33,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.InventoryView;
@@ -97,7 +96,9 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        metrics.shutdown();
+        if (metrics != null) {
+            metrics.shutdown();
+        }
         LocalUtil.save();
         instance = null;
     }
@@ -122,34 +123,15 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     }
 
     public SortingMethod getDefaultSortingMethod() {
-        return SortingMethod.parse(getConfig().getString("defaults.sort_mode"), SortingMethod.preferredDefault());
+        return SortingMethod.parse(getConfig().getString("defaults.sort_mode"), SortingMethod.DEFAULT);
     }
 
     public ClickMethod getDefaultClickMethod() {
-        return ClickMethod.parse(getConfig().getString("defaults.click_mode"), ClickMethod.preferredDefault());
+        return ClickMethod.parse(getConfig().getString("defaults.click_mode"), ClickMethod.DEFAULT);
     }
 
     public boolean getDefaultShiftClick() {
         return getConfig().getBoolean("defaults.shift_click");
-    }
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        String storedMethod = sortingPrefs.getStoredClickMethodName(player);
-        if (storedMethod == null) {
-            return;
-        }
-        String messageKey;
-        try {
-            messageKey = ClickMethod.valueOf(storedMethod).isAvailable() ? null : "clickMethodNotAvailable";
-        } catch (IllegalArgumentException e) {
-            messageKey = "clickMethodUnknown";
-        }
-        if (messageKey != null) {
-            MiscUtil.alertMessage(player,
-                LanguageLoader.getColoredMessage(messageKey, Placeholder.unparsed("method", storedMethod)));
-        }
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
@@ -177,7 +159,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
             if (event.isLeftClick() && clickMethod != ClickMethod.NONE) {
                 // shift-left-clicking an empty slot cycles sort method for the player
                 do {
-                    sortMethod = sortMethod.next();
+                    sortMethod = sortMethod.cycle();
                 } while (!sortMethod.isAvailable());
                 sortingPrefs.setSortingMethod(player, sortMethod);
                 MiscUtil.statusMessage(player,
@@ -190,7 +172,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
                                 .decorate(TextDecoration.ITALIC));
             } else if (event.isRightClick()) {
                 // shift-right-clicking an empty slot cycles click method for the player
-                clickMethod = clickMethod.nextAvailable();
+                clickMethod = clickMethod.cycle();
                 sortingPrefs.setClickMethod(player, clickMethod);
                 MiscUtil.statusMessage(player, clickMethod.getInstruction());
                 messager.message(player, "rightclick", 60,
@@ -205,7 +187,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
             case SINGLE -> event.getClick() == ClickType.LEFT && event.getCurrentItem().getType() == Material.AIR && (
                     event.getCursor() == null || event.getCursor().getType() == Material.AIR);
             case DOUBLE -> event.getClick() == ClickType.DOUBLE_CLICK;
-            case MIDDLE -> event.getClick() == ClickType.MIDDLE;
             case SWAP -> event.getClick() == ClickType.SWAP_OFFHAND;
             default -> false;
         };
@@ -253,7 +234,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
     }
 
     public void processConfig() {
-        validateClickMode();
 
         MiscUtil.setColouredConsole(getConfig().getBoolean("coloured_console"));
 
@@ -266,15 +246,6 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
                 return null;
             }
         }).filter(Objects::nonNull).collect(Collectors.toList());
-    }
-
-    private void validateClickMode() {
-        String configured = getConfig().getString("defaults.click_mode");
-        if (ClickMethod.resolveAvailable(configured) == null) {
-            LogUtils.warning("Configured click_mode '" + configured
-                + "' is invalid or unavailable on this server version; defaulting to "
-                + ClickMethod.preferredDefault());
-        }
     }
 
     private boolean sortInventory(final InventoryClickEvent event, final SortingMethod sortMethod) {
