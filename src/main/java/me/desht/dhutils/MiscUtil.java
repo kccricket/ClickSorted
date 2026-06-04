@@ -10,7 +10,6 @@ import java.util.*;
 import java.util.logging.Level;
 
 public class MiscUtil {
-    private static boolean colouredConsole = true;
 
     public static String toPlain(String s) {
         return s;
@@ -18,10 +17,6 @@ public class MiscUtil {
 
     public static String toPlain(Component component) {
         return PlainTextComponentSerializer.plainText().serialize(component);
-    }
-
-    public static void setColouredConsole(boolean coloured) {
-        colouredConsole = coloured;
     }
 
     public static void errorMessage(CommandSender sender, Component component) {
@@ -65,7 +60,7 @@ public class MiscUtil {
     }
 
     private static void message(CommandSender sender, Component component, Level level) {
-        if (sender instanceof ConsoleCommandSender && !colouredConsole) {
+        if (sender instanceof ConsoleCommandSender) {
             LogUtils.log(level != null ? level : Level.INFO, toPlain(component));
         } else {
             sender.sendMessage(component);
