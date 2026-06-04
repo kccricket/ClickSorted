@@ -1,10 +1,5 @@
 package me.desht.clicksort;
 
-import me.desht.dhutils.CompatUtil;
-import me.desht.dhutils.ItemNames;
-import me.desht.dhutils.LogUtils;
-import org.bukkit.inventory.ItemStack;
-
 /*
  This file is part of ClickSort
 
@@ -22,17 +17,19 @@ import org.bukkit.inventory.ItemStack;
  along with ClickSort.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-public enum SortingMethod {
-    ID, NAME, GROUP;
+import me.desht.dhutils.ItemNames;
+import me.desht.dhutils.LogUtils;
+import org.bukkit.inventory.ItemStack;
 
-    public SortingMethod next() {
-        int o = (ordinal() + 1) % values().length;
-        return values()[o];
+public enum SortingMethod {
+    NAME, GROUP;
+
+    public SortingMethod cycle() {
+        return values()[(ordinal() + 1) % values().length];
     }
 
     public boolean isAvailable() {
         return switch (this) {
-            case ID -> CompatUtil.isMaterialIdAllowed();
             case GROUP -> ClickSortPlugin.getInstance().getItemGrouping().isAvailable();
             default -> true;
         };
@@ -42,7 +39,7 @@ public enum SortingMethod {
         switch (this) {
             case NAME:
                 String name = ItemNames.lookup(stack);
-                return name == null ? null : name.replaceAll("\u00a7.", "");
+                return name;
             case GROUP:
                 String grp = ClickSortPlugin.getInstance().getItemGrouping().getGroup(stack);
                 return String.format("%s-%s", grp, stack.getType());
@@ -51,13 +48,11 @@ public enum SortingMethod {
         }
     }
 
-    public static SortingMethod preferredDefault() {
-        return NAME;
-    }
+    public static final SortingMethod DEFAULT = NAME;
 
     public static SortingMethod parse(String sortingMethod) {
         ClickSortPlugin inst = ClickSortPlugin.getInstance();
-        return parse(sortingMethod, inst != null ? inst.getDefaultSortingMethod() : preferredDefault());
+        return parse(sortingMethod, inst != null ? inst.getDefaultSortingMethod() : DEFAULT);
     }
 
     public static SortingMethod parse(String sortingMethod, SortingMethod defaultMethod) {
