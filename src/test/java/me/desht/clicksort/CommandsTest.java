@@ -61,7 +61,6 @@ class CommandsTest extends AbstractClickSortTest {
     @Test
     void sortCommandIsPlayerOnly() {
         // Sending the command from the console should fail with "not from console" text.
-        SortingMethod before = plugin.getSortingPrefs().getSortingMethod(server.addPlayer("Alice"));
         // Should not throw; just fail gracefully.
         assertDoesNotThrow(() -> server.dispatchCommand(server.getConsoleSender(), "clicksort sort NAME"));
     }

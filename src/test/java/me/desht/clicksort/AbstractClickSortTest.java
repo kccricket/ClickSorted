@@ -97,7 +97,7 @@ abstract class AbstractClickSortTest {
         Map<Material, Integer> counts = new HashMap<>();
         for (ItemStack item : inv.getContents()) {
             if (item != null && item.getType() != Material.AIR) {
-                counts.merge(item.getType(), item.getAmount(), Integer::sum);
+                counts.put(item.getType(), counts.getOrDefault(item.getType(), 0) + item.getAmount());
             }
         }
         return counts;

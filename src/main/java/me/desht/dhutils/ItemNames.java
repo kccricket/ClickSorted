@@ -2,7 +2,6 @@ package me.desht.dhutils;
 
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
-import org.bukkit.inventory.meta.ItemMeta;
 import xyz.chengzi.clicksort.util.LocalUtil;
 
 /**
