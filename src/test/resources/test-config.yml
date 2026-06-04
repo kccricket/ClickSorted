@@ -5,7 +5,6 @@ debug_level: 0
 drop_excess: true
 default_group_name: '000-default'
 ignore_plugin_inventory: false
-coloured_console: false
 defaults:
   click_mode: SWAP
   sort_mode: NAME

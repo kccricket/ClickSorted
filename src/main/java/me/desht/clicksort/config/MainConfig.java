@@ -3,7 +3,6 @@ package me.desht.clicksort.config;
 import me.desht.clicksort.ClickMethod;
 import me.desht.clicksort.SortingMethod;
 import me.desht.dhutils.Debugger;
-import me.desht.dhutils.MiscUtil;
 import org.bukkit.event.inventory.InventoryType;
 
 import java.util.List;
@@ -54,13 +53,9 @@ public class MainConfig implements ManagedConfig {
         plugin.getConfig().options().setHeader(
                 List.of("See https://dev.bukkit.org/projects/clicksort/pages/configuration"));
         plugin.getConfig().options().copyDefaults(true);
-        // Remove superseded / legacy keys so they do not accumulate in the file
-        plugin.getConfig().set("log_level", null);
-        plugin.getConfig().set("autosave_seconds", null);
     }
 
     private void applyToRuntime() {
-        MiscUtil.setColouredConsole(plugin.getConfig().getBoolean("coloured_console"));
         Debugger.getInstance().setLevel(plugin.getConfig().getInt("debug_level"));
 
         sortableInventories = plugin.getConfig().getStringList("sortable_inventories").stream()
