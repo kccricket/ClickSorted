@@ -5,13 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
-mvn clean package          # Build JAR → target/clicksort.jar
-mvn clean test             # Run all tests
-mvn test -Dtest=ClassName  # Run a single test class
-mvn test -Dtest=ClassName#methodName  # Run a single test method
+./gradlew clean build                                    # Build JAR → build/libs/clicksort-<version>.jar
+./gradlew clean test                                     # Run all tests
+./gradlew test --tests "ClassName"                       # Run a single test class
+./gradlew test --tests "ClassName.methodName"            # Run a single test method
 ```
 
-Maven Surefire is pre-configured with the `--add-opens` JVM args needed for MockBukkit + ByteBuddy on Java 16+; no extra flags needed.
+The Gradle `test` task is pre-configured with the `--add-opens` JVM args needed for MockBukkit + ByteBuddy on Java 16+; no extra flags needed. JUnit Platform launcher is added via `testRuntimeOnly`.
 
 ## Architecture Overview
 

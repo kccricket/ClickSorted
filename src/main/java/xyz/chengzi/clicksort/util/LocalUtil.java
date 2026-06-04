@@ -20,7 +20,6 @@ package xyz.chengzi.clicksort.util;
 import me.desht.clicksort.ClickSortPlugin;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 

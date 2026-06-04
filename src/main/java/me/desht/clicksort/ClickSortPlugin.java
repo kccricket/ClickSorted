@@ -97,6 +97,7 @@ public class ClickSortPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        metrics.shutdown();
         LocalUtil.save();
         instance = null;
     }
