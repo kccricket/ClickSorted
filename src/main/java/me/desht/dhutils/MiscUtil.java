@@ -11,10 +11,6 @@ import java.util.logging.Level;
 
 public class MiscUtil {
 
-    public static String toPlain(String s) {
-        return s;
-    }
-
     public static String toPlain(Component component) {
         return PlainTextComponentSerializer.plainText().serialize(component);
     }

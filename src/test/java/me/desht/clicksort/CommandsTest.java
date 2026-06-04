@@ -152,10 +152,10 @@ class CommandsTest extends AbstractClickSortTest {
         player.setOp(true);
         drainMessages(player);
 
-        // Set debug level to 2.
-        server.dispatchCommand(player, "clicksort debug 2");
+        // Set debug level to TRACE.
+        server.dispatchCommand(player, "clicksort debug TRACE");
 
-        assertTrue(anyMessageContains(player, "2", "Debug", "debug"),
+        assertTrue(anyMessageContains(player, "TRACE", "Debug", "debug"),
                 "Expected debug-level status message");
     }
 

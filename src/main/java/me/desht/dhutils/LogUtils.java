@@ -2,67 +2,26 @@ package me.desht.dhutils;
 
 import org.bukkit.plugin.Plugin;
 
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class LogUtils {
+public final class LogUtils {
 
     private static Logger logger;
+    private static DebugLevel debugLevel = DebugLevel.OFF;
 
-    public static void init(String name) {
-        logger = Logger.getLogger(name);
-    }
+    private LogUtils() {}
 
     public static void init(Plugin plugin) {
         logger = plugin.getLogger();
-
-        // this feels a bit hack-ish, but it avoids the problem where we would
-        // need to
-        // modify the parent logger (which is the Bukkit.getServer().getLogger()
-        // logger,
-        // common to all plugins) just to change the log level
-        // for (Handler h : logger.getParent().getHandlers()) {
-        // logger.addHandler(h);
-        // }
-        // logger.setUseParentHandlers(false);
     }
 
-    public static Level getLogLevel() {
-        return logger.getLevel();
-    }
-
-    public static void setLogLevel(Level level) {
-        logger.setLevel(level);
-        for (Handler h : logger.getHandlers()) {
-            h.setLevel(level);
-        }
-    }
-
-    /**
-     * Set the new log level
-     *
-     * @param val
-     * @throws IllegalArgumentException if the value does not represent a valid log level
-     */
-    public static void setLogLevel(String val) {
-        setLogLevel(Level.parse(val.toUpperCase()));
-    }
+    // -------------------------------------------------------------------------
+    // Standard log levels
+    // -------------------------------------------------------------------------
 
     public static void log(Level level, String message) {
         logger.log(level, message);
-    }
-
-    public static void fine(String message) {
-        logger.fine(message);
-    }
-
-    public static void finer(String message) {
-        logger.finer(message);
-    }
-
-    public static void finest(String message) {
-        logger.finest(message);
     }
 
     public static void info(String message) {
@@ -73,28 +32,43 @@ public class LogUtils {
         logger.warning(message);
     }
 
+    public static void warning(String message, Throwable t) {
+        logger.log(Level.WARNING, message, t);
+    }
+
     public static void severe(String message) {
         logger.severe(message);
     }
 
-    public static void warning(String message, Exception err) {
-        if (err == null) {
-            warning(message);
-        } else {
-            logger.log(Level.WARNING, getMsg(message, err));
+    public static void severe(String message, Throwable t) {
+        logger.log(Level.SEVERE, message, t);
+    }
+
+    // -------------------------------------------------------------------------
+    // Debug logging (gated by debugLevel; routed through the plugin logger)
+    // -------------------------------------------------------------------------
+
+    public static void setDebugLevel(DebugLevel level) {
+        debugLevel = level;
+    }
+
+    public static DebugLevel getDebugLevel() {
+        return debugLevel;
+    }
+
+    /** Emit {@code message} at {@link DebugLevel#DEBUG} verbosity. */
+    public static void debug(String message) {
+        logAt(DebugLevel.DEBUG, message);
+    }
+
+    /** Emit {@code message} at {@link DebugLevel#TRACE} verbosity (per-item verbose). */
+    public static void trace(String message) {
+        logAt(DebugLevel.TRACE, message);
+    }
+
+    private static void logAt(DebugLevel level, String message) {
+        if (debugLevel != DebugLevel.OFF && debugLevel.ordinal() >= level.ordinal()) {
+            logger.info("[debug] " + message);
         }
     }
-
-    public static void severe(String message, Exception err) {
-        if (err == null) {
-            severe(message);
-        } else {
-            logger.log(Level.SEVERE, getMsg(message, err));
-        }
-    }
-
-    private static String getMsg(String message, Exception e) {
-        return message == null ? e.getMessage() : MiscUtil.toPlain(message);
-    }
-
 }

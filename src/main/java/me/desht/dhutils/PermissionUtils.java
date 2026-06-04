@@ -19,9 +19,8 @@ public class PermissionUtils {
             return true;
         }
         boolean allowed = sender.hasPermission(node);
-        Debugger.getInstance().debug(
-                "Permission check: player=" + sender.getName() + ", node=" + node
-                        + ", allowed=" + allowed);
+        LogUtils.debug("Permission check: player=" + sender.getName() + ", node=" + node
+                + ", allowed=" + allowed);
         return allowed;
     }
 

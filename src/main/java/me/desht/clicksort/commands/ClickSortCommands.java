@@ -1,7 +1,6 @@
 package me.desht.clicksort.commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -9,7 +8,8 @@ import io.papermc.paper.command.brigadier.Commands;
 import me.desht.clicksort.ClickMethod;
 import me.desht.clicksort.ClickSortPlugin;
 import me.desht.clicksort.SortingMethod;
-import me.desht.dhutils.Debugger;
+import me.desht.dhutils.DebugLevel;
+import me.desht.dhutils.LogUtils;
 import me.desht.dhutils.MiscUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
@@ -154,20 +154,36 @@ public class ClickSortCommands {
         return Commands.literal("debug")
                 .requires(src -> src.getSender().hasPermission("clicksort.commands.debug"))
                 .executes(ctx -> {
-                    int cur = Debugger.getInstance().getLevel();
-                    Debugger.getInstance().setLevel(cur > 0 ? 0 : 1);
+                    DebugLevel next = LogUtils.getDebugLevel() == DebugLevel.OFF ? DebugLevel.DEBUG : DebugLevel.OFF;
+                    LogUtils.setDebugLevel(next);
                     MiscUtil.statusMessage(ctx.getSource().getSender(),
                             plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
-                                    Placeholder.unparsed("level", String.valueOf(Debugger.getInstance().getLevel()))));
+                                    Placeholder.unparsed("level", next.name())));
                     return Command.SINGLE_SUCCESS;
                 })
-                .then(Commands.argument("level", IntegerArgumentType.integer(0))
+                .then(Commands.argument("level", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            String input = builder.getRemaining().toUpperCase();
+                            for (DebugLevel l : DebugLevel.values()) {
+                                if (l.name().startsWith(input)) {
+                                    builder.suggest(l.name().toLowerCase());
+                                }
+                            }
+                            return builder.buildFuture();
+                        })
                         .executes(ctx -> {
-                            int level = IntegerArgumentType.getInteger(ctx, "level");
-                            Debugger.getInstance().setLevel(level);
-                            MiscUtil.statusMessage(ctx.getSource().getSender(),
-                                    plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
-                                            Placeholder.unparsed("level", String.valueOf(level))));
+                            String arg = StringArgumentType.getString(ctx, "level");
+                            try {
+                                DebugLevel level = DebugLevel.valueOf(arg.toUpperCase());
+                                LogUtils.setDebugLevel(level);
+                                MiscUtil.statusMessage(ctx.getSource().getSender(),
+                                        plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
+                                                Placeholder.unparsed("level", level.name())));
+                            } catch (IllegalArgumentException ignored) {
+                                MiscUtil.errorMessage(ctx.getSource().getSender(),
+                                        plugin.getConfigManager().lang().getColoredMessage("invalidDebugLevel",
+                                                Placeholder.unparsed("level", arg)));
+                            }
                             return Command.SINGLE_SUCCESS;
                         }));
     }

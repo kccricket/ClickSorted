@@ -1,5 +1,5 @@
 # See https://dev.bukkit.org/projects/clicksort/pages/configuration
-debug_level: 0
+debug_level: OFF
 drop_excess: true
 default_group_name: '000-default'
 ignore_plugin_inventory: false

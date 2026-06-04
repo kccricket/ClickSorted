@@ -1,5 +1,6 @@
 package xyz.chengzi.clicksort.util;
 
+import me.desht.dhutils.LogUtils;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 
@@ -38,7 +39,7 @@ public final class ResourceUpdater {
         try {
             userConfig.save(userFile);
         } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save updated " + resourceName + ": " + e.getMessage());
+            LogUtils.warning("Failed to save updated " + resourceName + ": " + e.getMessage(), e);
         }
 
         return userConfig;

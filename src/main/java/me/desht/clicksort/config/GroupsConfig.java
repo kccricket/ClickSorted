@@ -1,6 +1,5 @@
 package me.desht.clicksort.config;
 
-import me.desht.dhutils.Debugger;
 import me.desht.dhutils.LogUtils;
 import org.bukkit.Material;
 import org.bukkit.configuration.Configuration;
@@ -58,7 +57,7 @@ public class GroupsConfig implements ManagedConfig {
         }
         String key = material.toString();
         mapping.put(key, grpName);
-        Debugger.getInstance().debug(2, "addMapping: " + key + " = " + grpName);
+        LogUtils.trace("addMapping: " + key + " = " + grpName);
     }
 
     public String getGroup(ItemStack stack) {
@@ -66,7 +65,7 @@ public class GroupsConfig implements ManagedConfig {
         if (group == null) {
             group = plugin.getConfig().getString("default_group_name", "000-default");
         }
-        Debugger.getInstance().debug(2, "getGroup: " + stack + " = " + group);
+        LogUtils.trace("getGroup: " + stack + " = " + group);
         return group;
     }
 

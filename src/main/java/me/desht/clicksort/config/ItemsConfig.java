@@ -1,5 +1,6 @@
 package me.desht.clicksort.config;
 
+import me.desht.dhutils.LogUtils;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemStack;
@@ -44,7 +45,7 @@ public class ItemsConfig implements ManagedConfig {
             try {
                 config.save(file);
             } catch (IOException e) {
-                plugin.getLogger().warning("Failed to save " + FILE_NAME + ": " + e.getMessage());
+                LogUtils.warning("Failed to save " + FILE_NAME + ": " + e.getMessage(), e);
             }
         }
     }
