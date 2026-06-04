@@ -14,11 +14,12 @@ public enum ClickMethod {
     }
 
     public String getInstruction() {
+        var lang = ClickSortPlugin.getInstance().getConfigManager().lang();
         return switch (this) {
-            case SINGLE -> LanguageLoader.getMessage("instructionSingle");
-            case DOUBLE -> LanguageLoader.getMessage("instructionDouble");
-            case SWAP -> LanguageLoader.getMessage("instructionSwap");
-            default -> LanguageLoader.getMessage("instructionDisabled");
+            case SINGLE -> lang.getMessage("instructionSingle");
+            case DOUBLE -> lang.getMessage("instructionDouble");
+            case SWAP -> lang.getMessage("instructionSwap");
+            default -> lang.getMessage("instructionDisabled");
         };
     }
 

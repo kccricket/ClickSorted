@@ -1,41 +1,47 @@
-package me.desht.clicksort;
+package me.desht.clicksort.config;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.plugin.Plugin;
 import xyz.chengzi.clicksort.util.ResourceUpdater;
 
-public class LanguageLoader {
+/**
+ * Manages {@code lang.yml}: all user-facing messages, rendered via MiniMessage.
+ */
+public class LangConfig implements ManagedConfig {
+
     private static final String FILE_NAME = "lang.yml";
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
-    private static ClickSortPlugin plugin;
-    private static FileConfiguration config;
+    private final Plugin plugin;
+    private FileConfiguration config;
 
-    public static void init(ClickSortPlugin plugin) {
-        LanguageLoader.plugin = plugin;
-        load();
+    public LangConfig(Plugin plugin) {
+        this.plugin = plugin;
     }
 
-    public static void reload() {
-        init(plugin);
+    @Override
+    public String fileName() {
+        return FILE_NAME;
     }
 
-    public static void load() {
+    @Override
+    public void load() {
         config = ResourceUpdater.update(plugin, FILE_NAME);
     }
 
-    public static String getMessage(String path) {
+    public String getMessage(String path) {
         return config.getString(path);
     }
 
-    public static String getMessage(String path, String def) {
+    public String getMessage(String path, String def) {
         String msg = config.getString(path);
         return msg != null ? msg : def;
     }
 
-    public static Component getColoredMessage(String path, TagResolver... resolvers) {
+    public Component getColoredMessage(String path, TagResolver... resolvers) {
         return MM.deserialize(getMessage(path), resolvers);
     }
 }

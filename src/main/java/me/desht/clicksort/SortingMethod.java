@@ -30,22 +30,20 @@ public enum SortingMethod {
 
     public boolean isAvailable() {
         return switch (this) {
-            case GROUP -> ClickSortPlugin.getInstance().getItemGrouping().isAvailable();
+            case GROUP -> ClickSortPlugin.getInstance().getConfigManager().groups().isAvailable();
             default -> true;
         };
     }
 
     public String makeSortPrefix(ItemStack stack) {
-        switch (this) {
-            case NAME:
-                String name = ItemNames.lookup(stack);
-                return name;
-            case GROUP:
-                String grp = ClickSortPlugin.getInstance().getItemGrouping().getGroup(stack);
-                return String.format("%s-%s", grp, stack.getType());
-            default:
-                return "";
-        }
+        return switch (this) {
+            case NAME -> ItemNames.lookup(stack);
+            case GROUP -> {
+                String grp = ClickSortPlugin.getInstance().getConfigManager().groups().getGroup(stack);
+                yield String.format("%s-%s", grp, stack.getType());
+            }
+            default -> "";
+        };
     }
 
     public static final SortingMethod DEFAULT = NAME;
