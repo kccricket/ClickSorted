@@ -1,1 +1,1 @@
-rootProject.name = "clicksort"
+rootProject.name = "clicksorted"

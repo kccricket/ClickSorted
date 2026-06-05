@@ -1,4 +1,4 @@
-# See https://dev.bukkit.org/projects/clicksort/pages/configuration
+# See https://github.com/kccricket/clicksort
 debug_level: OFF
 drop_excess: true
 default_group_name: '000-default'
