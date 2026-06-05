@@ -7,7 +7,7 @@ import java.io.File;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression test for the bug where {@code /clicksort reload} only recreated {@code items.yml}
+ * Regression test for the bug where {@code /clicksorted reload} only recreated {@code items.yml}
  * after all four config files were deleted mid-session.
  *
  * <p>All four files must be recreated from bundled defaults when they are absent at reload time.
@@ -26,7 +26,7 @@ class ConfigReloadTest extends AbstractClickSortedTest {
             }
         }
 
-        // Simulate /clicksort reload
+        // Simulate /clicksorted reload
         plugin.getConfigManager().reloadAll();
 
         // All four must now exist again

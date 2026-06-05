@@ -174,7 +174,7 @@ class InventorySortTest extends AbstractClickSortedTest {
 
     @Test
     void playerWithoutSortPermissionCannotSort() {
-        // A player explicitly denied clicksort.sort should not trigger a sort.
+        // A player explicitly denied clicksorted.sort should not trigger a sort.
         PlayerMock player = server.addPlayer("Bob");
         player.addAttachment(plugin, "clicksorted.sort", false);  // explicitly deny
 
@@ -190,7 +190,7 @@ class InventorySortTest extends AbstractClickSortedTest {
         for (ItemStack item : chest.getContents()) {
             if (item != null && item.getType() == Material.STONE) stoneSlots++;
         }
-        assertEquals(2, stoneSlots, "Player without clicksort.sort should not trigger a sort");
+        assertEquals(2, stoneSlots, "Player without clicksorted.sort should not trigger a sort");
     }
 
     // --- Shift-click cycling tests ---

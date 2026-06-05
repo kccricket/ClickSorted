@@ -16,7 +16,7 @@ import java.util.Map;
  * <p>
  * Every {@link #load()} passes through {@link ResourceUpdater#update} so the file is
  * recreated from bundled defaults when absent — including after a mid-session delete
- * followed by {@code /clicksort reload}.
+ * followed by {@code /clicksorted reload}.
  */
 public class GroupsConfig implements ManagedConfig {
 

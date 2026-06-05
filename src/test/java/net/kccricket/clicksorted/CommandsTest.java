@@ -8,7 +8,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for the ClickSort command tree.  Each subcommand is exercised by calling
+ * Integration tests for the ClickSorted command tree.  Each subcommand is exercised by calling
  * server.dispatchCommand (which routes through ClickSortedPlugin.onCommand → CommandManager →
  * the specific command class).
  *

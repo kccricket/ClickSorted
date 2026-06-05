@@ -8,7 +8,7 @@ import net.kccricket.clicksorted.ClickSortedPlugin;
  *
  * <p>Every file routes through {@link ResourceUpdater#update}
  * on load/reload, so missing files are recreated from bundled defaults — including after
- * a mid-session delete followed by {@code /clicksort reload}.
+ * a mid-session delete followed by {@code /clicksorted reload}.
  */
 public class ConfigManager {
 
@@ -32,7 +32,7 @@ public class ConfigManager {
         items.load();
     }
 
-    /** Reload all four config files. Called by {@code /clicksort reload}. */
+    /** Reload all four config files. Called by {@code /clicksorted reload}. */
     public void reloadAll() {
         main.reload();
         lang.reload();

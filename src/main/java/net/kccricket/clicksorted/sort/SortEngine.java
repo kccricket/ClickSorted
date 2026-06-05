@@ -90,7 +90,7 @@ public final class SortEngine {
                     Log.severe(item.toString());
                 }
                 Log.severe(
-                        "Please report this, quoting all above error text, in a ticket at https://github.com/NewbieOrange/clicksort/issues/");
+                        "Please report this, quoting all above error text, in a ticket at https://github.com/kccricket/clicksorted/issues/");
             }
         }
     }

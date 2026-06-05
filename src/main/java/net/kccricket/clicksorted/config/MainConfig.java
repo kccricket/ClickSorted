@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * On every {@link #load()} / {@link #reload()} the file is guaranteed to exist on disk:
  * defaults are applied and {@code saveConfig()} is called before the config is read.
  * This closes the bug where deleting {@code config.yml} mid-session and running
- * {@code /clicksort reload} left the file absent.
+ * {@code /clicksorted reload} left the file absent.
  */
 public class MainConfig implements ManagedConfig {
 
@@ -53,7 +53,7 @@ public class MainConfig implements ManagedConfig {
 
     private void applyDefaults() {
         plugin.getConfig().options().setHeader(
-                List.of("See https://dev.bukkit.org/projects/clicksort/pages/configuration"));
+                List.of("See https://github.com/kccricket/clicksorted"));
         plugin.getConfig().options().copyDefaults(true);
     }
 

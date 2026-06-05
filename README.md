@@ -10,7 +10,7 @@ Copy ClickSorted.jar into your plugins/ folder.  Restart/reload your server.  Do
 
 ## Building
 
-1) Download ClickSorted: "git clone https://github.com/kccricket/clicksort.git"
+1) Download ClickSorted: "git clone https://github.com/kccricket/clicksorted.git"
 
 2) Build ClickSorted: `./gradlew clean build`
 
@@ -22,8 +22,4 @@ For configuration options, see the bundled config.yml, lang.yml, and groups.yml 
 
 ## License
 
-ClickSorted (modern fork) retains the original GPL v3 license. Original ClickSort by Des Herriott is licensed under the [GNU GPL v3](http://www.gnu.org/licenses/gpl-3.0.html).
-
-## JetBrains Toolkit
-
-This project is developed with Intellij IDEA Ultimate from JetBrains! https://jb.gg/OpenSource
+ClickSorted retains the original GPL v3 license. Original ClickSort by Des Herriott is licensed under the [GNU GPL v3](http://www.gnu.org/licenses/gpl-3.0.html).

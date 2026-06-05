@@ -4,7 +4,7 @@ package net.kccricket.clicksorted.config;
  * Lifecycle contract for a single plugin configuration file.
  * All implementations route through {@link ResourceUpdater#update}
  * so the file is recreated from bundled defaults when missing (including mid-session deletes
- * followed by {@code /clicksort reload}).
+ * followed by {@code /clicksorted reload}).
  */
 public interface ManagedConfig {
 
