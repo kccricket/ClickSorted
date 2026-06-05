@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
-./gradlew clean build                                    # Build JAR → build/libs/clicksort-<version>.jar
+./gradlew clean build                                    # Build JAR → build/libs/clicksorted-<version>.jar
 ./gradlew clean test                                     # Run all tests
 ./gradlew test --tests "ClassName"                       # Run a single test class
 ./gradlew test --tests "ClassName.methodName"            # Run a single test method
@@ -15,15 +15,15 @@ The Gradle `test` task is pre-configured with the `--add-opens` JVM args needed 
 
 ## Architecture Overview
 
-ClickSort is a Paper/Bukkit plugin that lets players sort inventories via configurable mouse clicks. The main plugin class (`net.kccricket.clicksort.ClickSortPlugin`) is the `JavaPlugin` entry point.
+ClickSorted is a Paper/Bukkit plugin that lets players sort inventories via configurable mouse clicks. The main plugin class (`net.kccricket.clicksorted.ClickSortedPlugin`) is the `JavaPlugin` entry point.
 
 ### Package Layout
 
 ```
-net.kccricket.clicksort
-├── ClickSortPlugin          entry point
+net.kccricket.clicksorted
+├── ClickSortedPlugin          entry point
 ├── model/                   ClickMethod, SortingMethod, SortKey, PlayerSortingPrefs
-├── commands/                ClickSortCommands (Brigadier command tree)
+├── commands/                ClickSortedCommands (Brigadier command tree)
 ├── config/                  ConfigManager, ManagedConfig, MainConfig, LangConfig,
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
 ├── events/                  InventorySortEvent
@@ -45,7 +45,7 @@ net.kccricket.clicksort
 
 | Class | Package | Role |
 |---|---|---|
-| `ClickSortPlugin` | root | `JavaPlugin` entry point, wires all components |
+| `ClickSortedPlugin` | root | `JavaPlugin` entry point, wires all components |
 | `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, shift-click flag) stored via PDC |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
 | `SortingMethod` | model | Enum (NAME, GROUP) controlling `SortKey.makeSortPrefix()` |
@@ -69,13 +69,13 @@ net.kccricket.clicksort
 
 ### Testing
 
-Tests live in `src/test/java/net/kccricket/clicksort/` and are **integration-level**: they bootstrap the full plugin via `MockBukkit.loadWithConfig()` and dispatch real Bukkit events. `AbstractClickSortTest` is the shared base class — it wires up the server, loads the plugin with `src/test/resources/test-config.yml` (bStats disabled), and provides helper methods for simulating inventory interactions.
+Tests live in `src/test/java/net/kccricket/clicksorted/` and are **integration-level**: they bootstrap the full plugin via `MockBukkit.loadWithConfig()` and dispatch real Bukkit events. `AbstractClickSortedTest` is the shared base class — it wires up the server, loads the plugin with `src/test/resources/test-config.yml` (bStats disabled), and provides helper methods for simulating inventory interactions.
 
 There is a known non-obvious setup required for MockBukkit v4 on Java 16+; see `memory/mockbukkit-v4-test-setup.md` for the full list of fixes (ByteBuddy opens, JARUtil null-guard, SQLite JDBC classloader, DurationUtil format, JaCoCo scoping).
 
 ### Command Framework
 
-Commands are implemented as a Brigadier tree in `ClickSortCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand (`sort`, `click`, `shiftclick`, `reload`, `getcfg`, `debug`) is a static builder method. Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
+Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand (`sort`, `click`, `shiftclick`, `reload`, `getcfg`, `debug`) is a static builder method. Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
 
 ### Version Compatibility
 
