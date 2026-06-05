@@ -1,5 +1,5 @@
 name: ClickSort
-main: me.desht.clicksort.ClickSortPlugin
+main: net.kccricket.clicksort.ClickSortPlugin
 authors: [ desht, chengzi, kccricket ]
 version: ${project.version}
 description: Super-convenient inventory sorting

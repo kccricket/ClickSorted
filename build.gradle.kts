@@ -102,7 +102,7 @@ tasks.jacocoTestReport {
     dependsOn(tasks.test)
     classDirectories.setFrom(
         fileTree(layout.buildDirectory.dir("classes/java/main")) {
-            include("me/desht/**", "xyz/chengzi/clicksort/**")
+            include("net/kccricket/clicksort/**")
         }
     )
 }
@@ -112,10 +112,10 @@ tasks.shadowJar {
     // Produce build/libs/clicksort.jar (no classifier, fixed name)
     archiveFileName.set("clicksort-${version}.jar")
     // Relocate bStats so it doesn't conflict with other plugins bundling the same library
-    relocate("org.bstats", "me.desht.clicksort.thirdparty")
+    relocate("org.bstats", "net.kccricket.clicksort.thirdparty")
     // Retain manifest Main-Class for parity with the Maven build
     manifest {
-        attributes["Main-Class"] = "me.desht.clicksort.ClickSortPlugin"
+        attributes["Main-Class"] = "net.kccricket.clicksort.ClickSortPlugin"
     }
 }
 
