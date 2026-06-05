@@ -36,7 +36,7 @@ public class PlayerSortingPrefs {
 
     public SortingMethod getSortingMethod(Player player) {
         String stored = player.getPersistentDataContainer().get(sortKey, PersistentDataType.STRING);
-        return stored != null ? SortingMethod.parse(stored) : plugin.getDefaultSortingMethod();
+        return stored != null ? SortingMethod.parse(stored) : plugin.getConfigManager().main().getDefaultSortingMethod();
     }
 
     public void setSortingMethod(Player player, SortingMethod sortMethod) {
@@ -45,7 +45,7 @@ public class PlayerSortingPrefs {
 
     public ClickMethod getClickMethod(Player player) {
         String stored = player.getPersistentDataContainer().get(clickKey, PersistentDataType.STRING);
-        return stored != null ? ClickMethod.parse(stored) : plugin.getDefaultClickMethod();
+        return stored != null ? ClickMethod.parse(stored) : plugin.getConfigManager().main().getDefaultClickMethod();
     }
 
     public void setClickMethod(Player player, ClickMethod clickMethod) {
@@ -54,7 +54,7 @@ public class PlayerSortingPrefs {
 
     public boolean getShiftClickAllowed(Player player) {
         Byte stored = player.getPersistentDataContainer().get(shiftClickKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getDefaultShiftClick();
+        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultShiftClick();
     }
 
     public void setShiftClickAllowed(Player player, boolean allow) {
