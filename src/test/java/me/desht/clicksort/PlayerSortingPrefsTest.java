@@ -17,7 +17,7 @@ class PlayerSortingPrefsTest extends AbstractClickSortTest {
     @Test
     void defaultSortingMethodMatchesConfig() {
         PlayerMock player = server.addPlayer("Alice");
-        assertEquals(plugin.getDefaultSortingMethod(),
+        assertEquals(plugin.getConfigManager().main().getDefaultSortingMethod(),
                 plugin.getSortingPrefs().getSortingMethod(player),
                 "New player should get the default sort method from config");
     }
@@ -25,7 +25,7 @@ class PlayerSortingPrefsTest extends AbstractClickSortTest {
     @Test
     void defaultClickMethodMatchesConfig() {
         PlayerMock player = server.addPlayer("Alice");
-        assertEquals(plugin.getDefaultClickMethod(),
+        assertEquals(plugin.getConfigManager().main().getDefaultClickMethod(),
                 plugin.getSortingPrefs().getClickMethod(player),
                 "New player should get the default click method from config");
     }
@@ -33,7 +33,7 @@ class PlayerSortingPrefsTest extends AbstractClickSortTest {
     @Test
     void defaultShiftClickAllowedMatchesConfig() {
         PlayerMock player = server.addPlayer("Alice");
-        assertEquals(plugin.getDefaultShiftClick(),
+        assertEquals(plugin.getConfigManager().main().getDefaultShiftClick(),
                 plugin.getSortingPrefs().getShiftClickAllowed(player),
                 "New player should get the default shift-click setting from config");
     }

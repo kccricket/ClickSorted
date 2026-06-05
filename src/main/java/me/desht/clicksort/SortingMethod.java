@@ -50,7 +50,7 @@ public enum SortingMethod {
 
     public static SortingMethod parse(String sortingMethod) {
         ClickSortPlugin inst = ClickSortPlugin.getInstance();
-        return parse(sortingMethod, inst != null ? inst.getDefaultSortingMethod() : DEFAULT);
+        return parse(sortingMethod, inst != null ? inst.getConfigManager().main().getDefaultSortingMethod() : DEFAULT);
     }
 
     public static SortingMethod parse(String sortingMethod, SortingMethod defaultMethod) {
