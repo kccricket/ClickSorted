@@ -38,12 +38,6 @@ class PlayerSortingPrefsTest extends AbstractClickSortTest {
                 "New player should get the default shift-click setting from config");
     }
 
-    @Test
-    void storedClickMethodNameIsNullForNewPlayer() {
-        PlayerMock player = server.addPlayer("Alice");
-        assertNull(plugin.getSortingPrefs().getStoredClickMethodName(player));
-    }
-
     // --- PDC read/write ---
 
     @Test
@@ -85,13 +79,4 @@ class PlayerSortingPrefsTest extends AbstractClickSortTest {
         assertEquals(expected, player.getPersistentDataContainer().get(key, PersistentDataType.BYTE));
     }
 
-    @Test
-    void storedClickMethodNameReturnsEnumNameAfterSet() {
-        PlayerMock player = server.addPlayer("Alice");
-        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-
-        prefs.setClickMethod(player, ClickMethod.DOUBLE);
-
-        assertEquals("DOUBLE", prefs.getStoredClickMethodName(player));
-    }
 }

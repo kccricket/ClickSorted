@@ -61,8 +61,4 @@ public class PlayerSortingPrefs {
         player.getPersistentDataContainer().set(shiftClickKey, PersistentDataType.BYTE, allow ? (byte) 1 : (byte) 0);
     }
 
-    /** Returns the raw stored click method name from PDC, or {@code null} if never set. */
-    public String getStoredClickMethodName(Player player) {
-        return player.getPersistentDataContainer().get(clickKey, PersistentDataType.STRING);
-    }
 }

@@ -29,7 +29,7 @@ public class InventorySortEvent extends InventoryInteractEvent {
         return sortableSlots;
     }
 
-    public void fixItemInSlot(int slot) {
+    public void excludeSlot(int slot) {
         sortableSlots.remove(slot);
     }
 }

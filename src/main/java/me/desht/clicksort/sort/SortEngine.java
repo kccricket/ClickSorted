@@ -14,8 +14,7 @@ package me.desht.clicksort.sort;
 
 import me.desht.clicksort.SortKey;
 import me.desht.clicksort.SortingMethod;
-import me.desht.dhutils.LogUtils;
-import me.desht.dhutils.MiscUtil;
+import me.desht.dhutils.Log;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
@@ -41,7 +40,7 @@ public final class SortEngine {
         Map<SortKey, Integer> amounts = new HashMap<>();
 
         // Phase 1: extract unique item keys and accumulate quantities
-        LogUtils.debug("sortAndMerge: sortable = " + sortableSlots + ", size = " + items.length);
+        Log.debug("sortAndMerge: sortable = " + sortableSlots + ", size = " + items.length);
         for (int i : sortableSlots) {
             ItemStack is = items[i];
             if (is != null) {
@@ -59,12 +58,12 @@ public final class SortEngine {
 
         // Phase 2: sort the extracted keys and reconstruct stacks respecting max stack size
         List<ItemStack> sorted = new LinkedList<>();
-        for (SortKey sortKey : MiscUtil.asSortedList(amounts.keySet())) {
+        for (SortKey sortKey : asSortedList(amounts.keySet())) {
             int amount = amounts.get(sortKey);
-            LogUtils.trace("Process item [" + sortKey + "], amount = " + amount);
+            Log.trace("Process item [" + sortKey + "], amount = " + amount);
             Material mat = sortKey.getMaterial();
             int maxStack = mat.getMaxStackSize();
-            LogUtils.trace("max stack size for " + mat + " = " + maxStack);
+            Log.trace("max stack size for " + mat + " = " + maxStack);
             if (maxStack != 0) {
                 while (amount > maxStack) {
                     sorted.add(sortKey.toItemStack(maxStack));
@@ -77,14 +76,20 @@ public final class SortEngine {
         return sorted;
     }
 
+    private static <T extends Comparable<? super T>> List<T> asSortedList(Collection<T> c) {
+        List<T> list = new ArrayList<>(c);
+        Collections.sort(list);
+        return list;
+    }
+
     private static void checkNoNulls(Map<SortKey, Integer> amounts, ItemStack[] items) {
         for (SortKey key : amounts.keySet()) {
             if (key == null) {
-                LogUtils.severe("Detected null sort key!  Inventory dump follows:");
+                Log.severe("Detected null sort key!  Inventory dump follows:");
                 for (ItemStack item : items) {
-                    LogUtils.severe(item.toString());
+                    Log.severe(item.toString());
                 }
-                LogUtils.severe(
+                Log.severe(
                         "Please report this, quoting all above error text, in a ticket at https://github.com/NewbieOrange/clicksort/issues/");
             }
         }

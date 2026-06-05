@@ -16,8 +16,8 @@ import me.desht.clicksort.ClickMethod;
 import me.desht.clicksort.ClickSortPlugin;
 import me.desht.clicksort.PlayerSortingPrefs;
 import me.desht.clicksort.SortingMethod;
-import me.desht.dhutils.LogUtils;
-import me.desht.dhutils.PermissionUtils;
+import me.desht.dhutils.Log;
+import me.desht.dhutils.Permissions;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -53,11 +53,11 @@ public class InventoryClickListener implements Listener {
         if (event.getCurrentItem() == null) {
             return;
         }
-        if (!PermissionUtils.isAllowedTo(player, "clicksort.sort")) {
+        if (!Permissions.isAllowedTo(player, "clicksort.sort")) {
             return;
         }
 
-        LogUtils.debug("inventory click by player " + player.getName() + ": type=" + event.getClick()
+        Log.debug("inventory click by player " + player.getName() + ": type=" + event.getClick()
                 + " slot=" + event.getSlot() + " rawslot=" + event.getRawSlot());
 
         SortingMethod sortMethod = prefs.getSortingMethod(player);

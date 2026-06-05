@@ -1,6 +1,6 @@
 package me.desht.clicksort.config;
 
-import me.desht.dhutils.LogUtils;
+import me.desht.dhutils.Log;
 import org.bukkit.Material;
 import org.bukkit.configuration.Configuration;
 import org.bukkit.inventory.ItemStack;
@@ -44,7 +44,7 @@ public class GroupsConfig implements ManagedConfig {
                 try {
                     addMapping(matName, grpName);
                 } catch (IllegalArgumentException e) {
-                    LogUtils.warning("Unknown material name '" + matName + "' in group '" + grpName + "'");
+                    Log.warning("Unknown material name '" + matName + "' in group '" + grpName + "'");
                 }
             }
         }
@@ -57,7 +57,7 @@ public class GroupsConfig implements ManagedConfig {
         }
         String key = material.toString();
         mapping.put(key, grpName);
-        LogUtils.trace("addMapping: " + key + " = " + grpName);
+        Log.trace("addMapping: " + key + " = " + grpName);
     }
 
     public String getGroup(ItemStack stack) {
@@ -65,7 +65,7 @@ public class GroupsConfig implements ManagedConfig {
         if (group == null) {
             group = plugin.getConfig().getString("default_group_name", "000-default");
         }
-        LogUtils.trace("getGroup: " + stack + " = " + group);
+        Log.trace("getGroup: " + stack + " = " + group);
         return group;
     }
 

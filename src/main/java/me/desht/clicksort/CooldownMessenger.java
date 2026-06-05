@@ -1,19 +1,19 @@
 package me.desht.clicksort;
 
-import me.desht.dhutils.MiscUtil;
+import me.desht.dhutils.MessageUtil;
 import net.kyori.adventure.text.Component;
 import org.bukkit.command.CommandSender;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class CooldownMessager {
+public class CooldownMessenger {
     private final Map<String, Long> cooldowns = new HashMap<>();
 
     public void message(CommandSender sender, String cooldown, int secs, Component message) {
         long last = getLast(sender, cooldown);
         if (System.currentTimeMillis() - last > secs * 1000L) {
-            MiscUtil.statusMessage(sender, message);
+            MessageUtil.statusMessage(sender, message);
             cooldowns.put(sender.getName() + "." + cooldown, System.currentTimeMillis());
         }
     }

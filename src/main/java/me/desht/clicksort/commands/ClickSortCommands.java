@@ -9,8 +9,8 @@ import me.desht.clicksort.ClickMethod;
 import me.desht.clicksort.ClickSortPlugin;
 import me.desht.clicksort.SortingMethod;
 import me.desht.dhutils.DebugLevel;
-import me.desht.dhutils.LogUtils;
-import me.desht.dhutils.MiscUtil;
+import me.desht.dhutils.Log;
+import me.desht.dhutils.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
 
@@ -42,7 +42,7 @@ public class ClickSortCommands {
                         })
                         .executes(ctx -> {
                             if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                                MiscUtil.errorMessage(ctx.getSource().getSender(),
+                                MessageUtil.errorMessage(ctx.getSource().getSender(),
                                         plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
                                 return Command.SINGLE_SUCCESS;
                             }
@@ -50,13 +50,13 @@ public class ClickSortCommands {
                             try {
                                 SortingMethod method = SortingMethod.valueOf(arg.toUpperCase());
                                 if (!method.isAvailable()) {
-                                    MiscUtil.errorMessage(player,
+                                    MessageUtil.errorMessage(player,
                                             plugin.getConfigManager().lang().getColoredMessage("sortingMethodNotAvailable",
                                                     Placeholder.unparsed("method", method.toString())));
                                     return Command.SINGLE_SUCCESS;
                                 }
                                 plugin.getSortingPrefs().setSortingMethod(player, method);
-                                MiscUtil.statusMessage(player,
+                                MessageUtil.statusMessage(player,
                                         plugin.getConfigManager().lang().getColoredMessage("setSortingMethodTo",
                                                 Placeholder.unparsed("method", method.toString())));
                             } catch (IllegalArgumentException ignored) {
@@ -81,7 +81,7 @@ public class ClickSortCommands {
                         })
                         .executes(ctx -> {
                             if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                                MiscUtil.errorMessage(ctx.getSource().getSender(),
+                                MessageUtil.errorMessage(ctx.getSource().getSender(),
                                         plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
                                 return Command.SINGLE_SUCCESS;
                             }
@@ -89,7 +89,7 @@ public class ClickSortCommands {
                             try {
                                 ClickMethod method = ClickMethod.valueOf(arg.toUpperCase());
                                 plugin.getSortingPrefs().setClickMethod(player, method);
-                                MiscUtil.statusMessage(player,
+                                MessageUtil.statusMessage(player,
                                         plugin.getConfigManager().lang().getColoredMessage("setClickMethodTo",
                                                 Placeholder.unparsed("method", method.toString())));
                             } catch (IllegalArgumentException ignored) {
@@ -104,22 +104,22 @@ public class ClickSortCommands {
                 .requires(src -> src.getSender().hasPermission("clicksort.commands.shiftclick"))
                 .executes(ctx -> {
                     if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                        MiscUtil.errorMessage(ctx.getSource().getSender(),
+                        MessageUtil.errorMessage(ctx.getSource().getSender(),
                                 plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
                         return Command.SINGLE_SUCCESS;
                     }
                     boolean current = plugin.getSortingPrefs().getShiftClickAllowed(player);
                     plugin.getSortingPrefs().setShiftClickAllowed(player, !current);
                     String status = current ? "DISABLED" : "ENABLED";
-                    MiscUtil.statusMessage(player,
+                    MessageUtil.statusMessage(player,
                             plugin.getConfigManager().lang().getColoredMessage("setShiftClickStatus",
                                     Placeholder.unparsed("status", status)));
                     if (current) {
-                        MiscUtil.statusMessage(player, plugin.getConfigManager().lang().getColoredMessage("tipToReEnable"));
-                        plugin.getMessager().message(player, "shiftclick", 60,
+                        MessageUtil.statusMessage(player, plugin.getConfigManager().lang().getColoredMessage("tipToReEnable"));
+                        plugin.getMessenger().message(player, "shiftclick", 60,
                                 plugin.getConfigManager().lang().getColoredMessage("tipToChangeMode"));
                     } else {
-                        MiscUtil.statusMessage(player, plugin.getConfigManager().lang().getColoredMessage("tipToDisable"));
+                        MessageUtil.statusMessage(player, plugin.getConfigManager().lang().getColoredMessage("tipToDisable"));
                     }
                     return Command.SINGLE_SUCCESS;
                 });
@@ -130,7 +130,7 @@ public class ClickSortCommands {
                 .requires(src -> src.getSender().hasPermission("clicksort.commands.reload"))
                 .executes(ctx -> {
                     plugin.getConfigManager().reloadAll();
-                    MiscUtil.statusMessage(ctx.getSource().getSender(),
+                    MessageUtil.statusMessage(ctx.getSource().getSender(),
                             plugin.getConfigManager().lang().getColoredMessage("configReloaded"));
                     return Command.SINGLE_SUCCESS;
                 });
@@ -142,7 +142,7 @@ public class ClickSortCommands {
                 .executes(ctx -> {
                     for (String key : plugin.getConfig().getKeys(true)) {
                         if (!plugin.getConfig().isConfigurationSection(key)) {
-                            MiscUtil.rawMessage(ctx.getSource().getSender(),
+                            MessageUtil.rawMessage(ctx.getSource().getSender(),
                                     key + " = " + plugin.getConfig().get(key));
                         }
                     }
@@ -154,9 +154,9 @@ public class ClickSortCommands {
         return Commands.literal("debug")
                 .requires(src -> src.getSender().hasPermission("clicksort.commands.debug"))
                 .executes(ctx -> {
-                    DebugLevel next = LogUtils.getDebugLevel() == DebugLevel.OFF ? DebugLevel.DEBUG : DebugLevel.OFF;
-                    LogUtils.setDebugLevel(next);
-                    MiscUtil.statusMessage(ctx.getSource().getSender(),
+                    DebugLevel next = Log.getDebugLevel() == DebugLevel.OFF ? DebugLevel.DEBUG : DebugLevel.OFF;
+                    Log.setDebugLevel(next);
+                    MessageUtil.statusMessage(ctx.getSource().getSender(),
                             plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
                                     Placeholder.unparsed("level", next.name())));
                     return Command.SINGLE_SUCCESS;
@@ -175,12 +175,12 @@ public class ClickSortCommands {
                             String arg = StringArgumentType.getString(ctx, "level");
                             try {
                                 DebugLevel level = DebugLevel.valueOf(arg.toUpperCase());
-                                LogUtils.setDebugLevel(level);
-                                MiscUtil.statusMessage(ctx.getSource().getSender(),
+                                Log.setDebugLevel(level);
+                                MessageUtil.statusMessage(ctx.getSource().getSender(),
                                         plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
                                                 Placeholder.unparsed("level", level.name())));
                             } catch (IllegalArgumentException ignored) {
-                                MiscUtil.errorMessage(ctx.getSource().getSender(),
+                                MessageUtil.errorMessage(ctx.getSource().getSender(),
                                         plugin.getConfigManager().lang().getColoredMessage("invalidDebugLevel",
                                                 Placeholder.unparsed("level", arg)));
                             }

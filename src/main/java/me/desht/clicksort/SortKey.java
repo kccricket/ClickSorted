@@ -1,6 +1,6 @@
 package me.desht.clicksort;
 
-import me.desht.dhutils.LogUtils;
+import me.desht.dhutils.Log;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -21,7 +21,7 @@ public class SortKey implements Comparable<SortKey> {
         String prefix = sortMethod.makeSortPrefix(stack);
         if (prefix == null) {
             this.sortPrefix = stack.getType().toString();
-            LogUtils.warning("Can't determine sort prefix for " + stack + " (using "
+            Log.warning("Can't determine sort prefix for " + stack + " (using "
                     + this.sortPrefix + ")");
         } else {
             this.sortPrefix = prefix;

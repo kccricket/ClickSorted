@@ -3,7 +3,7 @@ package me.desht.clicksort.config;
 import me.desht.clicksort.ClickMethod;
 import me.desht.clicksort.SortingMethod;
 import me.desht.dhutils.DebugLevel;
-import me.desht.dhutils.LogUtils;
+import me.desht.dhutils.Log;
 import org.bukkit.event.inventory.InventoryType;
 
 import java.util.List;
@@ -57,7 +57,7 @@ public class MainConfig implements ManagedConfig {
     }
 
     private void applyToRuntime() {
-        LogUtils.setDebugLevel(DebugLevel.parse(plugin.getConfig().getString("debug_level"), DebugLevel.OFF));
+        Log.setDebugLevel(DebugLevel.parse(plugin.getConfig().getString("debug_level"), DebugLevel.OFF));
 
         sortableInventories = plugin.getConfig().getStringList("sortable_inventories").stream()
                 .map(s -> {

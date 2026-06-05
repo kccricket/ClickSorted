@@ -3,7 +3,7 @@ package me.desht.dhutils;
 import java.util.Locale;
 
 /**
- * Ordered debug verbosity levels for {@link LogUtils}.
+ * Ordered debug verbosity levels for {@link Log}.
  *
  * <ul>
  *   <li>{@link #OFF} — no debug output (default)</li>
@@ -14,8 +14,6 @@ import java.util.Locale;
 public enum DebugLevel {
     OFF, DEBUG, TRACE;
 
-    public static final DebugLevel DEFAULT = OFF;
-
     /**
      * Parse a level name (case-insensitive); warn and fall back to {@code def} on
      * an unrecognised value.
@@ -25,7 +23,7 @@ public enum DebugLevel {
         try {
             return DebugLevel.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            LogUtils.warning("invalid debug level '" + value + "' - defaulting to " + def);
+            Log.warning("invalid debug level '" + value + "' - defaulting to " + def);
             return def;
         }
     }

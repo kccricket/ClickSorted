@@ -15,9 +15,9 @@ package me.desht.clicksort.sort;
 import me.desht.clicksort.ClickSortPlugin;
 import me.desht.clicksort.SortingMethod;
 import me.desht.clicksort.events.InventorySortEvent;
-import me.desht.dhutils.LogUtils;
-import me.desht.dhutils.MiscUtil;
-import me.desht.dhutils.PermissionUtils;
+import me.desht.dhutils.Log;
+import me.desht.dhutils.MessageUtil;
+import me.desht.dhutils.Permissions;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.HumanEntity;
@@ -79,19 +79,19 @@ public class InventorySortService {
             inv = event.getView().getBottomInventory();
         }
 
-        LogUtils.debug("clicked inventory window " + inv.getType() + ", slot " + slot);
+        Log.debug("clicked inventory window " + inv.getType() + ", slot " + slot);
         int min, max; // slot range to sort
         InventoryType type = inv.getType();
         if (type == InventoryType.PLAYER) {
             if (slot < 9) {
                 // hotbar
-                if (!PermissionUtils.isAllowedTo(p, "clicksort.sort.hotbar")) {
+                if (!Permissions.isAllowedTo(p, "clicksort.sort.hotbar")) {
                     return false;
                 }
                 min = 0;
                 max = 9;
             } else {
-                if (!PermissionUtils.isAllowedTo(p, "clicksort.sort.player")) {
+                if (!Permissions.isAllowedTo(p, "clicksort.sort.player")) {
                     return false;
                 }
                 // main player inventory
@@ -100,7 +100,7 @@ public class InventorySortService {
                 max = plugin.getConfig().getInt("player_sort_max");
             }
         } else if (plugin.getConfigManager().main().getSortableInventories().contains(type)) {
-            if (!PermissionUtils.isAllowedTo(p, "clicksort.sort.container")) {
+            if (!Permissions.isAllowedTo(p, "clicksort.sort.container")) {
                 return false;
             }
             min = inv.getHolder() instanceof AbstractHorse ? 2 : 0;
@@ -119,7 +119,7 @@ public class InventorySortService {
         List<ItemStack> sortedItems = SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
-            MiscUtil.errorMessage(p, plugin.getConfigManager().lang().getColoredMessage("invOverFlow"));
+            MessageUtil.errorMessage(p, plugin.getConfigManager().lang().getColoredMessage("invOverFlow"));
             return false;
         }
 
@@ -135,9 +135,9 @@ public class InventorySortService {
         if (!sortedItems.isEmpty()) {
             // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
             // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
-            MiscUtil.alertMessage(p, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
+            MessageUtil.alertMessage(p, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
             for (ItemStack item : sortedItems) {
-                LogUtils.debug("dropping " + item + " by player " + p.getName());
+                Log.debug("dropping " + item + " by player " + p.getName());
                 p.getWorld().dropItemNaturally(p.getLocation(), item);
             }
         }

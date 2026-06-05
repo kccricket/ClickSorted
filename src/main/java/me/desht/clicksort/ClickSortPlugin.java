@@ -24,7 +24,7 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class ClickSortPlugin extends JavaPlugin {
-    private final CooldownMessager messager = new CooldownMessager();
+    private final CooldownMessenger messenger = new CooldownMessenger();
     private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
     private ConfigManager configManager;
@@ -35,7 +35,7 @@ public class ClickSortPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
 
-        LogUtils.init(this);
+        Log.init(this);
 
         configManager = new ConfigManager(this);
         configManager.loadAll();
@@ -71,8 +71,8 @@ public class ClickSortPlugin extends JavaPlugin {
         return instance;
     }
 
-    public CooldownMessager getMessager() {
-        return messager;
+    public CooldownMessenger getMessenger() {
+        return messenger;
     }
 
     public ConfigManager getConfigManager() {

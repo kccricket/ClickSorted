@@ -18,7 +18,7 @@ package me.desht.clicksort;
  */
 
 import me.desht.dhutils.ItemNames;
-import me.desht.dhutils.LogUtils;
+import me.desht.dhutils.Log;
 import org.bukkit.inventory.ItemStack;
 
 public enum SortingMethod {
@@ -57,7 +57,7 @@ public enum SortingMethod {
         try {
             return SortingMethod.valueOf(sortingMethod);
         } catch (IllegalArgumentException e) {
-            LogUtils.warning("invalid sort method " + sortingMethod + " - default to " + defaultMethod);
+            Log.warning("invalid sort method " + sortingMethod + " - default to " + defaultMethod);
             return defaultMethod;
         }
     }

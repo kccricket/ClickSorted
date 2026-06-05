@@ -15,7 +15,7 @@ package me.desht.clicksort.sort;
 import me.desht.clicksort.ClickMethod;
 import me.desht.clicksort.ClickSortPlugin;
 import me.desht.clicksort.SortingMethod;
-import me.desht.dhutils.MiscUtil;
+import me.desht.dhutils.MessageUtil;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -56,11 +56,11 @@ public class PrefsCycleHandler {
                 sortMethod = sortMethod.cycle();
             } while (!sortMethod.isAvailable());
             plugin.getSortingPrefs().setSortingMethod(player, sortMethod);
-            MiscUtil.statusMessage(player,
+            MessageUtil.statusMessage(player,
                     plugin.getConfigManager().lang().getColoredMessage("sortBy",
                             Placeholder.unparsed("method", sortMethod.toString()),
                             Placeholder.unparsed("instruction", clickMethod.getInstruction())));
-            plugin.getMessager().message(player, "leftclick", 60,
+            plugin.getMessenger().message(player, "leftclick", 60,
                     plugin.getConfigManager().lang().getColoredMessage("shiftLeftToChange")
                             .colorIfAbsent(NamedTextColor.GRAY)
                             .decorate(TextDecoration.ITALIC));
@@ -69,8 +69,8 @@ public class PrefsCycleHandler {
             // shift-right-clicking an empty slot cycles click method for the player
             clickMethod = clickMethod.cycle();
             plugin.getSortingPrefs().setClickMethod(player, clickMethod);
-            MiscUtil.statusMessage(player, clickMethod.getInstruction());
-            plugin.getMessager().message(player, "rightclick", 60,
+            MessageUtil.statusMessage(player, clickMethod.getInstruction());
+            plugin.getMessenger().message(player, "rightclick", 60,
                     plugin.getConfigManager().lang().getColoredMessage("shiftRightToChange")
                             .colorIfAbsent(NamedTextColor.GRAY)
                             .decorate(TextDecoration.ITALIC));

@@ -5,12 +5,12 @@ import org.bukkit.plugin.Plugin;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public final class LogUtils {
+public final class Log {
 
     private static Logger logger;
     private static DebugLevel debugLevel = DebugLevel.OFF;
 
-    private LogUtils() {}
+    private Log() {}
 
     public static void init(Plugin plugin) {
         logger = plugin.getLogger();
@@ -22,10 +22,6 @@ public final class LogUtils {
 
     public static void log(Level level, String message) {
         logger.log(level, message);
-    }
-
-    public static void info(String message) {
-        logger.info(message);
     }
 
     public static void warning(String message) {
