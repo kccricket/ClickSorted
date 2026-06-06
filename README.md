@@ -1,6 +1,6 @@
 # ClickSorted
 
-> Sort any inventory with a click.
+*Sort any inventory with a click.*
 
 <!-- TODO: replace placeholder badge URLs once distribution pages are live
 ![Version](https://img.shields.io/badge/version-TODO-blue)
@@ -8,18 +8,53 @@
 ![Paper](https://img.shields.io/badge/Paper-1.20.6%2B-orange)
 ![Build](https://img.shields.io/badge/build-TODO-lightgrey)
 -->
+---
+
+## Contents
+
+- [ClickSorted](#clicksorted)
+  - [Contents](#contents)
+  - [Acknowledgements](#acknowledgements)
+  - [Features](#features)
+  - [Download \& Installation](#download--installation)
+  - [Player Guide](#player-guide)
+    - [Sorting an inventory](#sorting-an-inventory)
+    - [Changing preferences in-inventory (shift-click)](#changing-preferences-in-inventory-shift-click)
+    - [Your player inventory: two regions](#your-player-inventory-two-regions)
+    - [Player commands](#player-commands)
+  - [Admin Reference](#admin-reference)
+    - [Admin commands](#admin-commands)
+    - [Permissions](#permissions)
+    - [`config.yml`](#configyml)
+    - [Sort orders \& `groups.yml`](#sort-orders--groupsyml)
+      - [Name sort](#name-sort)
+      - [Group sort](#group-sort)
+      - [`groups.yml` structure](#groupsyml-structure)
+      - [Default groups (bundled)](#default-groups-bundled)
+      - [Adding or editing groups](#adding-or-editing-groups)
+    - [`items.yml`](#itemsyml)
+    - [`lang.yml`](#langyml)
+      - [Sort order feedback](#sort-order-feedback)
+      - [Click trigger feedback](#click-trigger-feedback)
+      - [Shift-click toggle feedback](#shift-click-toggle-feedback)
+      - [Debug commands](#debug-commands)
+      - [Reload](#reload)
+      - [Inventory overflow](#inventory-overflow)
+      - [Sort trigger instructions](#sort-trigger-instructions)
+      - [Shift-cycle prompts](#shift-cycle-prompts)
+      - [Tips](#tips)
+      - [Console / player-only error](#console--player-only-error)
+  - [Building from Source](#building-from-source)
+  - [License](#license)
 
 ---
 
-> **Acknowledgements**
->
-> ClickSorted is a modern, Paper-only fork of the original **[ClickSort](https://dev.bukkit.org/projects/clicksort)** plugin by **Des Herriott (desht)**,
-> with contributions from **chengzi**. The original plugin made inventory sorting delightful; this fork updates it to use
-> the modern Paper API.
->
+## Acknowledgements
+
+ClickSorted is a Paper/Folia fork of the original **[ClickSort](https://dev.bukkit.org/projects/clicksort)** plugin by **Des Herriott (desht)**,
+with contributions from **chengzi**. The original plugin made inventory sorting delightful; this fork updates it to use the Paper API.
+
 > Original ClickSort © Des Herriott — licensed under the GNU GPL v3. ClickSorted retains that licence.
-
----
 
 ## Features
 
@@ -29,8 +64,6 @@
 - Change preferences entirely **in-inventory with the mouse** — commands are optional.
 - Identical items are automatically merged into full stacks before sorting.
 - Fully configurable: messages (MiniMessage), item groups, sortable inventory types, slot ranges, and more.
-
----
 
 ## Download & Installation
 
@@ -42,8 +75,6 @@
 
 **Requirements:** Paper 1.20.6 or newer. No other plugins required.
 The bundled `groups.yml` was generated from Minecraft 26.1.2 creative tabs.
-
----
 
 ## Player Guide
 
@@ -87,8 +118,6 @@ All three commands are available to every player by default.
 | `/clicksorted click <swap\|single\|double\|none>` | Set your sort trigger. |
 | `/clicksorted shiftclick` | Toggle in-inventory shift-click mode-cycling on or off. |
 
----
-
 ## Admin Reference
 
 ### Admin commands
@@ -100,8 +129,6 @@ These commands require the `clicksorted.commands.*` op permissions (see [Permiss
 | `/clicksorted reload` | Reload all config files (`config.yml`, `groups.yml`, `items.yml`, `lang.yml`) without a server restart. |
 | `/clicksorted getcfg` | Print every `config.yml` key/value to the console or chat. |
 | `/clicksorted debug [off\|debug\|trace]` | Set logging verbosity at runtime (not persisted to `config.yml`). With no argument, toggles between `off` and `debug`. |
-
----
 
 ### Permissions
 
@@ -120,8 +147,6 @@ These commands require the `clicksorted.commands.*` op permissions (see [Permiss
 | `clicksorted.sort.container` | `true` | Allow sorting container inventories (chests, barrels, etc.). |
 
 Out of the box, all players can click-sort everything and change their own preferences. Only ops can reload configs, dump config values, or change the debug level.
-
----
 
 ### `config.yml`
 
@@ -181,8 +206,6 @@ sortable_inventories:
   - "DISPENSER"
 ```
 
----
-
 ### Sort orders & `groups.yml`
 
 #### Name sort
@@ -234,8 +257,6 @@ To create a new group or move items between groups, edit `groups.yml` and run `/
 
 To add items to an existing group, find the group key and append the material names to its list.
 
----
-
 ### `items.yml`
 
 `items.yml` is a **runtime-generated cache** that maps Bukkit Material names to display names, used by the **name** sort order.
@@ -250,8 +271,6 @@ OAK_LOG: "Oak Log"
 - You may **edit the display-name values** (the right side of each entry) to customise how items are labelled for name sorting. For example, renaming `DIRT` to `"Dirt (Terrible)"` will sort it under `T`.
 - **Do not change the Material keys** (the left side) — they are Bukkit enum names.
 - If you delete `items.yml` it will repopulate over time as players interact with inventories.
-
----
 
 ### `lang.yml`
 
@@ -349,8 +368,6 @@ To run the test suite:
 ```bash
 ./gradlew clean test
 ```
-
----
 
 ## License
 
