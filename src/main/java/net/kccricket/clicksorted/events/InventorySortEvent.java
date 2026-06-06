@@ -4,12 +4,12 @@ import org.bukkit.event.inventory.InventoryInteractEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 
-import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 public class InventorySortEvent extends InventoryInteractEvent {
     private final Inventory sortInv;
-    private final Set<Integer> sortableSlots = new HashSet<>();
+    private final Set<Integer> sortableSlots = new TreeSet<>();
 
     public InventorySortEvent(InventoryView transaction, Inventory sortInv, int min, int max) {
         super(transaction);

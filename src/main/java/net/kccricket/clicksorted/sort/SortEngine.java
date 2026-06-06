@@ -53,9 +53,6 @@ public final class SortEngine {
             }
         }
 
-        // Sanity check
-        checkNoNulls(amounts, items);
-
         // Phase 2: sort the extracted keys and reconstruct stacks respecting max stack size
         List<ItemStack> sorted = new LinkedList<>();
         for (SortKey sortKey : asSortedList(amounts.keySet())) {
@@ -64,7 +61,10 @@ public final class SortEngine {
             Material mat = sortKey.getMaterial();
             int maxStack = mat.getMaxStackSize();
             Log.trace("max stack size for " + mat + " = " + maxStack);
-            if (maxStack != 0) {
+            if (maxStack == 0) {
+                Log.severe("Item with zero max stack size will be dropped: " + mat + " (amount=" + amount + ")");
+                sorted.add(sortKey.toItemStack(amount));
+            } else {
                 while (amount > maxStack) {
                     sorted.add(sortKey.toItemStack(maxStack));
                     amount -= maxStack;
@@ -80,18 +80,5 @@ public final class SortEngine {
         List<T> list = new ArrayList<>(c);
         Collections.sort(list);
         return list;
-    }
-
-    private static void checkNoNulls(Map<SortKey, Integer> amounts, ItemStack[] items) {
-        for (SortKey key : amounts.keySet()) {
-            if (key == null) {
-                Log.severe("Detected null sort key!  Inventory dump follows:");
-                for (ItemStack item : items) {
-                    Log.severe(item.toString());
-                }
-                Log.severe(
-                        "Please report this, quoting all above error text, in a ticket at https://github.com/kccricket/clicksorted/issues/");
-            }
-        }
     }
 }
