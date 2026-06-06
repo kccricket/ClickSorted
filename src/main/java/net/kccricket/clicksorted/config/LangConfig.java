@@ -1,5 +1,6 @@
 package net.kccricket.clicksorted.config;
 
+import net.kccricket.clicksorted.logging.Log;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
@@ -41,6 +42,11 @@ public class LangConfig implements ManagedConfig {
     }
 
     public Component getColoredMessage(String path, TagResolver... resolvers) {
-        return MM.deserialize(getMessage(path), resolvers);
+        String raw = getMessage(path);
+        if (raw == null) {
+            Log.severe("Missing lang key: " + path);
+            raw = "<red>[missing lang key: " + path + "]";
+        }
+        return MM.deserialize(raw, resolvers);
     }
 }
