@@ -91,7 +91,8 @@ public class ClickSortedCommands {
                                 plugin.getSortingPrefs().setClickMethod(player, method);
                                 MessageUtil.statusMessage(player,
                                         plugin.getConfigManager().lang().getColoredMessage("setClickMethodTo",
-                                                Placeholder.unparsed("method", method.toString())));
+                                                Placeholder.unparsed("method", method.toString()),
+                                                Placeholder.unparsed("instruction", method.getInstruction())));
                             } catch (IllegalArgumentException ignored) {
                                 // invalid value → no-op
                             }

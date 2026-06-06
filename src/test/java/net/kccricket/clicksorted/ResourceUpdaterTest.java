@@ -28,14 +28,14 @@ class ResourceUpdaterTest extends AbstractClickSortedTest {
                 "Existing key must not be overwritten by update()");
 
         // Missing key must be added from the bundled default
-        assertNotNull(result.getString("sortBy"),
+        assertNotNull(result.getString("setSortingMethodTo"),
                 "Missing key from bundled default must be added by update()");
 
         // The file on disk must reflect the same state
         YamlConfiguration onDisk = YamlConfiguration.loadConfiguration(langFile);
         assertEquals("CUSTOM_VALUE", onDisk.getString("tipToReEnable"),
                 "File on disk must still have the preserved custom value");
-        assertNotNull(onDisk.getString("sortBy"),
+        assertNotNull(onDisk.getString("setSortingMethodTo"),
                 "File on disk must contain the newly added default key");
     }
 }

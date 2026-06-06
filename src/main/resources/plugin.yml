@@ -1,9 +1,9 @@
 name: ClickSorted
 main: net.kccricket.clicksorted.ClickSortedPlugin
-authors: [ desht, chengzi, kccricket ]
+authors: [ kccricket, desht, chengzi ]
 version: ${project.version}
 description: Super-convenient inventory sorting
-website: https://dev.bukkit.org/projects/clicksort
+website: https://github.com/kccricket/ClickSorted
 api-version: 1.20.6
 
 permissions:

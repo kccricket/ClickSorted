@@ -1,19 +1,16 @@
-# Adjust this as you wish to define sort groups that will be used when the
-# player sort mode is GROUP.  You can add as many or as few groups as you
-# please.
+# Item groups used when a player's sort mode is set to GROUP.
 #
-# See https://github.com/kccricket/clicksort
-# for more information.
+# See https://github.com/kccricket/ClickSorted for more information.
 #
-# You can use anything you like for the group names, but they are sorted
-# alphabetically, so a numeric prefix as used below is recommended.
+# Group names can be anything you like, but they are sorted alphabetically,
+# so a numeric prefix (as used below) is recommended to control the order.
 #
-# You can use numeric material ID's or material names as defined in
-# http://jd.bukkit.org/rb/apidocs/org/bukkit/Material.html.  You can also
-# specify a data value if you want, e.g. '351:4' is a piece of a lapis.
-# 
-# See also the 'default_group_name' setting in config.yml for how to define
-# a default group for any items not listed here.
+# Each group is a list of Bukkit Material names (case-insensitive).
+# See https://jd.papermc.io/paper/1.21.5/org/bukkit/Material.html for valid names.
+# Unknown material names are logged as warnings and skipped.
+#
+# Items not listed in any group are assigned to the group specified by
+# 'default_group_name' in config.yml.
 #
 010-tools: [ wooden_shovel, wooden_pickaxe, wooden_axe, stone_shovel, stone_pickaxe, stone_axe, iron_shovel, iron_pickaxe, iron_axe, golden_shovel, golden_pickaxe, golden_axe, diamond_shovel, diamond_pickaxe, diamond_axe, flint_and_steel, fishing_rod, carrot_on_a_stick ]
 020-weapons: [ wooden_sword, stone_sword, iron_sword, golden_sword, diamond_sword, bow ]

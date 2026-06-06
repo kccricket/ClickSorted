@@ -43,7 +43,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         configManager.loadAll();
 
         if (getConfig().getBoolean("enable_metrics", true)) {
-            metrics = new Metrics(this, 9432);
+            metrics = new Metrics(this, 31833);
         }
 
         sortingPrefs = new PlayerSortingPrefs(this);

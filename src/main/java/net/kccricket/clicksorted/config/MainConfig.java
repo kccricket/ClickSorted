@@ -52,9 +52,55 @@ public class MainConfig implements ManagedConfig {
     }
 
     private void applyDefaults() {
-        plugin.getConfig().options().setHeader(
-                List.of("See https://github.com/kccricket/clicksorted"));
+        plugin.getConfig().options().setHeader(List.of(
+                "ClickSorted configuration",
+                "See https://github.com/kccricket/ClickSorted for full documentation."));
         plugin.getConfig().options().copyDefaults(true);
+        applyComments();
+    }
+
+    private void applyComments() {
+        var cfg = plugin.getConfig();
+        cfg.setComments("enable_metrics", List.of(
+                "Send anonymous usage statistics to bStats (https://bstats.org).",
+                "Set to false to opt out."));
+        cfg.setComments("debug_level", List.of(
+                "Logging verbosity for the plugin.",
+                "Values: OFF (no debug output), DEBUG (high-level flow), TRACE (per-item verbose)"));
+        cfg.setComments("drop_excess", List.of(
+                "What to do when merging stacks produces more items than fit in the sortable slots.",
+                "true  = overflow items are dropped on the ground.",
+                "false = the sort is aborted and the player sees the invOverFlow message."));
+        cfg.setComments("default_group_name", List.of(
+                "Fallback group name (from groups.yml) assigned to any item not explicitly listed there.",
+                "Groups sort alphabetically, so the numeric prefix controls where unlisted items land."));
+        cfg.setComments("ignore_plugin_inventory", List.of(
+                "When true, only vanilla container inventories are sortable; custom plugin GUIs are skipped.",
+                "When false (default), any inventory whose type appears in sortable_inventories can be sorted."));
+        cfg.setComments("defaults", List.of(
+                "Default preferences applied to new players (or any player whose PDC entry is missing)."));
+        cfg.setComments("defaults.click_mode", List.of(
+                "How a player triggers a sort.",
+                "Values: SWAP (press the swap-offhand key over a slot), SINGLE (left-click an empty slot),",
+                "        DOUBLE (double-click), NONE (click-sorting disabled)"));
+        cfg.setComments("defaults.sort_mode", List.of(
+                "Algorithm used to order items.",
+                "Values: NAME (alphabetical by display name), GROUP (by group defined in groups.yml).",
+                "GROUP requires at least one group to be configured in groups.yml."));
+        cfg.setComments("defaults.shift_click", List.of(
+                "When true, shift-clicking an empty slot cycles through sort/click modes.",
+                "Players can toggle this per-session with /clicksorted shiftclick."));
+        cfg.setComments("player_sort_min", List.of(
+                "First inventory slot included when sorting a player's main inventory (inclusive).",
+                "Slot 9 is the first row of main storage (slots 0-8 are the hotbar)."));
+        cfg.setComments("player_sort_max", List.of(
+                "Last inventory slot included when sorting a player's main inventory (inclusive).",
+                "Slot 35 is the last main-storage slot; slots 36+ are armor and off-hand."));
+        cfg.setComments("sortable_inventories", List.of(
+                "Inventory types that players are allowed to sort.",
+                "Values must be valid Bukkit InventoryType names (case-sensitive).",
+                "See https://jd.papermc.io/paper/1.21.5/org/bukkit/event/inventory/InventoryType.html",
+                "Unrecognized names are silently ignored."));
     }
 
     private void applyToRuntime() {
