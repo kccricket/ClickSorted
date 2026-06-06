@@ -1,5 +1,6 @@
-# See https://github.com/kccricket/clicksort
-enable_metrics: true
+# Test-only config — keeps tests hermetic and fast.
+# Disables bStats network activity.
+enable_metrics: false
 debug_level: OFF
 drop_excess: true
 default_group_name: '000-default'
@@ -13,11 +14,6 @@ player_sort_max: 36
 sortable_inventories:
   - "PLAYER"
   - "CHEST"
-  - "CHEST_MINECART"
   - "ENDER_CHEST"
   - "SHULKER_BOX"
   - "BARREL"
-  - "HOPPER"
-  - "HOPPER_MINECART"
-  - "DROPPER"
-  - "DISPENSER"
