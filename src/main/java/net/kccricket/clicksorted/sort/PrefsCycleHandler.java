@@ -57,9 +57,8 @@ public class PrefsCycleHandler {
             } while (!sortMethod.isAvailable());
             plugin.getSortingPrefs().setSortingMethod(player, sortMethod);
             MessageUtil.statusMessage(player,
-                    plugin.getConfigManager().lang().getColoredMessage("sortBy",
-                            Placeholder.unparsed("method", sortMethod.toString()),
-                            Placeholder.unparsed("instruction", clickMethod.getInstruction())));
+                    plugin.getConfigManager().lang().getColoredMessage("setSortingMethodTo",
+                            Placeholder.unparsed("method", sortMethod.toString())));
             plugin.getMessenger().message(player, "leftclick", 60,
                     plugin.getConfigManager().lang().getColoredMessage("shiftLeftToChange")
                             .colorIfAbsent(NamedTextColor.GRAY)
@@ -69,7 +68,10 @@ public class PrefsCycleHandler {
             // shift-right-clicking an empty slot cycles click method for the player
             clickMethod = clickMethod.cycle();
             plugin.getSortingPrefs().setClickMethod(player, clickMethod);
-            MessageUtil.statusMessage(player, clickMethod.getInstruction());
+            MessageUtil.statusMessage(player,
+                    plugin.getConfigManager().lang().getColoredMessage("setClickMethodTo",
+                            Placeholder.unparsed("method", clickMethod.toString()),
+                            Placeholder.unparsed("instruction", clickMethod.getInstruction())));
             plugin.getMessenger().message(player, "rightclick", 60,
                     plugin.getConfigManager().lang().getColoredMessage("shiftRightToChange")
                             .colorIfAbsent(NamedTextColor.GRAY)

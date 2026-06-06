@@ -110,7 +110,7 @@ tasks.jacocoTestReport {
 // Shadow JAR configuration — replaces maven-shade-plugin
 tasks.shadowJar {
     // Produce build/libs/clicksorted.jar (no classifier, fixed name)
-    archiveFileName.set("clicksorted-${version}.jar")
+    archiveFileName.set("ClickSorted-${version}.jar")
     // Relocate bStats so it doesn't conflict with other plugins bundling the same library
     relocate("org.bstats", "net.kccricket.clicksorted.thirdparty")
     // Retain manifest Main-Class for parity with the Maven build

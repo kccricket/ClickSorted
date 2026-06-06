@@ -1,20 +1,53 @@
-setClickMethodTo: "Click method has been set to: <method>"
-setSortingMethodTo: "Sorting method has been set to: <method>"
-sortingMethodNotAvailable: "Sorting method <method> is not available."
+# ClickSorted language file
+#
+# All values are rendered with MiniMessage (https://docs.advntr.dev/minimessage).
+# You may use color/formatting tags such as <white>, <red>, <bold>, etc.
+# Edits take effect after running /clicksorted reload.
+#
+# Placeholder tags are listed in comments above each message that accepts one.
+# Do not remove a placeholder from a message that requires it.
+
+# Command feedback — sort mode
+# Placeholder: <method>
+setSortingMethodTo: "Sort mode set to <method>."
+# Placeholder: <method>
+sortingMethodNotAvailable: "Sort mode <method> is not available — configure groups.yml first."
+
+# Command feedback — click mode
+# Placeholders: <method>, <instruction>
+setClickMethodTo: "Click mode set to <method>. <instruction>"
+
+# Command feedback — shift-click toggle
+# Placeholder: <status> (ENABLED or DISABLED)
+setShiftClickStatus: "Shift-click mode cycling: <status>."
+
+# Command feedback — debug level
+# Placeholder: <level>
 setDebugLevelTo: "Debug level is now <level>"
-invalidDebugLevel: "Invalid debug level: <level>"
-configReloaded: "The configurations of ClickSorted has been reloaded."
-setShiftClickStatus: "Shift-click sort/click mode changing has been <status>."
-sortBy: "Sort by <method>. <instruction>"
-invOverFlow: "Inventory overflow detected!  Items not sorted."
+# Placeholder: <level>
+invalidDebugLevel: "Invalid debug level '<level>'. Valid values: OFF, DEBUG, TRACE."
+
+# Command feedback — reload
+configReloaded: "ClickSorted configuration reloaded."
+
+# Inventory overflow messages
+invOverFlow: "Inventory overflow — items were not sorted."
 dropItems: "Some items couldn't fit and were dropped!"
-shiftLeftToChange: "Shift-Left-click any empty inventory slot to change."
-shiftRightToChange: "Shift-Right-click any empty inventory slot to change."
-instructionSingle: "Single-click an empty inventory slot to sort."
-instructionDouble: "Double-click to sort."
-instructionSwap: "Swap-key to sort."
+
+# Sort-trigger instructions (shown as part of the sortBy message via <instruction>)
+instructionSingle: "Left-click an empty slot to sort."
+instructionDouble: "Double-click any slot to sort."
+instructionSwap: "Press the offhand-swap key to sort."
 instructionDisabled: "Click-sorting has been disabled."
-tipToChangeMode: "(Use <white>/clicksorted sort</white> and <white>/clicksorted click</white> to change sort/click mode)"
-tipToReEnable: "<white>/clicksorted shiftclick</white> to re-enable."
-tipToDisable: "<white>/clicksorted shiftclick</white> to disable."
+
+# Shift-click cycling prompts
+shiftLeftToChange: "Shift-left-click an empty slot to change."
+shiftRightToChange: "Shift-right-click an empty slot to change."
+
+# Tip messages shown alongside the shift-click toggle confirmation
+tipToChangeMode: "(Use <white>/clicksorted sort</white> and <white>/clicksorted click</white> to change modes)"
+tipToReEnable: "Run <white>/clicksorted shiftclick</white> to re-enable."
+tipToDisable: "Run <white>/clicksorted shiftclick</white> to disable."
+
+# Error shown when a player-only command is run from the console
 notFromConsole: "This command can only be used by a player."

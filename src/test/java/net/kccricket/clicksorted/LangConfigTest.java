@@ -24,12 +24,12 @@ class LangConfigTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void sortBy_substitutesMethodAndInstruction() {
-        Component c = plugin.getConfigManager().lang().getColoredMessage("sortBy",
-                Placeholder.unparsed("method", "NAME"),
-                Placeholder.unparsed("instruction", "Single-click to sort."));
+    void setClickMethodTo_substitutesMethodAndInstruction() {
+        Component c = plugin.getConfigManager().lang().getColoredMessage("setClickMethodTo",
+                Placeholder.unparsed("method", "SWAP"),
+                Placeholder.unparsed("instruction", "Press the offhand-swap key to sort."));
         String plain = PLAIN.serialize(c);
-        assertTrue(plain.contains("NAME"), "Expected <method> placeholder to be substituted");
-        assertTrue(plain.contains("Single-click to sort."), "Expected <instruction> placeholder to be substituted");
+        assertTrue(plain.contains("SWAP"), "Expected <method> placeholder to be substituted");
+        assertTrue(plain.contains("Press the offhand-swap key to sort."), "Expected <instruction> placeholder to be substituted");
     }
 }
