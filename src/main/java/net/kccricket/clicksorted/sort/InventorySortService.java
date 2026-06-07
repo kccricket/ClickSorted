@@ -26,7 +26,6 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
@@ -49,7 +48,7 @@ public class InventorySortService {
      * @return true if the clicked inventory in this event is one that should be sorted
      */
     public boolean isSortableTarget(InventoryClickEvent event) {
-        return shouldSort(viewToClickedInventory(event.getView(), event.getRawSlot()));
+        return shouldSort(event.getClickedInventory());
     }
 
     /**
@@ -59,24 +58,10 @@ public class InventorySortService {
      */
     public boolean sortInventory(final InventoryClickEvent event, final SortingMethod sortMethod) {
         Player p = (Player) event.getWhoClicked();
-        int rawSlot = event.getRawSlot();
-        int slot = event.getView().convertSlot(rawSlot);
-
-        Inventory inv;
-        if (slot == rawSlot) {
-            // upper inv was clicked
-            inv = event.getView().getTopInventory();
-            if (slot >= inv.getSize()) {
-                // is this a Bukkit bug? clicking a player inventory when the
-                // crafting or dispenser view is up
-                // seems to give rawSlot==localSlot, implying the upper
-                // inventory (crafting/dispenser) has been clicked
-                // when in fact the lower inventory (player) was clicked
-                inv = event.getView().getBottomInventory();
-            }
-        } else {
-            // lower inv was clicked
-            inv = event.getView().getBottomInventory();
+        int slot = event.getSlot();
+        Inventory inv = event.getClickedInventory();
+        if (inv == null) {
+            return false;
         }
 
         Log.debug("clicked inventory window " + inv.getType() + ", slot " + slot);
@@ -90,14 +75,16 @@ public class InventorySortService {
                 }
                 min = 0;
                 max = 9;
-            } else {
+            } else if (slot < plugin.getConfig().getInt("player_sort_max")) {
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.player")) {
                     return false;
                 }
                 // main player inventory
                 min = plugin.getConfig().getInt("player_sort_min");
-                // don't sort equipments and off-hand
                 max = plugin.getConfig().getInt("player_sort_max");
+            } else {
+                // armor / offhand slots — never sort
+                return false;
             }
         } else if (plugin.getConfigManager().main().getSortableInventories().contains(type)) {
             if (!Permissions.isAllowedTo(p, "clicksorted.sort.container")) {
@@ -154,11 +141,6 @@ public class InventorySortService {
     // -------------------------------------------------------------------------
     // Target-inventory helpers
     // -------------------------------------------------------------------------
-
-    private Inventory viewToClickedInventory(InventoryView view, int rawSlot) {
-        return rawSlot < 0 ? null
-                : (rawSlot < view.getTopInventory().getSize() ? view.getTopInventory() : view.getBottomInventory());
-    }
 
     private boolean shouldSort(Inventory clickedInventory) {
         return clickedInventory != null && !shouldIgnore(clickedInventory)

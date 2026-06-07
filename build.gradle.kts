@@ -39,13 +39,9 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-// Emit Java 17 bytecode regardless of the JDK used to compile.
-// We intentionally do NOT pin a Java 17 toolchain because paper-api 26.1.2 is compiled
-// for Java 25; a JDK 17 compiler would reject those classpath classes.
-// --release 17 tells the JDK 25 compiler to produce v61 bytecode and restrict the
-// platform API to the Java 17 standard library.
+// Emit Java 21 bytecode regardless of the JDK used to compile.
 tasks.withType<JavaCompile> {
-    options.release.set(17)
+    options.release.set(21)
     options.encoding = "UTF-8"
 }
 
