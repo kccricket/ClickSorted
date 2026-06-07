@@ -38,6 +38,7 @@ public class MainConfig implements ManagedConfig {
         // On first load the config is already in memory (from disk or from MockBukkit in tests).
         // Just ensure defaults are applied and the file is written, then parse the values.
         applyDefaults();
+        normalizeValues();
         plugin.saveConfig();
         applyToRuntime();
     }
@@ -101,6 +102,13 @@ public class MainConfig implements ManagedConfig {
                 "Values must be valid Bukkit InventoryType names (case-sensitive).",
                 "See https://jd.papermc.io/paper/1.21.5/org/bukkit/event/inventory/InventoryType.html",
                 "Unrecognized names are silently ignored."));
+    }
+
+    private void normalizeValues() {
+        // YAML 1.1 parses unquoted OFF as boolean false; silently correct it so the saved file is valid.
+        if (plugin.getConfig().isBoolean("debug_level") && !plugin.getConfig().getBoolean("debug_level")) {
+            plugin.getConfig().set("debug_level", "OFF");
+        }
     }
 
     private void applyToRuntime() {

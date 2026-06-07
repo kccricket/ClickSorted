@@ -46,6 +46,38 @@ class InventorySortTest extends AbstractClickSortedTest {
         };
     }
 
+    /**
+     * Build a click event that simulates a click on an equipment slot (armor/offhand).
+     * MockBukkit's convertSlot cannot produce getSlot() 36–40 from any real rawSlot, so we
+     * override getSlot(), getClickedInventory(), and getCurrentItem() directly.
+     */
+    private InventoryClickEvent armorSlotClickEvent(
+            InventoryView view, int armorSlot, ItemStack currentItem) {
+        Inventory playerInv = view.getPlayer().getInventory();
+        return new InventoryClickEvent(
+                view, InventoryType.SlotType.ARMOR, 63, ClickType.SWAP_OFFHAND,
+                InventoryAction.UNKNOWN) {
+            @Override
+            public int getSlot() { return armorSlot; }
+            @Override
+            public Inventory getClickedInventory() { return playerInv; }
+            @Override
+            public ItemStack getCurrentItem() { return currentItem; }
+        };
+    }
+
+    /**
+     * Count how many slots in [fromSlot, toSlot) of the given inventory contain the given material.
+     */
+    private long countSlotsWithMaterial(Inventory inv, Material mat, int fromSlot, int toSlot) {
+        ItemStack[] contents = inv.getContents();
+        long count = 0;
+        for (int i = fromSlot; i < toSlot && i < contents.length; i++) {
+            if (contents[i] != null && contents[i].getType() == mat) count++;
+        }
+        return count;
+    }
+
     private void callEvent(InventoryClickEvent event) {
         server.getPluginManager().callEvent(event);
     }
@@ -193,6 +225,29 @@ class InventorySortTest extends AbstractClickSortedTest {
         assertEquals(2, stoneSlots, "Player without clicksorted.sort should not trigger a sort");
     }
 
+    @Test
+    void sortNonChestContainer() {
+        // BARREL is in the sortable_inventories list; sorting should work the same as for CHEST.
+        PlayerMock player = addOpPlayer("Alice");
+        Inventory barrel = server.createInventory(null, InventoryType.BARREL);
+        barrel.setItem(0, stack(Material.STONE, 5));
+        barrel.setItem(1, stack(Material.STONE, 10));
+        barrel.setItem(2, stack(Material.DIRT, 3));
+        InventoryView view = player.openInventory(barrel);
+
+        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+
+        Map<Material, Integer> counts = countByMaterial(barrel);
+        assertEquals(15, counts.getOrDefault(Material.STONE, 0), "STONE stacks should merge to 15");
+        assertEquals(3, counts.getOrDefault(Material.DIRT, 0));
+
+        long stoneSlots = 0;
+        for (ItemStack item : barrel.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(1, stoneSlots, "Two STONE stacks should have merged into one");
+    }
+
     // --- Shift-click cycling tests ---
 
     @Test
@@ -245,47 +300,120 @@ class InventorySortTest extends AbstractClickSortedTest {
     // --- Player inventory sort ---
 
     @Test
-    void sortPlayerMainInventory() {
-        // Clicking inside the player-inventory portion of an open-chest view should sort the
-        // player's main inventory (slots 9–35, i.e. player_sort_min..player_sort_max).
+    void clickHotbarSortsHotbarOnly() {
+        // Clicking a hotbar slot (player slots 0–8) sorts only the hotbar; main inventory is untouched.
+        // In a 27-slot chest view, rawSlot 54 maps to getSlot() 0 (first hotbar slot).
         PlayerMock player = addOpPlayer("Alice");
+        player.getInventory().setItem(0, stack(Material.STONE, 5));
+        player.getInventory().setItem(1, stack(Material.STONE, 10));
+        player.getInventory().setItem(9, stack(Material.DIRT, 3));
+        player.getInventory().setItem(10, stack(Material.DIRT, 7));
 
-        // Fill main inventory (player slots 9-11) with mergeable stacks.
-        player.getInventory().setItem(9, stack(Material.IRON_INGOT, 10));
-        player.getInventory().setItem(10, stack(Material.IRON_INGOT, 20));
-        player.getInventory().setItem(11, stack(Material.GOLD_INGOT, 5));
-
-        // Open a chest so we have a two-pane view; clicking in the bottom pane sorts player inv.
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         InventoryView view = player.openInventory(chest);
 
-        // The player inventory starts at rawSlot = chest.getSize() = 27.
-        // Main inventory slot 9 is at rawSlot 27 + 9 = 36.
-        // SWAP_OFFHAND at rawSlot 36 → currentItem = player.getInventory().getItem(9) = IRON_INGOT.
-        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 36));
+        // getCurrentItem() via view.getItem(54) = bottomInv.getItem(27), which is empty — override it.
+        InventoryClickEvent event = clickEventWithCurrentItem(
+                view, ClickType.SWAP_OFFHAND, 54, stack(Material.STONE, 5));
+        assertEquals(0, event.getSlot(), "rawSlot 54 in a 27-slot chest view must map to hotbar slot 0");
+        callEvent(event);
 
-        Map<Material, Integer> counts = countByMaterial(player.getInventory());
-        assertEquals(30, counts.getOrDefault(Material.IRON_INGOT, 0), "IRON_INGOT stacks should merge to 30");
-        assertEquals(5, counts.getOrDefault(Material.GOLD_INGOT, 0));
+        // Hotbar STONE must collapse to one slot; main-inv DIRT must remain two separate slots.
+        assertEquals(1, countSlotsWithMaterial(player.getInventory(), Material.STONE, 0, 9),
+                "Hotbar STONE should have merged to one slot");
+        assertEquals(2, countSlotsWithMaterial(player.getInventory(), Material.DIRT, 9, 36),
+                "Main-inventory DIRT should be untouched (still two slots)");
     }
 
     @Test
-    void sortPlayerHotbar() {
-        // Clicking a hotbar slot (player inv slots 0-8) sorts the hotbar range.
+    void clickMainSortsMainOnly() {
+        // Clicking a main-inventory slot (player slots 9–35) sorts only the main inventory;
+        // the hotbar is untouched.
+        // In a 27-slot chest view, rawSlot 27 maps to getSlot() 9 (first main-inventory slot).
         PlayerMock player = addOpPlayer("Alice");
-
+        player.getInventory().setItem(9, stack(Material.DIRT, 3));
+        player.getInventory().setItem(10, stack(Material.DIRT, 7));
         player.getInventory().setItem(0, stack(Material.STONE, 5));
         player.getInventory().setItem(1, stack(Material.STONE, 10));
-        player.getInventory().setItem(2, stack(Material.OAK_LOG, 3));
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         InventoryView view = player.openInventory(chest);
 
-        // Player hotbar slot 0 is at rawSlot 27 + 0 = 27 in the chest view.
-        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 27));
+        InventoryClickEvent event = fireClick(view, ClickType.SWAP_OFFHAND, 27);
+        assertEquals(9, event.getSlot(), "rawSlot 27 in a 27-slot chest view must map to main-inv slot 9");
 
-        Map<Material, Integer> counts = countByMaterial(player.getInventory());
-        assertEquals(15, counts.getOrDefault(Material.STONE, 0), "Hotbar STONE stacks should merge to 15");
-        assertEquals(3, counts.getOrDefault(Material.OAK_LOG, 0));
+        // Main-inv DIRT must collapse to one slot; hotbar STONE must remain two separate slots.
+        assertEquals(1, countSlotsWithMaterial(player.getInventory(), Material.DIRT, 9, 36),
+                "Main-inventory DIRT should have merged to one slot");
+        assertEquals(2, countSlotsWithMaterial(player.getInventory(), Material.STONE, 0, 9),
+                "Hotbar STONE should be untouched (still two slots)");
+    }
+
+    @Test
+    void equipmentUntouchedByHotbarSort() {
+        // Sorting the hotbar must not disturb armor or offhand slots.
+        PlayerMock player = addOpPlayer("Alice");
+        player.getInventory().setHelmet(stack(Material.DIAMOND_HELMET));
+        player.getInventory().setItemInOffHand(stack(Material.TORCH));
+        player.getInventory().setItem(0, stack(Material.STONE, 5));
+        player.getInventory().setItem(1, stack(Material.STONE, 10));
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        InventoryView view = player.openInventory(chest);
+        // getCurrentItem() via view.getItem(54) = bottomInv.getItem(27), which is empty — override it.
+        callEvent(clickEventWithCurrentItem(view, ClickType.SWAP_OFFHAND, 54, stack(Material.STONE, 5)));
+
+        assertEquals(1, countSlotsWithMaterial(player.getInventory(), Material.STONE, 0, 9),
+                "Hotbar STONE should have merged (confirming sort ran)");
+        assertEquals(Material.DIAMOND_HELMET, player.getInventory().getHelmet().getType(),
+                "Helmet must be unchanged after hotbar sort");
+        assertEquals(Material.TORCH, player.getInventory().getItemInOffHand().getType(),
+                "Offhand item must be unchanged after hotbar sort");
+    }
+
+    @Test
+    void equipmentUntouchedByMainSort() {
+        // Sorting the main inventory must not disturb armor or offhand slots.
+        PlayerMock player = addOpPlayer("Alice");
+        player.getInventory().setHelmet(stack(Material.DIAMOND_HELMET));
+        player.getInventory().setItemInOffHand(stack(Material.TORCH));
+        player.getInventory().setItem(9, stack(Material.STONE, 5));
+        player.getInventory().setItem(10, stack(Material.STONE, 10));
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        InventoryView view = player.openInventory(chest);
+        // getCurrentItem() via view.getItem(27) = bottomInv.getItem(0), which is empty — override it.
+        callEvent(clickEventWithCurrentItem(view, ClickType.SWAP_OFFHAND, 27, stack(Material.STONE, 5)));
+
+        assertEquals(1, countSlotsWithMaterial(player.getInventory(), Material.STONE, 9, 36),
+                "Main-inventory STONE should have merged (confirming sort ran)");
+        assertEquals(Material.DIAMOND_HELMET, player.getInventory().getHelmet().getType(),
+                "Helmet must be unchanged after main-inventory sort");
+        assertEquals(Material.TORCH, player.getInventory().getItemInOffHand().getType(),
+                "Offhand item must be unchanged after main-inventory sort");
+    }
+
+    @Test
+    void clickEquipmentSlotDoesNotSort() {
+        // Clicking an armor/offhand slot (getSlot() 36–40) must not trigger any sort.
+        // Without the equipment-slot guard in InventorySortService, such a click falls through
+        // to the main-inventory branch and incorrectly sorts slots 9–35.
+        PlayerMock player = addOpPlayer("Alice");
+        player.getInventory().setItem(9, stack(Material.STONE, 5));
+        player.getInventory().setItem(10, stack(Material.STONE, 10));
+        player.getInventory().setHelmet(stack(Material.DIAMOND_HELMET));
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        InventoryView view = player.openInventory(chest);
+
+        // No real rawSlot in MockBukkit produces getSlot() 36–40, so we override the event directly.
+        InventoryClickEvent event = armorSlotClickEvent(view, 39, stack(Material.DIAMOND_HELMET));
+        callEvent(event);
+
+        // Main-inventory STONE must remain two separate slots — no sort should have occurred.
+        assertEquals(2, countSlotsWithMaterial(player.getInventory(), Material.STONE, 9, 36),
+                "Equipment slot click must not sort the main inventory");
+        assertEquals(Material.DIAMOND_HELMET, player.getInventory().getHelmet().getType(),
+                "Helmet must remain unchanged");
     }
 }

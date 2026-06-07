@@ -80,3 +80,45 @@ Commands are implemented as a Brigadier tree in `ClickSortedCommands` and regist
 ### Version Compatibility
 
 `ClickMethod` and `SortingMethod` are plain enums. `SortingMethod.isAvailable()` checks whether `groups.yml` has any mappings loaded (GROUP requires a populated groups file).
+
+## Release Notes Template
+
+Use this format when drafting GitHub release notes. Omit sections that have no entries.
+
+```markdown
+ClickSorted <version> <one-sentence summary of the release theme>.
+
+## Highlights
+
+- <bullet> — <one-line description>
+
+## New Features
+
+### <Feature Area>
+
+<Prose description. Include PR reference [PR #N] if applicable.>
+
+## Bug Fixes
+
+- <description> — <brief cause/fix>. [PR #N]
+
+## Other Improvements
+
+- <description>. [PR #N]
+
+## Compatibility
+
+✔️ Paper <version>
+✔️ Java <version>
+
+## Upgrading
+
+1. Stop your server.
+2. Replace the old jar in `plugins/` with this release.
+3. <Any migration steps — delete if none.>
+4. Start your server.
+
+## What's Changed
+
+- <PR title> by @<author> in #<N>
+```
