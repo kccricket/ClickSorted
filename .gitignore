@@ -23,4 +23,5 @@
 *.iws
 
 /.vscode
-/.claude/settings.local.json
+/.claude
+/.bug-hunter
