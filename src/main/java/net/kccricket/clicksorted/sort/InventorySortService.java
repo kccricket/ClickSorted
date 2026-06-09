@@ -103,6 +103,11 @@ public class InventorySortService {
         }
 
         Set<Integer> sortableSlots = sortEvent.getSortableSlots();
+        if (type == InventoryType.PLAYER) {
+            for (int locked : plugin.getSortingPrefs().getLockedSlots(p)) {
+                sortEvent.excludeSlot(locked);
+            }
+        }
         List<ItemStack> sortedItems = SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {

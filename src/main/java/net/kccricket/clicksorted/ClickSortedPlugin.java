@@ -14,6 +14,7 @@ package net.kccricket.clicksorted;
 
 import net.kccricket.clicksorted.commands.ClickSortedCommands;
 import net.kccricket.clicksorted.config.ConfigManager;
+import net.kccricket.clicksorted.gui.LockGuiListener;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
@@ -53,6 +54,7 @@ public class ClickSortedPlugin extends JavaPlugin {
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new InventoryClickListener(this, sortService, cycleHandler), this);
+        pm.registerEvents(new LockGuiListener(this), this);
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(ClickSortedCommands.build(this), "Manage the ClickSorted plugin"));

@@ -6,6 +6,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.logging.DebugLevel;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
@@ -21,6 +22,7 @@ public class ClickSortedCommands {
                 .then(buildSort(plugin))
                 .then(buildClick(plugin))
                 .then(buildShiftClick(plugin))
+                .then(buildLock(plugin))
                 .then(buildReload(plugin))
                 .then(buildGetcfg(plugin))
                 .then(buildDebug(plugin))
@@ -122,6 +124,20 @@ public class ClickSortedCommands {
                     } else {
                         MessageUtil.statusMessage(player, plugin.getConfigManager().lang().getColoredMessage("tipToDisable"));
                     }
+                    return Command.SINGLE_SUCCESS;
+                });
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildLock(ClickSortedPlugin plugin) {
+        return Commands.literal("lock")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.lock"))
+                .executes(ctx -> {
+                    if (!(ctx.getSource().getExecutor() instanceof Player player)) {
+                        MessageUtil.errorMessage(ctx.getSource().getSender(),
+                                plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    player.openInventory(new LockGuiHolder(plugin, player).getInventory());
                     return Command.SINGLE_SUCCESS;
                 });
     }

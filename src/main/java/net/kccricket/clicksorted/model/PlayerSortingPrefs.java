@@ -22,17 +22,22 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class PlayerSortingPrefs {
     private final ClickSortedPlugin plugin;
     private final NamespacedKey sortKey;
     private final NamespacedKey clickKey;
     private final NamespacedKey shiftClickKey;
+    private final NamespacedKey lockedSlotsKey;
 
     public PlayerSortingPrefs(ClickSortedPlugin plugin) {
         this.plugin = plugin;
         this.sortKey = new NamespacedKey(plugin, "sort");
         this.clickKey = new NamespacedKey(plugin, "click");
         this.shiftClickKey = new NamespacedKey(plugin, "shift_click");
+        this.lockedSlotsKey = new NamespacedKey(plugin, "locked_slots");
     }
 
     public SortingMethod getSortingMethod(Player player) {
@@ -60,6 +65,41 @@ public class PlayerSortingPrefs {
 
     public void setShiftClickAllowed(Player player, boolean allow) {
         player.getPersistentDataContainer().set(shiftClickKey, PersistentDataType.BYTE, allow ? (byte) 1 : (byte) 0);
+    }
+
+    public Set<Integer> getLockedSlots(Player player) {
+        int[] stored = player.getPersistentDataContainer().get(lockedSlotsKey, PersistentDataType.INTEGER_ARRAY);
+        if (stored == null) {
+            return new HashSet<>();
+        }
+        Set<Integer> result = new HashSet<>(stored.length);
+        for (int slot : stored) {
+            result.add(slot);
+        }
+        return result;
+    }
+
+    public void setLockedSlots(Player player, Set<Integer> slots) {
+        if (slots.isEmpty()) {
+            player.getPersistentDataContainer().remove(lockedSlotsKey);
+        } else {
+            player.getPersistentDataContainer().set(lockedSlotsKey, PersistentDataType.INTEGER_ARRAY,
+                    slots.stream().mapToInt(Integer::intValue).toArray());
+        }
+    }
+
+    public boolean isSlotLocked(Player player, int slot) {
+        return getLockedSlots(player).contains(slot);
+    }
+
+    public void setSlotLocked(Player player, int slot, boolean locked) {
+        Set<Integer> slots = getLockedSlots(player);
+        if (locked) {
+            slots.add(slot);
+        } else {
+            slots.remove(slot);
+        }
+        setLockedSlots(player, slots);
     }
 
 }
