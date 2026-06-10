@@ -2,6 +2,7 @@ package net.kccricket.clicksorted;
 
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import org.bukkit.Material;
+import java.util.Set;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -120,7 +121,7 @@ class LockGuiListenerTest extends AbstractClickSortedTest {
     @Test
     void clickPaneTogglesLockFromLockedToUnlocked() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setSlotLocked(player, 9, true);
+        plugin.getSortingPrefs().setLockedSlots(player, Set.of(9));
         InventoryView view = openLockGui(player);
 
         // Should open with red pane at slot 0 (locked).
@@ -147,6 +148,33 @@ class LockGuiListenerTest extends AbstractClickSortedTest {
 
         assertTrue(plugin.getSortingPrefs().isSlotLocked(player, 0),
                 "Hotbar slot 0 should be locked after clicking chest slot 36");
+    }
+
+    // --- Out-of-range slots ---
+
+    @Test
+    void clickOutOfRangeSlotDoesNotLock() {
+        PlayerMock player = addOpPlayer("Alice");
+        // Narrow the sortable range so inv slots 27-35 are excluded (chest slots 18-26 map to those).
+        plugin.getConfig().set("player_sort_max", 27);
+        InventoryView view = openLockGui(player);
+
+        guiClick(view, 18);  // chest slot 18 → inv slot 27, outside [9,27)
+
+        assertTrue(plugin.getSortingPrefs().getLockedSlots(player).isEmpty(),
+                "Clicking an out-of-range slot should not lock it");
+    }
+
+    @Test
+    void outOfRangeSlotRendersAsBlackPane() {
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getConfig().set("player_sort_max", 27);
+        InventoryView view = openLockGui(player);
+
+        // Chest slot 18 maps to inv slot 27, which is outside [9,27).
+        assertEquals(Material.BLACK_STAINED_GLASS_PANE,
+                view.getTopInventory().getItem(18).getType(),
+                "Out-of-range slot should render as black stained glass pane");
     }
 
     // --- Divider ---

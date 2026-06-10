@@ -57,20 +57,13 @@ public class LockGuiListener implements Listener {
             return;
         }
 
-        // Ignore divider row.
-        if (LockGuiHolder.isDividerSlot(rawSlot)) {
-            return;
-        }
-
         int invSlot = LockGuiHolder.chestSlotToInvSlot(rawSlot);
-        if (invSlot < 0) {
+        if (!plugin.getConfigManager().main().isPlayerSlotSortable(invSlot)) {
             return;
         }
 
-        // Toggle the lock state and update the pane.
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-        boolean nowLocked = !prefs.isSlotLocked(player, invSlot);
-        prefs.setSlotLocked(player, invSlot, nowLocked);
+        boolean nowLocked = prefs.toggleSlotLocked(player, invSlot);
 
         event.getView().getTopInventory().setItem(rawSlot,
                 LockGuiHolder.buildPane(plugin.getConfigManager().lang(), nowLocked, rawSlot));

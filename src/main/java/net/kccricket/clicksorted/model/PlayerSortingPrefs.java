@@ -22,6 +22,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -69,14 +70,22 @@ public class PlayerSortingPrefs {
 
     public Set<Integer> getLockedSlots(Player player) {
         int[] stored = player.getPersistentDataContainer().get(lockedSlotsKey, PersistentDataType.INTEGER_ARRAY);
-        if (stored == null) {
-            return new HashSet<>();
+        if (stored == null || stored.length == 0) {
+            return Set.of();
         }
         Set<Integer> result = new HashSet<>(stored.length);
         for (int slot : stored) {
             result.add(slot);
         }
-        return result;
+        return Collections.unmodifiableSet(result);
+    }
+
+    public boolean toggleSlotLocked(Player player, int slot) {
+        Set<Integer> slots = new HashSet<>(getLockedSlots(player));
+        boolean nowLocked = slots.add(slot);
+        if (!nowLocked) slots.remove(slot);
+        setLockedSlots(player, slots);
+        return nowLocked;
     }
 
     public void setLockedSlots(Player player, Set<Integer> slots) {
@@ -92,14 +101,5 @@ public class PlayerSortingPrefs {
         return getLockedSlots(player).contains(slot);
     }
 
-    public void setSlotLocked(Player player, int slot, boolean locked) {
-        Set<Integer> slots = getLockedSlots(player);
-        if (locked) {
-            slots.add(slot);
-        } else {
-            slots.remove(slot);
-        }
-        setLockedSlots(player, slots);
-    }
 
 }

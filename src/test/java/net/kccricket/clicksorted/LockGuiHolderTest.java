@@ -56,6 +56,36 @@ class LockGuiHolderTest {
         assertFalse(LockGuiHolder.isDividerSlot(44));
     }
 
+    // --- isInvSlotSortable ---
+
+    @Test
+    void hotbarSlotsAreAlwaysSortable() {
+        for (int slot = 0; slot < 9; slot++) {
+            assertTrue(LockGuiHolder.isInvSlotSortable(slot, 9, 36),
+                    "Hotbar slot " + slot + " should always be sortable");
+        }
+    }
+
+    @Test
+    void mainStorageSlotInRangeIsSortable() {
+        assertTrue(LockGuiHolder.isInvSlotSortable(9, 9, 36));
+        assertTrue(LockGuiHolder.isInvSlotSortable(35, 9, 36));
+    }
+
+    @Test
+    void mainStorageSlotOutOfRangeIsNotSortable() {
+        assertFalse(LockGuiHolder.isInvSlotSortable(27, 9, 27),
+                "Inv slot 27 should not be sortable when sortMax is 27");
+        assertFalse(LockGuiHolder.isInvSlotSortable(35, 9, 27),
+                "Inv slot 35 should not be sortable when sortMax is 27");
+    }
+
+    @Test
+    void dividerSentinelIsNotSortable() {
+        assertFalse(LockGuiHolder.isInvSlotSortable(-1, 9, 36),
+                "Divider sentinel (-1) should never be sortable");
+    }
+
     // --- mapping is bijective for interactive slots ---
 
     @Test

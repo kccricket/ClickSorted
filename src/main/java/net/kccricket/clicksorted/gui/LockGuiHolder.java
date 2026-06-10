@@ -60,11 +60,16 @@ public class LockGuiHolder implements InventoryHolder {
                 lang.getColoredMessage("lockGuiTitle"));
 
         Set<Integer> locked = plugin.getSortingPrefs().getLockedSlots(player);
+        ItemStack unsortable = buildUnsortablePane(lang);
 
         // Rows 1-3: main storage slots 9-35 → chest slots 0-26
         for (int chestSlot = 0; chestSlot < DIVIDER_START; chestSlot++) {
             int invSlot = chestSlotToInvSlot(chestSlot);
-            inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+            if (plugin.getConfigManager().main().isPlayerSlotSortable(invSlot)) {
+                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+            } else {
+                inventory.setItem(chestSlot, unsortable.clone());
+            }
         }
 
         // Row 4: divider panes, with the rightmost slot replaced by the help head
@@ -108,6 +113,25 @@ public class LockGuiHolder implements InventoryHolder {
         meta.lore(List.of(
                 lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
                 lang.getColoredMessage(locked ? "lockPaneLockedLore" : "lockPaneUnlockedLore")));
+        pane.setItemMeta(meta);
+        return pane;
+    }
+
+    /**
+     * Returns true if the given player inventory slot should be interactive in the GUI.
+     * Hotbar slots (0-8) are always sortable; main-storage slots are gated by config range.
+     */
+    public static boolean isInvSlotSortable(int invSlot, int sortMin, int sortMax) {
+        if (invSlot < 0) return false;
+        if (invSlot < 9) return true;
+        return invSlot >= sortMin && invSlot < sortMax;
+    }
+
+    public static ItemStack buildUnsortablePane(LangConfig lang) {
+        ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemMeta meta = pane.getItemMeta();
+        meta.displayName(lang.getColoredMessage("lockPaneUnsortable"));
+        meta.lore(List.of(lang.getColoredMessage("lockPaneUnsortableLore")));
         pane.setItemMeta(meta);
         return pane;
     }

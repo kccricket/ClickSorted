@@ -67,6 +67,7 @@ public class InventorySortService {
         Log.debug("clicked inventory window " + inv.getType() + ", slot " + slot);
         int min, max; // slot range to sort
         InventoryType type = inv.getType();
+        var mainCfg = plugin.getConfigManager().main();
         if (type == InventoryType.PLAYER) {
             if (slot < 9) {
                 // hotbar
@@ -75,13 +76,13 @@ public class InventorySortService {
                 }
                 min = 0;
                 max = 9;
-            } else if (slot < plugin.getConfig().getInt("player_sort_max")) {
+            } else if (slot < mainCfg.getPlayerSortMax()) {
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.player")) {
                     return false;
                 }
                 // main player inventory
-                min = plugin.getConfig().getInt("player_sort_min");
-                max = plugin.getConfig().getInt("player_sort_max");
+                min = mainCfg.getPlayerSortMin();
+                max = mainCfg.getPlayerSortMax();
             } else {
                 // armor / offhand slots — never sort
                 return false;
