@@ -8,6 +8,10 @@ import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -80,6 +84,105 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
         NamespacedKey key = new NamespacedKey(plugin, "shift_click");
         byte expected = (!initial) ? (byte) 1 : (byte) 0;
         assertEquals(expected, player.getPersistentDataContainer().get(key, PersistentDataType.BYTE));
+    }
+
+    // --- Locked slots ---
+
+    @Test
+    void defaultLockedSlotsIsEmpty() {
+        PlayerMock player = server.addPlayer("Alice");
+        assertTrue(plugin.getSortingPrefs().getLockedSlots(player).isEmpty(),
+                "New player should have no locked slots");
+    }
+
+    @Test
+    void setLockedSlotsPersistsInPDC() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+
+        prefs.setLockedSlots(player, Set.of(9, 15, 0));
+
+        Set<Integer> stored = prefs.getLockedSlots(player);
+        assertEquals(Set.of(9, 15, 0), stored);
+
+        // Verify the raw PDC key holds an INTEGER_ARRAY with the same elements.
+        NamespacedKey key = new NamespacedKey(plugin, "locked_slots");
+        int[] raw = player.getPersistentDataContainer().get(key, PersistentDataType.INTEGER_ARRAY);
+        assertNotNull(raw);
+        Set<Integer> rawSet = Arrays.stream(raw).boxed().collect(Collectors.toSet());
+        assertEquals(Set.of(9, 15, 0), rawSet);
+    }
+
+    @Test
+    void setLockedSlotsEmptyRemovesKey() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+
+        prefs.setLockedSlots(player, Set.of(5));
+        prefs.setLockedSlots(player, Set.of());
+
+        assertTrue(prefs.getLockedSlots(player).isEmpty());
+        NamespacedKey key = new NamespacedKey(plugin, "locked_slots");
+        assertNull(player.getPersistentDataContainer().get(key, PersistentDataType.INTEGER_ARRAY),
+                "Empty lock set should remove the PDC key");
+    }
+
+    @Test
+    void isSlotLockedReturnsTrueForLockedSlot() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+
+        prefs.setLockedSlots(player, Set.of(12));
+
+        assertTrue(prefs.isSlotLocked(player, 12));
+        assertFalse(prefs.isSlotLocked(player, 11));
+    }
+
+    @Test
+    void getLockedSlotsEmptyReturnsUnmodifiableSet() {
+        PlayerMock player = server.addPlayer("Alice");
+        Set<Integer> slots = plugin.getSortingPrefs().getLockedSlots(player);
+        assertThrows(UnsupportedOperationException.class, () -> slots.add(1),
+                "Empty locked-slots set must be unmodifiable");
+    }
+
+    @Test
+    void getLockedSlotsNonEmptyReturnsUnmodifiableSet() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        prefs.setLockedSlots(player, Set.of(9));
+        Set<Integer> slots = prefs.getLockedSlots(player);
+        assertThrows(UnsupportedOperationException.class, () -> slots.add(10),
+                "Non-empty locked-slots set must be unmodifiable");
+    }
+
+    @Test
+    void toggleSlotLockedReturnsTrueWhenLocking() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        assertTrue(prefs.toggleSlotLocked(player, 5),
+                "toggleSlotLocked should return true when the slot was not previously locked");
+        assertTrue(prefs.isSlotLocked(player, 5));
+    }
+
+    @Test
+    void toggleSlotLockedReturnsFalseWhenUnlocking() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        prefs.toggleSlotLocked(player, 5);
+        assertFalse(prefs.toggleSlotLocked(player, 5),
+                "toggleSlotLocked should return false when the slot was already locked");
+        assertFalse(prefs.isSlotLocked(player, 5));
+    }
+
+    @Test
+    void toggleSlotLockedRoundTripsThroughPDC() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        prefs.toggleSlotLocked(player, 12);
+        assertTrue(prefs.isSlotLocked(player, 12), "Slot should be locked after one toggle");
+        prefs.toggleSlotLocked(player, 12);
+        assertFalse(prefs.isSlotLocked(player, 12), "Slot should be unlocked after second toggle");
     }
 
 }

@@ -27,6 +27,7 @@ net.kccricket.clicksorted
 ├── config/                  ConfigManager, ManagedConfig, MainConfig, LangConfig,
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
 ├── events/                  InventorySortEvent
+├── gui/                     LockGuiHolder, LockGuiListener
 ├── sort/                    InventoryClickListener, InventorySortService,
 │                            PrefsCycleHandler, SortEngine
 ├── text/                    MessageUtil, CooldownMessenger, ItemNames
@@ -40,13 +41,16 @@ net.kccricket.clicksorted
 2. `InventoryClickListener` checks the player's `PlayerSortingPrefs` (stored in Bukkit's Persistent Data Container) to see if the click matches their configured `ClickMethod`.
 3. If it matches, `InventorySortService` delegates to `SortEngine`: items are collapsed into a `HashMap<SortKey, Integer>` (material → quantity), then reconstructed into stacks and written back to the inventory.
 4. A custom `InventorySortEvent` fires after sorting so third-party plugins can intervene.
+5. For player inventories, any slots the player has locked (via `/clicksorted lock`) are excluded from the sortable set before `SortEngine` runs — locked slots are neither read nor overwritten.
 
 ### Key Classes
 
 | Class | Package | Role |
 |---|---|---|
 | `ClickSortedPlugin` | root | `JavaPlugin` entry point, wires all components |
-| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, shift-click flag) stored via PDC |
+| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, shift-click flag, locked slots) stored via PDC |
+| `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier panes and maps chest↔inventory slots |
+| `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; toggles lock state and cancels all real-inventory interaction |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
 | `SortingMethod` | model | Enum (NAME, GROUP) controlling `SortKey.makeSortPrefix()` |
 | `ClickMethod` | model | Enum (SINGLE, DOUBLE, SWAP, NONE) |
@@ -75,7 +79,7 @@ There is a known non-obvious setup required for MockBukkit v4 on Java 16+; see `
 
 ### Command Framework
 
-Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand (`sort`, `click`, `shiftclick`, `reload`, `getcfg`, `debug`) is a static builder method. Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
+Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand (`sort`, `click`, `shiftclick`, `lock`, `reload`, `getcfg`, `debug`) is a static builder method. Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
 
 ### Version Compatibility
 

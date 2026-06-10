@@ -21,6 +21,7 @@
     - [Sorting an inventory](#sorting-an-inventory)
     - [Changing preferences in-inventory (shift-click)](#changing-preferences-in-inventory-shift-click)
     - [Your player inventory: two regions](#your-player-inventory-two-regions)
+    - [Locking slots](#locking-slots)
     - [Player commands](#player-commands)
   - [Admin Reference](#admin-reference)
     - [Admin commands](#admin-commands)
@@ -44,6 +45,7 @@
       - [Shift-cycle prompts](#shift-cycle-prompts)
       - [Tips](#tips)
       - [Console / player-only error](#console--player-only-error)
+      - [Lock GUI](#lock-gui)
   - [Building from Source](#building-from-source)
   - [License](#license)
 
@@ -60,7 +62,8 @@ with contributions from **chengzi**. The original plugin made inventory sorting 
 
 - Sort player inventories, chests, ender chests, shulker boxes, barrels, hoppers, droppers, dispensers, and any other configured inventory.
 - Two sort orders: **name** (alphabetical by display name) and **group** (creative-tab-style buckets defined in `groups.yml`).
-- Per-player preferences (trigger, sort order, shift-cycling) persist across sessions.
+- **Lock individual inventory slots** so they are never moved by sorting.
+- Per-player preferences (trigger, sort order, shift-cycling, locked slots) persist across sessions.
 - Change preferences entirely **in-inventory with the mouse** — commands are optional.
 - Identical items are automatically merged into full stacks before sorting.
 - Fully configurable: messages (MiniMessage), item groups, sortable inventory types, slot ranges, and more.
@@ -108,15 +111,27 @@ When you sort your own inventory, the **main inventory** (slots 9–35, excludin
 
 *(Admins can adjust which slot range counts as "main" — see [`player_sort_min` / `player_sort_max`](#configyml) below.)*
 
+### Locking slots
+
+Run `/clicksorted lock` to open the slot-lock GUI. The top of the screen shows a grid of glass panes mirroring your inventory — three rows for the main inventory and one row for the hotbar, separated by a divider.
+
+- **Lime pane** — slot is unlocked and will be sorted normally.
+- **Barrier icon** — slot is locked and will be skipped by sorting.
+
+Click any pane to toggle its state. Changes are saved immediately. Close the GUI when done — your locks are active right away.
+
+Locked slots apply only to your own player inventory (both the main region and the hotbar). Container inventories (chests, barrels, etc.) are always sorted in full.
+
 ### Player commands
 
-All three commands are available to every player by default.
+All four commands are available to every player by default.
 
 | Command | Description |
 |---|---|
 | `/clicksorted sort <name\|group>` | Set your sort order. `group` is only available when `groups.yml` is configured. |
 | `/clicksorted click <swap\|single\|double\|none>` | Set your sort trigger. |
 | `/clicksorted shiftclick` | Toggle in-inventory shift-click mode-cycling on or off. |
+| `/clicksorted lock` | Open the slot-lock GUI to lock or unlock individual inventory slots. |
 
 ## Admin Reference
 
@@ -141,6 +156,7 @@ These commands require the `clicksorted.commands.*` op permissions (see [Permiss
 | `clicksorted.commands.sort` | `true` | Use `/clicksorted sort`. |
 | `clicksorted.commands.click` | `true` | Use `/clicksorted click`. |
 | `clicksorted.commands.shiftclick` | `true` | Use `/clicksorted shiftclick`. |
+| `clicksorted.commands.lock` | `true` | Use `/clicksorted lock`. |
 | `clicksorted.sort` | `true` | Master gate: allow a player to click-sort any inventory at all. Parent of the three nodes below. |
 | `clicksorted.sort.player` | `true` | Allow sorting the player's own main inventory (excluding hotbar). |
 | `clicksorted.sort.hotbar` | `true` | Allow sorting the player's hotbar. |
@@ -350,6 +366,21 @@ Shown periodically as tips alongside mode-cycle confirmations.
 | Key | Default text |
 |---|---|
 | `notFromConsole` | `This command can only be used by a player.` |
+
+#### Lock GUI
+
+| Key | Default text | Placeholders |
+|---|---|---|
+| `lockGuiTitle` | `Slot Locks` | — |
+| `lockPaneUnlocked` | `Unlocked` | — |
+| `lockPaneLocked` | `Locked` | — |
+| `lockPaneSlotInventory` | `Inventory slot <number>` | `<number>` — slot number (1–27) |
+| `lockPaneSlotHotbar` | `Hotbar slot <number>` | `<number>` — slot number (1–9) |
+| `lockPaneUnlockedLore` | `Click to lock this slot.` | — |
+| `lockPaneLockedLore` | `Click to unlock this slot.` | — |
+| `lockDividerName` | `--------` | — |
+| `lockHelpHeadName` | `What is this?` | — |
+| `lockHelpHeadLore` | `Locked inventory slots will not be sorted.` | — |
 
 ---
 

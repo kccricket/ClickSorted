@@ -51,3 +51,19 @@ tipToDisable: "Run <white>/clicksorted shiftclick</white> to disable."
 
 # Error shown when a player-only command is run from the console
 notFromConsole: "This command can only be used by a player."
+
+# Lock GUI
+lockGuiTitle: "<!italic>Slot Locks"
+lockPaneUnlocked: "<!italic><green>Unlocked"
+lockPaneLocked: "<!italic><red>Locked"
+# Placeholder: <number>
+lockPaneSlotInventory: "<!italic><gray>Inventory slot <number>"
+# Placeholder: <number>
+lockPaneSlotHotbar: "<!italic><gray>Hotbar slot <number>"
+lockPaneUnlockedLore: "<!italic><gray>Click to lock this slot."
+lockPaneLockedLore: "<!italic><gray>Click to unlock this slot."
+lockPaneUnsortable: "<!italic><dark_gray>Not sortable"
+lockPaneUnsortableLore: "<!italic><gray>This slot is always excluded from sorting."
+lockDividerName: "<!italic><dark_gray>--------"
+lockHelpHeadName: "<!italic>What is this?"
+lockHelpHeadLore: "<!italic><gray>Locked inventory slots will not be sorted."

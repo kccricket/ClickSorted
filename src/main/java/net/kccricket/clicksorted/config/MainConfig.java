@@ -145,4 +145,19 @@ public class MainConfig implements ManagedConfig {
     public boolean getDefaultShiftClick() {
         return plugin.getConfig().getBoolean("defaults.shift_click");
     }
+
+    public int getPlayerSortMin() {
+        return plugin.getConfig().getInt("player_sort_min");
+    }
+
+    public int getPlayerSortMax() {
+        return plugin.getConfig().getInt("player_sort_max");
+    }
+
+    /** Returns true if the given player inventory slot falls within the sortable range. */
+    public boolean isPlayerSlotSortable(int invSlot) {
+        if (invSlot < 0) return false;
+        if (invSlot < 9) return true; // hotbar: Bukkit slots 0-8
+        return invSlot >= getPlayerSortMin() && invSlot < getPlayerSortMax();
+    }
 }
