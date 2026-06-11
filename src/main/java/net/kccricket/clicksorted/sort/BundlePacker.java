@@ -83,35 +83,41 @@ public final class BundlePacker {
         List<ItemStack> result = new ArrayList<>(sorted);
         Set<Integer> absorbed = new HashSet<>();
 
+        // Build a mutable bin per bundle once, so weight/entry counts are not recomputed
+        // (and the meta is not re-cloned) on every candidate.
+        List<Bin> bins = new ArrayList<>(bundleIndices.size());
+        for (int bi : bundleIndices) {
+            Bin bin = Bin.of(bi, result.get(bi));
+            if (bin != null) bins.add(bin);
+        }
+
         for (int ci : candidateIndices) {
             ItemStack candidate = result.get(ci);
             int weight = stackWeight(candidate);
 
-            for (int bi : bundleIndices) {
-                ItemStack bundleItem = result.get(bi);
-                BundleMeta meta = (BundleMeta) bundleItem.getItemMeta();
-                if (meta == null) continue;
-
-                if (64 - bundleUsedWeight(meta) < weight) continue;
+            for (Bin bin : bins) {
+                if (64 - bin.usedWeight < weight) continue;
 
                 // Entry-cap check: merging into an existing entry costs no new entry slot
-                if (entryCap > 0 && !isExistingEntry(meta, candidate) && distinctEntries(meta) >= entryCap) continue;
+                boolean existing = bin.isExistingEntry(candidate);
+                if (entryCap > 0 && !existing && bin.distinct >= entryCap) continue;
 
                 // Fits — pack it. Prepend so Minecraft shows the most-recently-added item first.
-                List<ItemStack> items = new ArrayList<>();
-                items.add(candidate.clone());
-                items.addAll(meta.getItems());
-                meta.setItems(items);
-                bundleItem.setItemMeta(meta);
+                bin.add(candidate.clone(), weight, existing);
                 absorbed.add(ci);
                 Log.debug("BundlePacker: packed " + candidate.getType() + " x" + candidate.getAmount()
-                        + " into bundle (slot index " + bi + ")");
+                        + " into bundle (slot index " + bin.index + ")");
                 break;
             }
         }
 
         if (absorbed.isEmpty()) {
             return sorted;
+        }
+
+        // Flush each touched bin's accumulated items back to its bundle ItemStack once.
+        for (Bin bin : bins) {
+            bin.flush();
         }
 
         List<ItemStack> out = new ArrayList<>(result.size() - absorbed.size());
@@ -184,5 +190,57 @@ public final class BundlePacker {
         if (mat.name().contains("SHULKER_BOX")) return false;
         if (mat.getMaxStackSize() <= 1) return false;
         return true;
+    }
+
+    /**
+     * Mutable per-bundle accumulator used during {@link #pack}. Computes the bundle's used weight
+     * and distinct-entry count once up front, then maintains them incrementally as items are added
+     * — avoiding a fresh meta clone and full re-scan on every candidate.
+     */
+    private static final class Bin {
+        final int index;
+        final ItemStack bundleItem;
+        final BundleMeta meta;
+        final List<ItemStack> items;
+        int usedWeight;
+        int distinct;
+        boolean dirty;
+
+        private Bin(int index, ItemStack bundleItem, BundleMeta meta) {
+            this.index = index;
+            this.bundleItem = bundleItem;
+            this.meta = meta;
+            this.items = new ArrayList<>(meta.getItems());
+            this.usedWeight = bundleUsedWeight(meta);
+            this.distinct = distinctEntries(meta);
+        }
+
+        /** Wrap a bundle ItemStack, or {@code null} if it has no usable {@link BundleMeta}. */
+        static Bin of(int index, ItemStack bundleItem) {
+            if (!(bundleItem.getItemMeta() instanceof BundleMeta meta)) return null;
+            return new Bin(index, bundleItem, meta);
+        }
+
+        boolean isExistingEntry(ItemStack candidate) {
+            for (ItemStack is : items) {
+                if (is != null && is.isSimilar(candidate)) return true;
+            }
+            return false;
+        }
+
+        /** Prepend an item, updating the running weight and distinct count. */
+        void add(ItemStack item, int weight, boolean existingEntry) {
+            items.add(0, item);
+            usedWeight += weight;
+            if (!existingEntry) distinct++;
+            dirty = true;
+        }
+
+        /** Write accumulated items back to the bundle ItemStack, once, if anything was added. */
+        void flush() {
+            if (!dirty) return;
+            meta.setItems(items);
+            bundleItem.setItemMeta(meta);
+        }
     }
 }
