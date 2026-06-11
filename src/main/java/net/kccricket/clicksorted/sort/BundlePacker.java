@@ -157,7 +157,7 @@ public final class BundlePacker {
     public static int distinctEntries(BundleMeta meta) {
         List<ItemStack> seen = new ArrayList<>();
         for (ItemStack is : meta.getItems()) {
-            if (is != null && seen.stream().noneMatch(s -> s.isSimilar(is))) {
+            if (is != null && !containsSimilar(seen, is)) {
                 seen.add(is);
             }
         }
@@ -169,7 +169,12 @@ public final class BundlePacker {
      * the bundle, meaning it would merge into an existing entry rather than adding a new one.
      */
     public static boolean isExistingEntry(BundleMeta meta, ItemStack candidate) {
-        for (ItemStack is : meta.getItems()) {
+        return containsSimilar(meta.getItems(), candidate);
+    }
+
+    /** Shared similarity predicate: true if any non-null item in {@code items} isSimilar to {@code candidate}. */
+    private static boolean containsSimilar(Iterable<ItemStack> items, ItemStack candidate) {
+        for (ItemStack is : items) {
             if (is != null && is.isSimilar(candidate)) return true;
         }
         return false;
@@ -222,10 +227,7 @@ public final class BundlePacker {
         }
 
         boolean isExistingEntry(ItemStack candidate) {
-            for (ItemStack is : items) {
-                if (is != null && is.isSimilar(candidate)) return true;
-            }
-            return false;
+            return containsSimilar(items, candidate);
         }
 
         /** Prepend an item, updating the running weight and distinct count. */
