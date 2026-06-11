@@ -20,6 +20,7 @@ import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -147,14 +148,14 @@ public class InventorySortService {
     }
 
     /**
-     * Pack partial stacks in the player's main inventory into existing bundles, without sorting.
-     * The current item order is preserved; only absorbed partials are removed.
+     * Combine same-item stacks in the player's main inventory and pack the remaining partials into
+     * existing bundles, without sorting. The current item order is preserved.
      *
      * <p>This is the back-end for the Ctrl+Q-on-bundle shortcut.
      *
      * @param player   the player whose inventory to pack
      * @param entryCap maximum distinct entries per bundle; ≤ 0 means weight-only limit
-     * @return number of partial stacks absorbed into bundles, or -1 if the operation was denied
+     * @return number of inventory slots freed (by combining and bundling), or -1 if denied
      */
     public int packOnly(Player player, int entryCap) {
         if (!Permissions.isAllowedTo(player, "clicksorted.sort.player")) {
@@ -162,34 +163,67 @@ public class InventorySortService {
         }
 
         Set<Integer> sortableSlots = playerSortableSlots(player);
+        Set<Integer> locked = plugin.getSortingPrefs().getLockedSlots(player);
         var inv = player.getInventory();
 
-        // Collect items in slot order without sorting
-        List<ItemStack> items = new java.util.ArrayList<>();
-        for (int i : sortableSlots) {
-            ItemStack item = inv.getItem(i);
-            if (item != null) items.add(item.clone());
+        // Build a slot-aligned working copy (index ↔ slot), so positions are preserved: the
+        // largest stack of each type keeps its slot and bundles stay put, rather than reflowing.
+        // Locked slots are dropped by playerSortableSlots, so they are never read or written.
+        List<Integer> slots = new java.util.ArrayList<>(sortableSlots);
+        List<ItemStack> items = new java.util.ArrayList<>(slots.size());
+        for (int slot : slots) {
+            ItemStack item = inv.getItem(slot);
+            items.add(item == null ? null : item.clone());
         }
 
-        int beforePack = items.size();
-        List<ItemStack> packed = BundlePacker.pack(items, entryCap);
-        int absorbed = beforePack - packed.size();
-
-        if (absorbed == 0) {
-            return 0;
-        }
-
-        // Write back: fill sortable slots with the (shorter) packed list, clear the rest
-        for (int i : sortableSlots) {
-            if (!packed.isEmpty()) {
-                inv.setItem(i, packed.remove(0));
-            } else {
-                inv.clear(i);
+        // Hotbar bundles (slots 0–8) are valid bins, but hotbar *items* are never touched. A bundle
+        // in a locked hotbar slot is skipped.
+        List<Integer> hotbarSlots = new java.util.ArrayList<>();
+        List<ItemStack> hotbarBundles = new java.util.ArrayList<>();
+        for (int slot = 0; slot < 9; slot++) {
+            if (locked.contains(slot)) continue;
+            ItemStack item = inv.getItem(slot);
+            if (item != null && item.getType() == Material.BUNDLE) {
+                hotbarSlots.add(slot);
+                hotbarBundles.add(item.clone());
             }
         }
 
-        player.updateInventory();
-        return absorbed;
+        // Dissolve every eligible item into a pool and repack from scratch (pure, idempotent).
+        int freed = BundlePacker.repack(items, hotbarBundles, entryCap);
+
+        // Write each main slot and each hotbar-bundle slot back from the mutated copies; emptied
+        // slots are cleared. Refresh the viewer only if something actually changed.
+        boolean changed = writeBack(inv, slots, items);
+        changed |= writeBack(inv, hotbarSlots, hotbarBundles);
+
+        if (changed) {
+            player.updateInventory();
+        }
+        return freed;
+    }
+
+    /**
+     * Write a slot-aligned working copy back to the inventory, clearing emptied slots. Returns true
+     * if any slot changed.
+     */
+    private boolean writeBack(org.bukkit.inventory.PlayerInventory inv, List<Integer> slots, List<ItemStack> items) {
+        boolean changed = false;
+        for (int idx = 0; idx < slots.size(); idx++) {
+            int slot = slots.get(idx);
+            ItemStack before = inv.getItem(slot);
+            ItemStack after = items.get(idx);
+            if (after == null) {
+                if (before != null) {
+                    inv.clear(slot);
+                    changed = true;
+                }
+            } else if (!after.equals(before)) {
+                inv.setItem(slot, after);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     /**
