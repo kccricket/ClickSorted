@@ -139,16 +139,7 @@ public class ClickSortedCommands {
                                 plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
                         return Command.SINGLE_SUCCESS;
                     }
-                    var prefs = plugin.getSortingPrefs();
-                    int entryCap = prefs.getBundleCapEnabled(player)
-                            ? plugin.getConfigManager().main().getBundleEntryCap()
-                            : 0;
-                    int packed = plugin.getSortService().packOnly(player, entryCap);
-                    if (packed >= 0) {
-                        MessageUtil.statusMessage(player,
-                                plugin.getConfigManager().lang().getColoredMessage("bundlePacked",
-                                        Placeholder.unparsed("count", String.valueOf(packed))));
-                    }
+                    plugin.getSortService().packBundles(player);
                     return Command.SINGLE_SUCCESS;
                 });
     }

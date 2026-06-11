@@ -18,8 +18,6 @@ import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.security.Permissions;
-import net.kccricket.clicksorted.text.MessageUtil;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -79,14 +77,7 @@ public class InventoryClickListener implements Listener {
                 && event.getClickedInventory() != null
                 && event.getClickedInventory().getType() == InventoryType.PLAYER) {
             event.setCancelled(true);
-            int entryCap = prefs.getBundleCapEnabled(player)
-                    ? plugin.getConfigManager().main().getBundleEntryCap() : 0;
-            int packed = sortService.packOnly(player, entryCap);
-            if (packed >= 0) {
-                MessageUtil.statusMessage(player,
-                        plugin.getConfigManager().lang().getColoredMessage("bundlePacked",
-                                Placeholder.unparsed("count", String.valueOf(packed))));
-            }
+            sortService.packBundles(player);
             return;
         }
 

@@ -18,6 +18,7 @@ import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.text.MessageUtil;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.HumanEntity;
@@ -200,6 +201,22 @@ public class InventorySortService {
 
         player.updateInventory();
         return absorbed;
+    }
+
+    /**
+     * Pack the player's bundles using their current entry-cap preference, then send the
+     * feedback message. Shared entry point for {@code /clicksorted bundle} and the
+     * Ctrl+Q-on-bundle shortcut so both stay in lockstep.
+     */
+    public void packBundles(Player player) {
+        int entryCap = plugin.getSortingPrefs().getBundleCapEnabled(player)
+                ? plugin.getConfigManager().main().getBundleEntryCap() : 0;
+        int packed = packOnly(player, entryCap);
+        if (packed >= 0) {
+            MessageUtil.statusMessage(player,
+                    plugin.getConfigManager().lang().getColoredMessage("bundlePacked",
+                            Placeholder.unparsed("count", String.valueOf(packed))));
+        }
     }
 
     // -------------------------------------------------------------------------
