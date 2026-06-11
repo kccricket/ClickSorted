@@ -140,11 +140,10 @@ public class ClickSortedCommands {
                         return Command.SINGLE_SUCCESS;
                     }
                     var prefs = plugin.getSortingPrefs();
-                    SortingMethod sortMethod = prefs.getSortingMethod(player);
                     int entryCap = prefs.getBundleCapEnabled(player)
                             ? plugin.getConfigManager().main().getBundleEntryCap()
                             : 0;
-                    int packed = plugin.getSortService().sortAndPack(player, sortMethod, entryCap);
+                    int packed = plugin.getSortService().packOnly(player, entryCap);
                     if (packed >= 0) {
                         MessageUtil.statusMessage(player,
                                 plugin.getConfigManager().lang().getColoredMessage("bundlePacked",

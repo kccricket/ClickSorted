@@ -73,7 +73,7 @@ public class InventoryClickListener implements Listener {
             return;
         }
 
-        // Ctrl+Q (CONTROL_DROP) on a bundle in the player's own inventory triggers sort + pack.
+        // Ctrl+Q (CONTROL_DROP) on a bundle in the player's own inventory triggers pack-only.
         if (event.getClick() == ClickType.CONTROL_DROP
                 && event.getCurrentItem().getType() == Material.BUNDLE
                 && event.getClickedInventory() != null
@@ -81,7 +81,7 @@ public class InventoryClickListener implements Listener {
             event.setCancelled(true);
             int entryCap = prefs.getBundleCapEnabled(player)
                     ? plugin.getConfigManager().main().getBundleEntryCap() : 0;
-            int packed = sortService.sortAndPack(player, sortMethod, entryCap);
+            int packed = sortService.packOnly(player, entryCap);
             if (packed >= 0) {
                 MessageUtil.statusMessage(player,
                         plugin.getConfigManager().lang().getColoredMessage("bundlePacked",

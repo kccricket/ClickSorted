@@ -146,17 +146,16 @@ public class InventorySortService {
     }
 
     /**
-     * Sort the player's main inventory and then pack partial stacks into bundles.
-     * Operates on the main-storage slot range from the server config, excluding locked slots.
+     * Pack partial stacks in the player's main inventory into existing bundles, without sorting.
+     * The current item order is preserved; only absorbed partials are removed.
      *
-     * <p>This is the back-end for {@code /clicksorted bundle}. It does not require a click event.
+     * <p>This is the back-end for the Ctrl+Q-on-bundle shortcut.
      *
-     * @param player     the player whose inventory to sort and pack
-     * @param sortMethod the ordering strategy
-     * @param entryCap   maximum distinct entries per bundle; ≤ 0 means weight-only limit
-     * @return number of partial stacks absorbed into bundles, or -1 if the sort was aborted
+     * @param player   the player whose inventory to pack
+     * @param entryCap maximum distinct entries per bundle; ≤ 0 means weight-only limit
+     * @return number of partial stacks absorbed into bundles, or -1 if the operation was denied
      */
-    public int sortAndPack(Player player, SortingMethod sortMethod, int entryCap) {
+    public int packOnly(Player player, int entryCap) {
         if (!Permissions.isAllowedTo(player, "clicksorted.sort.player")) {
             return -1;
         }
@@ -174,36 +173,33 @@ public class InventorySortService {
         }
 
         var inv = player.getInventory();
-        List<ItemStack> sortedItems = SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
-        // Run bundle-packing before the overflow check — packing can only reduce the list size
-        int beforePack = sortedItems.size();
-        sortedItems = BundlePacker.pack(sortedItems, entryCap);
-        int packed = beforePack - sortedItems.size();
-
-        if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
-            MessageUtil.errorMessage(player, plugin.getConfigManager().lang().getColoredMessage("invOverFlow"));
-            return -1;
+        // Collect items in slot order without sorting
+        List<ItemStack> items = new java.util.ArrayList<>();
+        for (int i : sortableSlots) {
+            ItemStack item = inv.getItem(i);
+            if (item != null) items.add(item.clone());
         }
 
+        int beforePack = items.size();
+        List<ItemStack> packed = BundlePacker.pack(items, entryCap);
+        int absorbed = beforePack - packed.size();
+
+        if (absorbed == 0) {
+            return 0;
+        }
+
+        // Write back: fill sortable slots with the (shorter) packed list, clear the rest
         for (int i : sortableSlots) {
-            if (!sortedItems.isEmpty()) {
-                inv.setItem(i, sortedItems.remove(0));
+            if (!packed.isEmpty()) {
+                inv.setItem(i, packed.remove(0));
             } else {
                 inv.clear(i);
             }
         }
 
-        if (!sortedItems.isEmpty()) {
-            MessageUtil.alertMessage(player, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
-            for (ItemStack item : sortedItems) {
-                Log.debug("dropping " + item + " by player " + player.getName());
-                player.getWorld().dropItemNaturally(player.getLocation(), item);
-            }
-        }
-
         player.updateInventory();
-        return packed;
+        return absorbed;
     }
 
     // -------------------------------------------------------------------------
