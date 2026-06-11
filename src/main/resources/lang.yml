@@ -26,8 +26,8 @@ setShiftClickStatus: "Shift-click mode cycling: <status>."
 bundlePacked: "Packed <count> partial stack(s) into bundle(s)."
 
 # Command feedback — bundle entry-cap toggle (/clicksorted bundlecap)
-# Placeholder: <status> (ENABLED or DISABLED)
-setBundleCapStatus: "Bundle entry cap (12): <status>."
+# Placeholders: <status> (ENABLED or DISABLED), <cap> (configured max entries per bundle)
+setBundleCapStatus: "Bundle entry cap (<cap>): <status>."
 
 # Command feedback — debug level
 # Placeholder: <level>

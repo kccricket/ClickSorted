@@ -165,9 +165,11 @@ public class ClickSortedCommands {
                     boolean current = plugin.getSortingPrefs().getBundleCapEnabled(player);
                     plugin.getSortingPrefs().setBundleCapEnabled(player, !current);
                     String status = current ? "DISABLED" : "ENABLED";
+                    int cap = plugin.getConfigManager().main().getBundleEntryCap();
                     MessageUtil.statusMessage(player,
                             plugin.getConfigManager().lang().getColoredMessage("setBundleCapStatus",
-                                    Placeholder.unparsed("status", status)));
+                                    Placeholder.unparsed("status", status),
+                                    Placeholder.unparsed("cap", String.valueOf(cap))));
                     return Command.SINGLE_SUCCESS;
                 });
     }
