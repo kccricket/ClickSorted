@@ -18,11 +18,16 @@ import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.security.Permissions;
+import net.kccricket.clicksorted.text.MessageUtil;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
 
 /**
  * Thin event dispatcher. Reads player preferences, delegates pre-sort cycling to
@@ -65,6 +70,23 @@ public class InventoryClickListener implements Listener {
         boolean allowShiftClick = prefs.getShiftClickAllowed(player);
 
         if (cycleHandler.tryCycle(event, player, sortMethod, clickMethod, allowShiftClick)) {
+            return;
+        }
+
+        // Ctrl+Q (CONTROL_DROP) on a bundle in the player's own inventory triggers sort + pack.
+        if (event.getClick() == ClickType.CONTROL_DROP
+                && event.getCurrentItem().getType() == Material.BUNDLE
+                && event.getClickedInventory() != null
+                && event.getClickedInventory().getType() == InventoryType.PLAYER) {
+            event.setCancelled(true);
+            int entryCap = prefs.getBundleCapEnabled(player)
+                    ? plugin.getConfigManager().main().getBundleEntryCap() : 0;
+            int packed = sortService.sortAndPack(player, sortMethod, entryCap);
+            if (packed >= 0) {
+                MessageUtil.statusMessage(player,
+                        plugin.getConfigManager().lang().getColoredMessage("bundlePacked",
+                                Placeholder.unparsed("count", String.valueOf(packed))));
+            }
             return;
         }
 

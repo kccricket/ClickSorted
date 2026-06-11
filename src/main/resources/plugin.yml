@@ -16,6 +16,8 @@ permissions:
       clicksorted.commands.click: true
       clicksorted.commands.shiftclick: true
       clicksorted.commands.lock: true
+      clicksorted.commands.bundle: true
+      clicksorted.commands.bundlecap: true
       clicksorted.commands.getcfg: true
       clicksorted.commands.debug: true
   clicksorted.commands.reload:
@@ -38,6 +40,12 @@ permissions:
     default: true
   clicksorted.commands.lock:
     description: Allow use of the /clicksorted lock command
+    default: true
+  clicksorted.commands.bundle:
+    description: Allow use of the /clicksorted bundle command
+    default: true
+  clicksorted.commands.bundlecap:
+    description: Allow use of the /clicksorted bundlecap command
     default: true
   clicksorted.sort:
     description: Allow all kinds of inventories to be click-sorted

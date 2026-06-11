@@ -91,6 +91,13 @@ public class MainConfig implements ManagedConfig {
         cfg.setComments("defaults.shift_click", List.of(
                 "When true, shift-clicking an empty slot cycles through sort/click modes.",
                 "Players can toggle this per-session with /clicksorted shiftclick."));
+        cfg.setComments("defaults.bundle_cap", List.of(
+                "When true, /clicksorted bundle caps each bundle at bundle_entry_cap distinct entries",
+                "so its tooltip stays fully readable. Players can override with /clicksorted bundlecap."));
+        cfg.setComments("bundle_entry_cap", List.of(
+                "Maximum number of distinct item entries per bundle when the entry cap is enabled.",
+                "12 = tooltip-preview limit (bundles show the 12 most-recently-added items).",
+                "Set to 0 or less to disable the cap globally (weight-only limit applies instead)."));
         cfg.setComments("player_sort_min", List.of(
                 "First inventory slot included when sorting a player's main inventory (inclusive).",
                 "Slot 9 is the first row of main storage (slots 0-8 are the hotbar)."));
@@ -144,6 +151,18 @@ public class MainConfig implements ManagedConfig {
 
     public boolean getDefaultShiftClick() {
         return plugin.getConfig().getBoolean("defaults.shift_click");
+    }
+
+    public boolean getDefaultBundleCap() {
+        return plugin.getConfig().getBoolean("defaults.bundle_cap");
+    }
+
+    /**
+     * Maximum distinct entries per bundle when the per-player entry cap is enabled.
+     * Returns the configured value (≤ 0 means unlimited).
+     */
+    public int getBundleEntryCap() {
+        return plugin.getConfig().getInt("bundle_entry_cap");
     }
 
     public int getPlayerSortMin() {

@@ -31,6 +31,7 @@ public class ClickSortedPlugin extends JavaPlugin {
     private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
     private ConfigManager configManager;
+    private InventorySortService sortService;
 
     private static ClickSortedPlugin instance = null;
 
@@ -49,7 +50,7 @@ public class ClickSortedPlugin extends JavaPlugin {
 
         sortingPrefs = new PlayerSortingPrefs(this);
 
-        InventorySortService sortService = new InventorySortService(this);
+        sortService = new InventorySortService(this);
         PrefsCycleHandler cycleHandler = new PrefsCycleHandler(this);
 
         PluginManager pm = this.getServer().getPluginManager();
@@ -86,5 +87,9 @@ public class ClickSortedPlugin extends JavaPlugin {
     /** @return the sorting prefs for all players */
     public PlayerSortingPrefs getSortingPrefs() {
         return sortingPrefs;
+    }
+
+    public InventorySortService getSortService() {
+        return sortService;
     }
 }

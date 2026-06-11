@@ -9,6 +9,8 @@ defaults:
   click_mode: SWAP
   sort_mode: NAME
   shift_click: true
+  bundle_cap: true
+bundle_entry_cap: 12
 player_sort_min: 9
 player_sort_max: 36
 sortable_inventories:

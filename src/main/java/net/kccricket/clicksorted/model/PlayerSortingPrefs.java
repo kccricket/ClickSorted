@@ -32,6 +32,7 @@ public class PlayerSortingPrefs {
     private final NamespacedKey clickKey;
     private final NamespacedKey shiftClickKey;
     private final NamespacedKey lockedSlotsKey;
+    private final NamespacedKey bundleCapKey;
 
     public PlayerSortingPrefs(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -39,6 +40,7 @@ public class PlayerSortingPrefs {
         this.clickKey = new NamespacedKey(plugin, "click");
         this.shiftClickKey = new NamespacedKey(plugin, "shift_click");
         this.lockedSlotsKey = new NamespacedKey(plugin, "locked_slots");
+        this.bundleCapKey = new NamespacedKey(plugin, "bundle_cap");
     }
 
     public SortingMethod getSortingMethod(Player player) {
@@ -66,6 +68,19 @@ public class PlayerSortingPrefs {
 
     public void setShiftClickAllowed(Player player, boolean allow) {
         player.getPersistentDataContainer().set(shiftClickKey, PersistentDataType.BYTE, allow ? (byte) 1 : (byte) 0);
+    }
+
+    /**
+     * Returns true if the per-player bundle entry cap is enabled.
+     * Falls back to the server default when the player has no stored preference.
+     */
+    public boolean getBundleCapEnabled(Player player) {
+        Byte stored = player.getPersistentDataContainer().get(bundleCapKey, PersistentDataType.BYTE);
+        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultBundleCap();
+    }
+
+    public void setBundleCapEnabled(Player player, boolean enabled) {
+        player.getPersistentDataContainer().set(bundleCapKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
     }
 
     public Set<Integer> getLockedSlots(Player player) {

@@ -30,6 +30,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Handles target-inventory resolution, permission checks, the {@link InventorySortEvent}
@@ -142,6 +143,67 @@ public class InventorySortService {
         }
 
         return true;
+    }
+
+    /**
+     * Sort the player's main inventory and then pack partial stacks into bundles.
+     * Operates on the main-storage slot range from the server config, excluding locked slots.
+     *
+     * <p>This is the back-end for {@code /clicksorted bundle}. It does not require a click event.
+     *
+     * @param player     the player whose inventory to sort and pack
+     * @param sortMethod the ordering strategy
+     * @param entryCap   maximum distinct entries per bundle; ≤ 0 means weight-only limit
+     * @return number of partial stacks absorbed into bundles, or -1 if the sort was aborted
+     */
+    public int sortAndPack(Player player, SortingMethod sortMethod, int entryCap) {
+        if (!Permissions.isAllowedTo(player, "clicksorted.sort.player")) {
+            return -1;
+        }
+
+        var mainCfg = plugin.getConfigManager().main();
+        int min = mainCfg.getPlayerSortMin();
+        int max = mainCfg.getPlayerSortMax();
+
+        Set<Integer> sortableSlots = new TreeSet<>();
+        for (int i = min; i < max; i++) {
+            sortableSlots.add(i);
+        }
+        for (int locked : plugin.getSortingPrefs().getLockedSlots(player)) {
+            sortableSlots.remove(locked);
+        }
+
+        var inv = player.getInventory();
+        List<ItemStack> sortedItems = SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
+
+        // Run bundle-packing before the overflow check — packing can only reduce the list size
+        int beforePack = sortedItems.size();
+        sortedItems = BundlePacker.pack(sortedItems, entryCap);
+        int packed = beforePack - sortedItems.size();
+
+        if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
+            MessageUtil.errorMessage(player, plugin.getConfigManager().lang().getColoredMessage("invOverFlow"));
+            return -1;
+        }
+
+        for (int i : sortableSlots) {
+            if (!sortedItems.isEmpty()) {
+                inv.setItem(i, sortedItems.remove(0));
+            } else {
+                inv.clear(i);
+            }
+        }
+
+        if (!sortedItems.isEmpty()) {
+            MessageUtil.alertMessage(player, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
+            for (ItemStack item : sortedItems) {
+                Log.debug("dropping " + item + " by player " + player.getName());
+                player.getWorld().dropItemNaturally(player.getLocation(), item);
+            }
+        }
+
+        player.updateInventory();
+        return packed;
     }
 
     // -------------------------------------------------------------------------

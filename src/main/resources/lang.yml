@@ -21,6 +21,14 @@ setClickMethodTo: "Click mode set to <method>. <instruction>"
 # Placeholder: <status> (ENABLED or DISABLED)
 setShiftClickStatus: "Shift-click mode cycling: <status>."
 
+# Command feedback — bundle pack (/clicksorted bundle)
+# Placeholder: <count> (number of partial stacks packed into bundles)
+bundlePacked: "Sorted. Packed <count> partial stack(s) into bundle(s)."
+
+# Command feedback — bundle entry-cap toggle (/clicksorted bundlecap)
+# Placeholder: <status> (ENABLED or DISABLED)
+setBundleCapStatus: "Bundle entry cap (12): <status>."
+
 # Command feedback — debug level
 # Placeholder: <level>
 setDebugLevelTo: "Debug level is now <level>"
