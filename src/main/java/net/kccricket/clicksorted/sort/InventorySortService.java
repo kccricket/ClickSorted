@@ -161,18 +161,7 @@ public class InventorySortService {
             return -1;
         }
 
-        var mainCfg = plugin.getConfigManager().main();
-        int min = mainCfg.getPlayerSortMin();
-        int max = mainCfg.getPlayerSortMax();
-
-        Set<Integer> sortableSlots = new TreeSet<>();
-        for (int i = min; i < max; i++) {
-            sortableSlots.add(i);
-        }
-        for (int locked : plugin.getSortingPrefs().getLockedSlots(player)) {
-            sortableSlots.remove(locked);
-        }
-
+        Set<Integer> sortableSlots = playerSortableSlots(player);
         var inv = player.getInventory();
 
         // Collect items in slot order without sorting
@@ -222,6 +211,21 @@ public class InventorySortService {
     // -------------------------------------------------------------------------
     // Target-inventory helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * The player's main-storage slot set (config range minus their locked slots).
+     */
+    private Set<Integer> playerSortableSlots(Player player) {
+        var mainCfg = plugin.getConfigManager().main();
+        Set<Integer> slots = new TreeSet<>();
+        for (int i = mainCfg.getPlayerSortMin(); i < mainCfg.getPlayerSortMax(); i++) {
+            slots.add(i);
+        }
+        for (int locked : plugin.getSortingPrefs().getLockedSlots(player)) {
+            slots.remove(locked);
+        }
+        return slots;
+    }
 
     private boolean shouldSort(Inventory clickedInventory) {
         return clickedInventory != null && !shouldIgnore(clickedInventory)
