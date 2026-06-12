@@ -67,7 +67,13 @@ public class InventoryClickListener implements Listener {
         ClickMethod clickMethod = prefs.getClickMethod(player);
         boolean allowShiftClick = prefs.getShiftClickAllowed(player);
 
-        if (cycleHandler.tryCycle(event, player, sortMethod, clickMethod, allowShiftClick)) {
+        // Prefs-cycle gesture. Throttle only once we know it is one (not on ordinary clicks),
+        // so the cooldown clock is spent on real actions rather than incidental inventory clicks.
+        if (cycleHandler.isCycleGesture(event, clickMethod, allowShiftClick)) {
+            if (throttled(player)) {
+                return;
+            }
+            cycleHandler.tryCycle(event, player, sortMethod, clickMethod, allowShiftClick);
             return;
         }
 
@@ -76,12 +82,19 @@ public class InventoryClickListener implements Listener {
                 && event.getCurrentItem().getType() == Material.BUNDLE
                 && event.getClickedInventory() != null
                 && event.getClickedInventory().getType() == InventoryType.PLAYER) {
+            // Cancel the vanilla drop regardless; only run the pack once past the throttle.
             event.setCancelled(true);
+            if (throttled(player)) {
+                return;
+            }
             sortService.packBundles(player);
             return;
         }
 
         if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
+            if (throttled(player)) {
+                return;
+            }
             if (sortService.sortInventory(event, sortMethod) && clickMethod.shouldCancelEvent()) {
                 // Use the Paper entity scheduler so the offhand reset is bound to this player
                 // entity (Folia-safe).
@@ -91,5 +104,18 @@ public class InventoryClickListener implements Listener {
                 event.setCancelled(true);
             }
         }
+    }
+
+    /**
+     * Shared per-player throttle gate. Returns {@code true} (and sends a rate-limited notice) when
+     * the action should be dropped; {@code false} when it may proceed.
+     */
+    private boolean throttled(Player player) {
+        if (plugin.getActionThrottle().allow(player)) {
+            return false;
+        }
+        plugin.getMessenger().message(player, "throttle", 3,
+                plugin.getConfigManager().lang().getColoredMessage("actionTooFast"));
+        return true;
     }
 }

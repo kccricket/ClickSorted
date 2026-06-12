@@ -17,6 +17,7 @@ import net.kccricket.clicksorted.config.ConfigManager;
 import net.kccricket.clicksorted.gui.LockGuiListener;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
+import net.kccricket.clicksorted.security.ActionThrottle;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
 import net.kccricket.clicksorted.sort.InventorySortService;
 import net.kccricket.clicksorted.sort.PrefsCycleHandler;
@@ -32,6 +33,7 @@ public class ClickSortedPlugin extends JavaPlugin {
     private PlayerSortingPrefs sortingPrefs;
     private ConfigManager configManager;
     private InventorySortService sortService;
+    private ActionThrottle actionThrottle;
 
     private static ClickSortedPlugin instance = null;
 
@@ -49,6 +51,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         }
 
         sortingPrefs = new PlayerSortingPrefs(this);
+        actionThrottle = new ActionThrottle(this);
 
         sortService = new InventorySortService(this);
         PrefsCycleHandler cycleHandler = new PrefsCycleHandler(this);
@@ -91,5 +94,9 @@ public class ClickSortedPlugin extends JavaPlugin {
 
     public InventorySortService getSortService() {
         return sortService;
+    }
+
+    public ActionThrottle getActionThrottle() {
+        return actionThrottle;
     }
 }

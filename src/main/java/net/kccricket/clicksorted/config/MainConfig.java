@@ -104,6 +104,13 @@ public class MainConfig implements ManagedConfig {
         cfg.setComments("player_sort_max", List.of(
                 "Last inventory slot included when sorting a player's main inventory (inclusive).",
                 "Slot 35 is the last main-storage slot; slots 36+ are armor and off-hand."));
+        cfg.setComments("action_cooldown_ms", List.of(
+                "Minimum milliseconds between successive ClickSorted actions per player",
+                "(sorting, bundle-packing, in-inventory mode cycling, lock-GUI toggles, commands).",
+                "Caps how fast a scripted client can spam these; players with the",
+                "clicksorted.throttle.bypass permission (default op) are exempt.",
+                "Lower values feel snappier but may clip rapid legitimate lock-GUI clicking.",
+                "Set to 0 to disable throttling entirely."));
         cfg.setComments("sortable_inventories", List.of(
                 "Inventory types that players are allowed to sort.",
                 "Values must be valid Bukkit InventoryType names (case-sensitive).",
@@ -167,6 +174,14 @@ public class MainConfig implements ManagedConfig {
 
     public int getPlayerSortMin() {
         return plugin.getConfig().getInt("player_sort_min");
+    }
+
+    /**
+     * Minimum milliseconds between successive per-player actions ({@code action_cooldown_ms}).
+     * A value ≤ 0 disables the {@link net.kccricket.clicksorted.security.ActionThrottle}.
+     */
+    public int getActionCooldownMs() {
+        return plugin.getConfig().getInt("action_cooldown_ms", 150);
     }
 
     public int getPlayerSortMax() {

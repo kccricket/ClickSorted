@@ -9,8 +9,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 /**

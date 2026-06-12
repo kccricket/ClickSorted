@@ -62,6 +62,13 @@ public class LockGuiListener implements Listener {
             return;
         }
 
+        // A confirmed lock-toggle action — subject to the shared per-player throttle.
+        if (!plugin.getActionThrottle().allow(player)) {
+            plugin.getMessenger().message(player, "throttle", 3,
+                    plugin.getConfigManager().lang().getColoredMessage("actionTooFast"));
+            return;
+        }
+
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
         boolean nowLocked = prefs.toggleSlotLocked(player, invSlot);
 

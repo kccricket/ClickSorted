@@ -1,6 +1,7 @@
 package net.kccricket.clicksorted.commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -11,11 +12,29 @@ import net.kccricket.clicksorted.logging.DebugLevel;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
 
 public class ClickSortedCommands {
+
+    /**
+     * Shared per-player throttle gate for command execution. Console and other non-player senders
+     * are always exempt. Returns {@code true} (and sends a rate-limited notice) when the command
+     * should be dropped.
+     */
+    private static boolean throttled(ClickSortedPlugin plugin, CommandSourceStack src) {
+        if (!(src.getExecutor() instanceof Player player)) {
+            return false;
+        }
+        if (plugin.getActionThrottle().allow(player)) {
+            return false;
+        }
+        plugin.getMessenger().message(player, "throttle", 3,
+                plugin.getConfigManager().lang().getColoredMessage("actionTooFast"));
+        return true;
+    }
 
     public static LiteralCommandNode<CommandSourceStack> build(ClickSortedPlugin plugin) {
         return Commands.literal("clicksorted")
@@ -28,6 +47,7 @@ public class ClickSortedCommands {
                 .then(buildReload(plugin))
                 .then(buildGetcfg(plugin))
                 .then(buildDebug(plugin))
+                .then(buildBenchmark(plugin))
                 .build();
     }
 
@@ -48,6 +68,9 @@ public class ClickSortedCommands {
                             if (!(ctx.getSource().getExecutor() instanceof Player player)) {
                                 MessageUtil.errorMessage(ctx.getSource().getSender(),
                                         plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            if (throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
                             String arg = StringArgumentType.getString(ctx, "method");
@@ -89,6 +112,9 @@ public class ClickSortedCommands {
                                         plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
                                 return Command.SINGLE_SUCCESS;
                             }
+                            if (throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
                             String arg = StringArgumentType.getString(ctx, "method");
                             try {
                                 ClickMethod method = ClickMethod.valueOf(arg.toUpperCase());
@@ -111,6 +137,9 @@ public class ClickSortedCommands {
                     if (!(ctx.getSource().getExecutor() instanceof Player player)) {
                         MessageUtil.errorMessage(ctx.getSource().getSender(),
                                 plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    if (throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
                     boolean current = plugin.getSortingPrefs().getShiftClickAllowed(player);
@@ -139,6 +168,9 @@ public class ClickSortedCommands {
                                 plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
                         return Command.SINGLE_SUCCESS;
                     }
+                    if (throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
                     plugin.getSortService().packBundles(player);
                     return Command.SINGLE_SUCCESS;
                 });
@@ -151,6 +183,9 @@ public class ClickSortedCommands {
                     if (!(ctx.getSource().getExecutor() instanceof Player player)) {
                         MessageUtil.errorMessage(ctx.getSource().getSender(),
                                 plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    if (throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
                     boolean current = plugin.getSortingPrefs().getBundleCapEnabled(player);
@@ -172,6 +207,9 @@ public class ClickSortedCommands {
                     if (!(ctx.getSource().getExecutor() instanceof Player player)) {
                         MessageUtil.errorMessage(ctx.getSource().getSender(),
                                 plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    if (throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
                     player.openInventory(new LockGuiHolder(plugin, player).getInventory());
@@ -240,5 +278,41 @@ public class ClickSortedCommands {
                             }
                             return Command.SINGLE_SUCCESS;
                         }));
+    }
+
+    private static final int BENCH_DEFAULT_ITERATIONS = 2000;
+    private static final int BENCH_MIN_ITERATIONS = 100;
+    private static final int BENCH_MAX_ITERATIONS = 50_000;
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBenchmark(ClickSortedPlugin plugin) {
+        return Commands.literal("benchmark")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.benchmark"))
+                .executes(ctx -> runBenchmark(plugin, ctx.getSource(), BENCH_DEFAULT_ITERATIONS))
+                .then(Commands.argument("iterations", IntegerArgumentType.integer(BENCH_MIN_ITERATIONS, BENCH_MAX_ITERATIONS))
+                        .executes(ctx -> runBenchmark(plugin, ctx.getSource(),
+                                IntegerArgumentType.getInteger(ctx, "iterations"))));
+    }
+
+    /**
+     * Runs the in-situ benchmark synchronously on the calling thread (the main thread for a command),
+     * briefly pausing the server, and reports per-operation timings for the sort and repack paths.
+     */
+    private static int runBenchmark(ClickSortedPlugin plugin, CommandSourceStack src, int iterations) {
+        var sender = src.getSender();
+        MessageUtil.statusMessage(sender, "Running ClickSorted benchmark (" + iterations
+                + " iterations)—the server will pause briefly…");
+
+        BundleBenchmark.Result result = BundleBenchmark.run(iterations);
+
+        reportStats(sender, "sortAndMerge", result.sort());
+        reportStats(sender, "bundle repack", result.repack());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static void reportStats(org.bukkit.command.CommandSender sender, String label, BundleBenchmark.Stats s) {
+        MessageUtil.statusMessage(sender, String.format(
+                "%s: min %.1f / median %.1f / p95 %.1f / max %.1f µs/op (n=%d, %.1f ms total)",
+                label, s.minUs(), s.medianUs(), s.p95Us(), s.maxUs(), s.iterations(),
+                s.totalNanos() / 1_000_000.0));
     }
 }

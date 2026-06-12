@@ -60,6 +60,9 @@ tipToDisable: "Run <white>/clicksorted shiftclick</white> to disable."
 # Error shown when a player-only command is run from the console
 notFromConsole: "This command can only be used by a player."
 
+# Shown (rate-limited) when a player triggers actions faster than action_cooldown_ms allows
+actionTooFast: "<red>Slow down — you're acting too quickly."
+
 # Lock GUI
 lockGuiTitle: "<!italic>Slot Locks"
 lockPaneUnlocked: "<!italic><green>Unlocked"
