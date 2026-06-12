@@ -91,13 +91,17 @@ public class MainConfig implements ManagedConfig {
         cfg.setComments("defaults.shift_click", List.of(
                 "When true, shift-clicking an empty slot cycles through sort/click modes.",
                 "Players can toggle this per-session with /clicksorted shiftclick."));
-        cfg.setComments("defaults.bundle_cap", List.of(
-                "When true, /clicksorted bundle caps each bundle at bundle_entry_cap distinct entries",
-                "so its tooltip stays fully readable. Players can override with /clicksorted bundlecap."));
-        cfg.setComments("bundle_entry_cap", List.of(
-                "Maximum number of distinct item entries per bundle when the entry cap is enabled.",
+        cfg.setComments("defaults.bundle_inventory", List.of(
+                "When true, sorting a player's own inventory also packs partial stacks into any bundles",
+                "present there. Players can toggle this with /clicksorted bundle inventory on|off."));
+        cfg.setComments("defaults.bundle_others", List.of(
+                "When true, sorting a container (chest, barrel, …) also packs partial stacks into any",
+                "bundles it holds. Players can toggle this with /clicksorted bundle others on|off."));
+        cfg.setComments("defaults.bundle_stack_limit", List.of(
+                "Default max number of distinct item entries per bundle when packing.",
                 "12 = tooltip-preview limit (bundles show the 12 most-recently-added items).",
-                "Set to 0 or less to disable the cap globally (weight-only limit applies instead)."));
+                "0 disables the entry limit (weight-only limit applies instead).",
+                "Players can change this with /clicksorted bundle stacklimit <n|off>."));
         cfg.setComments("player_sort_min", List.of(
                 "First inventory slot included when sorting a player's main inventory (inclusive).",
                 "Slot 9 is the first row of main storage (slots 0-8 are the hotbar)."));
@@ -160,16 +164,19 @@ public class MainConfig implements ManagedConfig {
         return plugin.getConfig().getBoolean("defaults.shift_click");
     }
 
-    public boolean getDefaultBundleCap() {
-        return plugin.getConfig().getBoolean("defaults.bundle_cap");
+    public boolean getDefaultBundlePackInventory() {
+        return plugin.getConfig().getBoolean("defaults.bundle_inventory");
+    }
+
+    public boolean getDefaultBundlePackOthers() {
+        return plugin.getConfig().getBoolean("defaults.bundle_others");
     }
 
     /**
-     * Maximum distinct entries per bundle when the per-player entry cap is enabled.
-     * Returns the configured value (≤ 0 means unlimited).
+     * Default max distinct entries per bundle when packing (0 = weight-only limit).
      */
-    public int getBundleEntryCap() {
-        return plugin.getConfig().getInt("bundle_entry_cap");
+    public int getDefaultBundleStackLimit() {
+        return plugin.getConfig().getInt("defaults.bundle_stack_limit");
     }
 
     public int getPlayerSortMin() {

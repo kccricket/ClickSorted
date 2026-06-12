@@ -37,19 +37,31 @@ public final class SortEngine {
      * @return a sorted, stack-merged list of items
      */
     public static List<ItemStack> sortAndMerge(ItemStack[] items, Set<Integer> sortableSlots, SortingMethod sortMethod) {
+        Log.debug("sortAndMerge: sortable = " + sortableSlots + ", size = " + items.length);
+        List<ItemStack> extracted = new ArrayList<>(sortableSlots.size());
+        for (int i : sortableSlots) {
+            if (items[i] != null) {
+                extracted.add(items[i]);
+            }
+        }
+        return sortAndMerge(extracted, sortMethod);
+    }
+
+    /**
+     * Sort and merge a flat collection of item stacks (no slot indexing).
+     *
+     * @param items      the item stacks to pool, merge, and sort ({@code null} entries are ignored)
+     * @param sortMethod the ordering strategy
+     * @return a sorted, stack-merged list of items
+     */
+    public static List<ItemStack> sortAndMerge(Collection<ItemStack> items, SortingMethod sortMethod) {
         Map<SortKey, Integer> amounts = new HashMap<>();
 
         // Phase 1: extract unique item keys and accumulate quantities
-        Log.debug("sortAndMerge: sortable = " + sortableSlots + ", size = " + items.length);
-        for (int i : sortableSlots) {
-            ItemStack is = items[i];
+        for (ItemStack is : items) {
             if (is != null) {
                 SortKey key = new SortKey(is, sortMethod);
-                if (amounts.containsKey(key)) {
-                    amounts.put(key, amounts.get(key) + is.getAmount());
-                } else {
-                    amounts.put(key, is.getAmount());
-                }
+                amounts.merge(key, is.getAmount(), Integer::sum);
             }
         }
 

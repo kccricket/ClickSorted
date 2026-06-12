@@ -32,7 +32,9 @@ public class PlayerSortingPrefs {
     private final NamespacedKey clickKey;
     private final NamespacedKey shiftClickKey;
     private final NamespacedKey lockedSlotsKey;
-    private final NamespacedKey bundleCapKey;
+    private final NamespacedKey bundleInventoryKey;
+    private final NamespacedKey bundleOthersKey;
+    private final NamespacedKey bundleStackLimitKey;
 
     public PlayerSortingPrefs(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -40,7 +42,9 @@ public class PlayerSortingPrefs {
         this.clickKey = new NamespacedKey(plugin, "click");
         this.shiftClickKey = new NamespacedKey(plugin, "shift_click");
         this.lockedSlotsKey = new NamespacedKey(plugin, "locked_slots");
-        this.bundleCapKey = new NamespacedKey(plugin, "bundle_cap");
+        this.bundleInventoryKey = new NamespacedKey(plugin, "bundle_inventory");
+        this.bundleOthersKey = new NamespacedKey(plugin, "bundle_others");
+        this.bundleStackLimitKey = new NamespacedKey(plugin, "bundle_stack_limit");
     }
 
     public SortingMethod getSortingMethod(Player player) {
@@ -71,16 +75,42 @@ public class PlayerSortingPrefs {
     }
 
     /**
-     * Returns true if the per-player bundle entry cap is enabled.
+     * Returns true if bundle packing is enabled for the player's own inventory.
      * Falls back to the server default when the player has no stored preference.
      */
-    public boolean getBundleCapEnabled(Player player) {
-        Byte stored = player.getPersistentDataContainer().get(bundleCapKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultBundleCap();
+    public boolean getBundlePackInventory(Player player) {
+        Byte stored = player.getPersistentDataContainer().get(bundleInventoryKey, PersistentDataType.BYTE);
+        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultBundlePackInventory();
     }
 
-    public void setBundleCapEnabled(Player player, boolean enabled) {
-        player.getPersistentDataContainer().set(bundleCapKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+    public void setBundlePackInventory(Player player, boolean enabled) {
+        player.getPersistentDataContainer().set(bundleInventoryKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+    }
+
+    /**
+     * Returns true if bundle packing is enabled for other (container) inventories the player sorts.
+     * Falls back to the server default when the player has no stored preference.
+     */
+    public boolean getBundlePackOthers(Player player) {
+        Byte stored = player.getPersistentDataContainer().get(bundleOthersKey, PersistentDataType.BYTE);
+        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultBundlePackOthers();
+    }
+
+    public void setBundlePackOthers(Player player, boolean enabled) {
+        player.getPersistentDataContainer().set(bundleOthersKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+    }
+
+    /**
+     * Returns the per-player bundle stack limit (max distinct entries per bundle); 0 means weight-only.
+     * Falls back to the server default when the player has no stored preference.
+     */
+    public int getBundleStackLimit(Player player) {
+        Integer stored = player.getPersistentDataContainer().get(bundleStackLimitKey, PersistentDataType.INTEGER);
+        return stored != null ? stored : plugin.getConfigManager().main().getDefaultBundleStackLimit();
+    }
+
+    public void setBundleStackLimit(Player player, int limit) {
+        player.getPersistentDataContainer().set(bundleStackLimitKey, PersistentDataType.INTEGER, Math.max(0, limit));
     }
 
     public Set<Integer> getLockedSlots(Player player) {

@@ -18,14 +18,11 @@ import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.security.Permissions;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryType;
 
 /**
  * Thin event dispatcher. Reads player preferences, delegates pre-sort cycling to
@@ -77,30 +74,18 @@ public class InventoryClickListener implements Listener {
             return;
         }
 
-        // Ctrl+Q (CONTROL_DROP) on a bundle in the player's own inventory triggers pack-only.
-        if (event.getClick() == ClickType.CONTROL_DROP
-                && event.getCurrentItem().getType() == Material.BUNDLE
-                && event.getClickedInventory() != null
-                && event.getClickedInventory().getType() == InventoryType.PLAYER) {
-            // Cancel the vanilla drop regardless; only run the pack once past the throttle.
-            event.setCancelled(true);
-            if (throttled(player)) {
-                return;
-            }
-            sortService.packBundles(player);
-            return;
-        }
-
         if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
             if (throttled(player)) {
                 return;
             }
             if (sortService.sortInventory(event, sortMethod) && clickMethod.shouldCancelEvent()) {
-                // Use the Paper entity scheduler so the offhand reset is bound to this player
-                // entity (Folia-safe).
-                player.getScheduler().runDelayed(plugin, task ->
-                        player.getInventory().setItemInOffHand(player.getInventory().getItemInOffHand()),
-                        null, 1L);
+                if (clickMethod.needsOffhandReset()) {
+                    // Use the Paper entity scheduler so the offhand reset is bound to this player
+                    // entity (Folia-safe).
+                    player.getScheduler().runDelayed(plugin, task ->
+                            player.getInventory().setItemInOffHand(player.getInventory().getItemInOffHand()),
+                            null, 1L);
+                }
                 event.setCancelled(true);
             }
         }

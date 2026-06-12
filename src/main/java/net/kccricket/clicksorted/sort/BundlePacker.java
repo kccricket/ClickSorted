@@ -54,69 +54,51 @@ public final class BundlePacker {
     private BundlePacker() {}
 
     /**
-     * Repack all eligible items across the given main-inventory slots and bundles by the
-     * pool-and-redistribute model. Mutates {@code inv} (slot-aligned, {@code null} = empty/free slot)
-     * and the bundle {@link ItemStack}s in {@code inv} and {@code hotbarBundles} in place.
+     * Pack the bundleable remainders of a pooled item multiset into the given bundles, returning the
+     * loose stacks that should stay out in the inventory. Mutates the bundle {@link ItemStack}s in
+     * {@code bundles} in place; layout of the returned loose stacks is left to the caller (the sort).
      *
-     * <p>Bins are every {@code BUNDLE} entry in {@code inv} plus every entry in {@code hotbarBundles}.
-     * Pool sources are {@code inv}'s non-bundle eligible entries plus every bundle's eligible contents;
-     * free slots are {@code inv}'s {@code null} entries. Ineligible items (loose or in a bundle) are
-     * never touched.
+     * <p>Each bundle's eligible contents are pooled into {@code loosePool}/{@code samples} as well, so
+     * the caller only needs to pre-pool the loose (non-bundle) eligible items. For each pooled type the
+     * total is split into full stacks plus a single remainder; a remainder whose weight is at or below
+     * {@link #MAX_PACK_WEIGHT} is placed into the fullest bundle with room (origin bundles preferred),
+     * otherwise it stays loose. Ineligible bundle contents are retained and never moved.
      *
-     * @param inv            slot-aligned main-storage items ({@code null} = empty); mutated in place
-     * @param hotbarBundles  bundle ItemStacks from the hotbar to use as bins; mutated in place
-     * @param entryCap       maximum distinct entries per bundle; ≤ 0 means weight-only limit
-     * @return net main-inventory slots freed (≥ 0)
+     * @param loosePool  pooled amounts per item type for the loose eligible items; bundle contents are
+     *                   merged in by this method (mutated)
+     * @param samples    a representative ItemStack per type (mutated: bundle-only types are added)
+     * @param bundles    the bundle ItemStacks to use as bins; mutated in place ({@code null}/empty ok)
+     * @param entryCap   maximum distinct entries per bundle; ≤ 0 means weight-only limit
+     * @return the leftover loose stacks (full stacks plus any un-bundled remainder) for every type
      */
-    public static int repack(List<ItemStack> inv, List<ItemStack> hotbarBundles, int entryCap) {
-        Map<SortKey, Long> totals = new LinkedHashMap<>();
-        Map<SortKey, ItemStack> samples = new LinkedHashMap<>();
+    public static List<ItemStack> packIntoBundles(Map<SortKey, Long> loosePool,
+                                                  Map<SortKey, ItemStack> samples,
+                                                  List<ItemStack> bundles, int entryCap) {
         Map<SortKey, Set<Integer>> originBins = new HashMap<>();
-        Map<SortKey, List<int[]>> invPositions = new HashMap<>();
 
-        // 1. Bins = every bundle in main storage, then every hotbar bundle. Pool each bundle's
-        //    eligible contents (ineligible contents are retained in the bin and never moved).
+        // Bins = each provided bundle; pool its eligible contents into the loose pool.
         List<Bin> bins = new ArrayList<>();
-        for (ItemStack is : inv) {
-            if (is != null && is.getType() == Material.BUNDLE) {
-                addBin(bins, is, totals, samples, originBins);
-            }
-        }
-        if (hotbarBundles != null) {
-            for (ItemStack b : hotbarBundles) {
+        if (bundles != null) {
+            for (ItemStack b : bundles) {
                 if (b != null && b.getType() == Material.BUNDLE) {
-                    addBin(bins, b, totals, samples, originBins);
+                    addBin(bins, b, loosePool, samples, originBins);
                 }
             }
         }
 
-        // 2. Pool eligible loose items from the inventory, recording their slots, then clear those
-        //    slots so layout can re-place from scratch. Bundles and ineligible items are left alone.
-        int eligibleInvSlots = 0;
-        for (int i = 0; i < inv.size(); i++) {
-            ItemStack is = inv.get(i);
-            if (is == null || is.getType() == Material.BUNDLE || !canBundle(is)) continue;
-            SortKey key = new SortKey(is, SortingMethod.NAME);
-            totals.merge(key, (long) is.getAmount(), Long::sum);
-            samples.putIfAbsent(key, is);
-            invPositions.computeIfAbsent(key, k -> new ArrayList<>()).add(new int[]{i, is.getAmount()});
-            inv.set(i, null);
-            eligibleInvSlots++;
+        if (loosePool.isEmpty()) {
+            return new ArrayList<>();
         }
 
-        if (totals.isEmpty()) {
-            return 0;
-        }
-
-        // 3. Merge by type: split each total into full stacks (inventory) and a single remainder.
+        // Split each total into full stacks plus a single remainder.
         Map<SortKey, TypePlan> plans = new LinkedHashMap<>();
-        for (Map.Entry<SortKey, Long> e : totals.entrySet()) {
+        for (Map.Entry<SortKey, Long> e : loosePool.entrySet()) {
             int maxStack = samples.get(e.getKey()).getType().getMaxStackSize();
             if (maxStack <= 0) maxStack = 64;
             plans.put(e.getKey(), new TypePlan(maxStack, e.getValue()));
         }
 
-        // Place bundleable remainders lightest-first (best-fit, current-bundle preference).
+        // Place bundleable remainders lightest-first (best-fit, origin-bundle preference).
         List<SortKey> remainders = new ArrayList<>();
         for (Map.Entry<SortKey, TypePlan> e : plans.entrySet()) {
             if (e.getValue().bundleable) remainders.add(e.getKey());
@@ -135,47 +117,23 @@ public final class BundlePacker {
             }
         }
 
-        // 4. Lay out the inventory: keep the largest existing stack in its slot, spill the rest into
-        //    free slots, and fall back to a bundle for any stack that cannot find a slot.
-        int filled = 0;
-        for (Map.Entry<SortKey, TypePlan> e : plans.entrySet()) {
-            SortKey key = e.getKey();
-            TypePlan plan = e.getValue();
-
-            List<Integer> targets = new ArrayList<>();
-            for (long f = 0; f < plan.fullStacks; f++) targets.add(plan.maxStack);
-            if (plan.remAmt > 0 && !(plan.bundleable && plan.remPlaced)) targets.add(plan.remAmt);
-            if (targets.isEmpty()) continue;
-
-            // Largest target into the slot that held the largest stack of this type — minimizing churn.
-            List<int[]> positions = new ArrayList<>(invPositions.getOrDefault(key, List.of()));
-            positions.sort((a, b) -> a[1] != b[1] ? b[1] - a[1] : a[0] - b[0]);
-
-            int ti = 0;
-            for (int[] pos : positions) {
-                if (ti >= targets.size()) break;
-                inv.set(pos[0], stackOf(samples.get(key), targets.get(ti++)));
-                filled++;
-            }
-            for (; ti < targets.size(); ti++) {
-                int slot = nextFreeSlot(inv);
-                if (slot >= 0) {
-                    inv.set(slot, stackOf(samples.get(key), targets.get(ti)));
-                    filled++;
-                } else {
-                    // Graceful fallback: no free slot (a bundle over-filled beyond 64 can produce
-                    // more full stacks than there are slots). Leave the excess in a bundle.
-                    spillIntoBins(bins, key, samples.get(key), targets.get(ti),
-                            originBins.getOrDefault(key, Set.of()));
-                }
-            }
-        }
-
         for (Bin bin : bins) {
             bin.flush();
         }
 
-        return Math.max(0, eligibleInvSlots - filled);
+        // Leftover loose stacks: full stacks plus any un-bundled remainder, per type.
+        List<ItemStack> leftover = new ArrayList<>();
+        for (Map.Entry<SortKey, TypePlan> e : plans.entrySet()) {
+            SortKey key = e.getKey();
+            TypePlan plan = e.getValue();
+            for (long f = 0; f < plan.fullStacks; f++) {
+                leftover.add(stackOf(samples.get(key), plan.maxStack));
+            }
+            if (plan.remAmt > 0 && !(plan.bundleable && plan.remPlaced)) {
+                leftover.add(stackOf(samples.get(key), plan.remAmt));
+            }
+        }
+        return leftover;
     }
 
     /** Construct a {@link Bin} for {@code bundleItem}, pooling its eligible contents into the pool. */
@@ -213,47 +171,11 @@ public final class BundlePacker {
         return best;
     }
 
-    /** Fallback for an inventory stack that found no free slot: pour it back into bundles by weight. */
-    private static void spillIntoBins(List<Bin> bins, SortKey key, ItemStack sample, int amount, Set<Integer> origins) {
-        int maxStack = sample.getType().getMaxStackSize();
-        if (maxStack <= 0) maxStack = 64;
-        // Origin bins first, then any bin with room.
-        int remaining = amount;
-        for (int pass = 0; pass < 2 && remaining > 0; pass++) {
-            for (Bin bin : bins) {
-                if (remaining <= 0) break;
-                boolean isOrigin = origins.contains(bin.id);
-                if (pass == 0 ? !isOrigin : isOrigin) continue;
-                int roomWeight = 64 - bin.usedWeight;
-                if (roomWeight <= 0) continue;
-                int roomAmt = roomWeight * maxStack / 64;
-                int add = Math.min(remaining, roomAmt);
-                if (add <= 0) continue;
-                ItemStack stack = sample.clone();
-                stack.setAmount(add);
-                bin.place(stack, add * 64 / maxStack);
-                remaining -= add;
-            }
-        }
-        if (remaining > 0) {
-            Log.warning("BundlePacker: no room to place " + remaining + " of " + key.getMaterial()
-                    + "; items left unplaced");
-        }
-    }
-
     /** A fresh stack of {@code sample}'s type/meta with the given amount. */
     private static ItemStack stackOf(ItemStack sample, int amount) {
         ItemStack stack = sample.clone();
         stack.setAmount(amount);
         return stack;
-    }
-
-    /** First {@code null} (free) slot in {@code inv}, or -1 if the list is full. */
-    private static int nextFreeSlot(List<ItemStack> inv) {
-        for (int i = 0; i < inv.size(); i++) {
-            if (inv.get(i) == null) return i;
-        }
-        return -1;
     }
 
     // -------------------------------------------------------------------------

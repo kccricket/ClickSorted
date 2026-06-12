@@ -12,6 +12,7 @@ package net.kccricket.clicksorted.sort;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
+import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
@@ -19,13 +20,16 @@ import org.bukkit.inventory.meta.BundleMeta;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * In-situ micro-benchmark for the two hottest ClickSorted code paths:
- * {@link SortEngine#sortAndMerge} and {@link BundlePacker#repack}. It builds deliberately
+ * {@link SortEngine#sortAndMerge} and the unified pack-and-sort path ({@link BundlePacker#packIntoBundles}
+ * feeding {@link SortEngine#sortAndMerge}). It builds deliberately
  * worst-case fixtures (a fully-fragmented 54-slot container and a densely-pooled player inventory
  * with hotbar bundles) and times many iterations against the real server JVM, so an admin can see
  * the actual per-operation cost rather than guessing.
@@ -111,21 +115,37 @@ public final class BundleBenchmark {
         Fixture template = buildRepackFixture();
 
         for (int i = 0; i < warmup; i++) {
-            Fixture f = template.copy();
-            BundlePacker.repack(f.inv, f.hotbarBundles, 0);
+            consume(runPack(template.copy()));
         }
 
         long[] samples = new long[iterations];
         for (int i = 0; i < iterations; i++) {
-            // repack() mutates its inputs, so each iteration runs on a fresh deep copy. The copy is
-            // made outside the timed region so only the algorithm is measured.
+            // packIntoBundles mutates its bundle inputs, so each iteration runs on a fresh deep copy.
+            // The copy is made outside the timed region so only the algorithm is measured.
             Fixture f = template.copy();
             long t0 = System.nanoTime();
-            int freed = BundlePacker.repack(f.inv, f.hotbarBundles, 0);
+            List<ItemStack> out = runPack(f);
             samples[i] = System.nanoTime() - t0;
-            consume(freed);
+            consume(out);
         }
         return summarize(samples);
+    }
+
+    /** The unified pack-and-sort pipeline, mirroring {@code InventorySortService.packAndSort}. */
+    private static List<ItemStack> runPack(Fixture f) {
+        Map<SortKey, Long> loosePool = new LinkedHashMap<>();
+        Map<SortKey, ItemStack> samples = new LinkedHashMap<>();
+        List<ItemStack> toSort = new ArrayList<>();
+        for (ItemStack is : f.inv) {
+            if (is == null) continue;
+            SortKey key = new SortKey(is, SortingMethod.NAME);
+            loosePool.merge(key, (long) is.getAmount(), Long::sum);
+            samples.putIfAbsent(key, is);
+        }
+        List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, f.hotbarBundles, 0);
+        toSort.addAll(leftover);
+        toSort.addAll(f.hotbarBundles);
+        return SortEngine.sortAndMerge(toSort, SortingMethod.NAME);
     }
 
     /**
