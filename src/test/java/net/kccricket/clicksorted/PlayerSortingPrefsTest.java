@@ -38,11 +38,11 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void defaultShiftClickAllowedMatchesConfig() {
+    void defaultSortOverItemsMatchesConfig() {
         PlayerMock player = server.addPlayer("Alice");
-        assertEquals(plugin.getConfigManager().main().getDefaultShiftClick(),
-                plugin.getSortingPrefs().getShiftClickAllowed(player),
-                "New player should get the default shift-click setting from config");
+        assertEquals(plugin.getConfigManager().main().getDefaultSortOverItems(),
+                plugin.getSortingPrefs().getSortOverItems(player),
+                "New player should get the default sort-over-items setting from config");
     }
 
     // --- PDC read/write ---
@@ -65,23 +65,23 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
         PlayerMock player = server.addPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
-        prefs.setClickMethod(player, ClickMethod.DOUBLE);
+        prefs.setClickMethod(player, ClickMethod.DOUBLE_CLICK);
 
-        assertEquals(ClickMethod.DOUBLE, prefs.getClickMethod(player));
+        assertEquals(ClickMethod.DOUBLE_CLICK, prefs.getClickMethod(player));
         NamespacedKey key = new NamespacedKey(plugin, "click");
-        assertEquals("DOUBLE", player.getPersistentDataContainer().get(key, PersistentDataType.STRING));
+        assertEquals("DOUBLE_CLICK", player.getPersistentDataContainer().get(key, PersistentDataType.STRING));
     }
 
     @Test
-    void setShiftClickAllowedPersistsInPDC() {
+    void setSortOverItemsPersistsInPDC() {
         PlayerMock player = server.addPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-        boolean initial = prefs.getShiftClickAllowed(player);
+        boolean initial = prefs.getSortOverItems(player);
 
-        prefs.setShiftClickAllowed(player, !initial);
+        prefs.setSortOverItems(player, !initial);
 
-        assertEquals(!initial, prefs.getShiftClickAllowed(player));
-        NamespacedKey key = new NamespacedKey(plugin, "shift_click");
+        assertEquals(!initial, prefs.getSortOverItems(player));
+        NamespacedKey key = new NamespacedKey(plugin, "sort_over_items");
         byte expected = (!initial) ? (byte) 1 : (byte) 0;
         assertEquals(expected, player.getPersistentDataContainer().get(key, PersistentDataType.BYTE));
     }

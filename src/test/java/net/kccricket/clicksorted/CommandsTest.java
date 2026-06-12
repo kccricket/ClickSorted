@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * the specific command class).
  *
  * Command permissions from plugin.yml:
- *   sort / click / shiftclick   — default true  (any player)
+ *   sort / click / hover        — default true  (any player)
  *   reload / getcfg / debug     — default op
  */
 class CommandsTest extends AbstractClickSortedTest {
@@ -73,9 +73,9 @@ class CommandsTest extends AbstractClickSortedTest {
     void clickCommandChangesClickMethod() {
         PlayerMock player = server.addPlayer("Alice");
         player.setOp(true);
-        // DOUBLE is always available.
-        server.dispatchCommand(player, "clicksorted click DOUBLE");
-        assertEquals(ClickMethod.DOUBLE, plugin.getSortingPrefs().getClickMethod(player));
+        // DOUBLE_CLICK is always available.
+        server.dispatchCommand(player, "clicksorted click DOUBLE_CLICK");
+        assertEquals(ClickMethod.DOUBLE_CLICK, plugin.getSortingPrefs().getClickMethod(player));
     }
 
     @Test
@@ -84,39 +84,39 @@ class CommandsTest extends AbstractClickSortedTest {
         player.setOp(true);
         drainMessages(player);
 
-        server.dispatchCommand(player, "clicksorted click DOUBLE");
+        server.dispatchCommand(player, "clicksorted click DOUBLE_CLICK");
 
-        assertTrue(anyMessageContains(player, "DOUBLE", "Click method"),
+        assertTrue(anyMessageContains(player, "DOUBLE_CLICK", "Click method"),
                 "Expected click-mode status message");
     }
 
-    // --- shiftclick ---
+    // --- hover ---
 
     @Test
-    void shiftclickCommandTogglesFlag() {
+    void hoverCommandTogglesFlag() {
         PlayerMock player = server.addPlayer("Alice");
         player.setOp(true);
-        boolean initial = plugin.getSortingPrefs().getShiftClickAllowed(player);
+        boolean initial = plugin.getSortingPrefs().getSortOverItems(player);
 
-        server.dispatchCommand(player, "clicksorted shiftclick");
-        assertEquals(!initial, plugin.getSortingPrefs().getShiftClickAllowed(player),
-                "shiftclick command should toggle the flag");
+        server.dispatchCommand(player, "clicksorted hover");
+        assertEquals(!initial, plugin.getSortingPrefs().getSortOverItems(player),
+                "hover command should toggle the flag");
 
-        server.dispatchCommand(player, "clicksorted shiftclick");
-        assertEquals(initial, plugin.getSortingPrefs().getShiftClickAllowed(player),
+        server.dispatchCommand(player, "clicksorted hover");
+        assertEquals(initial, plugin.getSortingPrefs().getSortOverItems(player),
                 "Second toggle should restore original value");
     }
 
     @Test
-    void shiftclickCommandSendsStatusMessage() {
+    void hoverCommandSendsStatusMessage() {
         PlayerMock player = server.addPlayer("Alice");
         player.setOp(true);
         drainMessages(player);
 
-        server.dispatchCommand(player, "clicksorted shiftclick");
+        server.dispatchCommand(player, "clicksorted hover");
 
-        assertTrue(anyMessageContains(player, "ENABLED", "DISABLED", "Shift-click"),
-                "Expected shift-click status message");
+        assertTrue(anyMessageContains(player, "ENABLED", "DISABLED", "Sort over items"),
+                "Expected sort-over-items status message");
     }
 
     // --- reload (op-only) ---

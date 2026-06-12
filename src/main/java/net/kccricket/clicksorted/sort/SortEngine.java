@@ -61,7 +61,7 @@ public final class SortEngine {
         for (ItemStack is : items) {
             if (is != null) {
                 SortKey key = new SortKey(is, sortMethod);
-                amounts.merge(key, is.getAmount(), Integer::sum);
+                amounts.merge(key, is.getAmount(), (a, b) -> Integer.sum(a, b));
             }
         }
 

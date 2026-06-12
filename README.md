@@ -19,7 +19,7 @@
   - [Download \& Installation](#download--installation)
   - [Player Guide](#player-guide)
     - [Sorting an inventory](#sorting-an-inventory)
-    - [Changing preferences in-inventory (shift-click)](#changing-preferences-in-inventory-shift-click)
+    - [Sorting over occupied slots](#sorting-over-occupied-slots)
     - [Your player inventory: two regions](#your-player-inventory-two-regions)
     - [Locking slots](#locking-slots)
     - [Player commands](#player-commands)
@@ -37,13 +37,11 @@
     - [`lang.yml`](#langyml)
       - [Sort order feedback](#sort-order-feedback)
       - [Click trigger feedback](#click-trigger-feedback)
-      - [Shift-click toggle feedback](#shift-click-toggle-feedback)
+      - [Sort-over-items toggle feedback](#sort-over-items-toggle-feedback)
       - [Debug commands](#debug-commands)
       - [Reload](#reload)
       - [Inventory overflow](#inventory-overflow)
       - [Sort trigger instructions](#sort-trigger-instructions)
-      - [Shift-cycle prompts](#shift-cycle-prompts)
-      - [Tips](#tips)
       - [Console / player-only error](#console--player-only-error)
       - [Lock GUI](#lock-gui)
   - [Building from Source](#building-from-source)
@@ -85,25 +83,23 @@ The bundled `groups.yml` was generated from Minecraft 26.1.2 creative tabs.
 
 By default (and out of the box for new players), sorting is triggered by pressing the **swap-offhand key** (usually `F`) while hovering over any slot in a sortable inventory. Your main inventory, chests, ender chest, shulker box, barrel — just open it and press `F` over any slot.
 
-There are four available trigger modes:
+The available trigger modes are:
 
 | Trigger mode | How to sort |
 |---|---|
 | **swap** *(default)* | Hover over any slot and press the swap-offhand key (`F`). |
-| **double** | Double-click any slot. |
-| **single** | Left-click an **empty** slot. |
+| **double_click** | Double-click any slot. |
+| **single_click** | Left-click an **empty** slot. |
+| **control_drop** | Press the drop key (`Ctrl+Q`) over a slot. |
+| **shift_left_click** | Shift-left-click a slot. |
+| **shift_right_click** | Shift-right-click a slot. |
 | **none** | Click-sorting disabled. |
 
-### Changing preferences in-inventory (shift-click)
+Change your trigger with `/clicksorted click <mode>` and your sort order with `/clicksorted sort <name\|group>`.
 
-You don't need to type any commands. While an inventory is open, shift-click an **empty slot**:
+### Sorting over occupied slots
 
-| Gesture | Effect |
-|---|---|
-| **Shift + left-click** an empty slot | Cycle sort order: **name → group → …** |
-| **Shift + right-click** an empty slot | Cycle trigger: **double → single → swap → none** |
-
-> **Note:** These gestures only activate on empty slots, so normal shift-clicking to move items is unaffected — *unless* you shift-click an empty slot, in which case the cycle fires instead. If this gets in the way, run `/clicksorted shiftclick` to disable it and use commands instead.
+By default a sort only fires when your cursor is over an **empty slot**, so your normal clicks on items are never hijacked. If you'd rather have your trigger fire even while hovering an occupied slot, run `/clicksorted hover` to toggle "sort over items" on (and again to turn it off). When enabled, the originating click is suppressed so the item underneath isn't picked up or moved. Admins set the default with [`defaults.sort_over_items`](#configyml).
 
 ### Your player inventory: two regions
 
@@ -124,13 +120,13 @@ Locked slots apply only to your own player inventory (both the main region and t
 
 ### Player commands
 
-All four commands are available to every player by default.
+These commands are available to every player by default.
 
 | Command | Description |
 |---|---|
 | `/clicksorted sort <name\|group>` | Set your sort order. `group` is only available when `groups.yml` is configured. |
-| `/clicksorted click <swap\|single\|double\|none>` | Set your sort trigger. |
-| `/clicksorted shiftclick` | Toggle in-inventory shift-click mode-cycling on or off. |
+| `/clicksorted click <swap\|single_click\|double_click\|control_drop\|shift_left_click\|shift_right_click\|none>` | Set your sort trigger. |
+| `/clicksorted hover` | Toggle whether sorting fires while hovering an occupied slot (off = empty slots only). |
 | `/clicksorted lock` | Open the slot-lock GUI to lock or unlock individual inventory slots. |
 
 ## Admin Reference
@@ -155,7 +151,7 @@ These commands require the `clicksorted.commands.*` op permissions (see [Permiss
 | `clicksorted.commands.debug` | `op` | Use `/clicksorted debug`. |
 | `clicksorted.commands.sort` | `true` | Use `/clicksorted sort`. |
 | `clicksorted.commands.click` | `true` | Use `/clicksorted click`. |
-| `clicksorted.commands.shiftclick` | `true` | Use `/clicksorted shiftclick`. |
+| `clicksorted.commands.hover` | `true` | Use `/clicksorted hover`. |
 | `clicksorted.commands.lock` | `true` | Use `/clicksorted lock`. |
 | `clicksorted.sort` | `true` | Master gate: allow a player to click-sort any inventory at all. Parent of the three nodes below. |
 | `clicksorted.sort.player` | `true` | Allow sorting the player's own main inventory (excluding hotbar). |
@@ -190,15 +186,17 @@ default_group_name: '000-default'
 # appears in sortable_inventories below.
 ignore_plugin_inventory: false
 
-# Per-player preference defaults. Players can override these with commands or
-# shift-click gestures; their choices are stored persistently.
+# Per-player preference defaults. Players can override these with commands;
+# their choices are stored persistently.
 defaults:
-  # Sort trigger. Values: SWAP, SINGLE, DOUBLE, NONE
+  # Sort trigger. Values: SWAP, SINGLE_CLICK, DOUBLE_CLICK, CONTROL_DROP,
+  #                       SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE
   click_mode: SWAP
   # Sort order. Values: NAME, GROUP
   sort_mode: NAME
-  # Whether shift-click in-inventory mode cycling is enabled for new players.
-  shift_click: true
+  # When true, the trigger also fires while hovering an occupied slot;
+  # when false, sorting only fires on an empty slot. Toggle with /clicksorted hover.
+  sort_over_items: false
   # Slot bounds of the player main-inventory sort region (inclusive lower, exclusive upper).
   # 9–36 covers the full main inventory (below hotbar, above armor/off-hand).
   # Set player_sort_min: 0 to include the hotbar in the same sort region,
@@ -307,11 +305,11 @@ All player-facing messages are stored in `lang.yml` and rendered with **[MiniMes
 |---|---|---|
 | `setClickMethodTo` | `Click mode set to <method>. <instruction>` | `<method>`, `<instruction>` |
 
-#### Shift-click toggle feedback
+#### Sort-over-items toggle feedback
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `setShiftClickStatus` | `Shift-click mode cycling: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
+| `setSortOverItemsStatus` | `Sort over items: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
 
 #### Debug commands
 
@@ -342,24 +340,10 @@ These strings are substituted as `<instruction>` in `setClickMethodTo`.
 | `instructionSingle` | `Left-click an empty slot to sort.` |
 | `instructionDouble` | `Double-click any slot to sort.` |
 | `instructionSwap` | `Press the offhand-swap key to sort.` |
+| `instructionControlDrop` | `Press Ctrl+Q (drop key) over a slot to sort.` |
+| `instructionShiftLeftClick` | `Shift-left-click a slot to sort.` |
+| `instructionShiftRightClick` | `Shift-right-click a slot to sort.` |
 | `instructionDisabled` | `Click-sorting has been disabled.` |
-
-#### Shift-cycle prompts
-
-Shown periodically as tips alongside mode-cycle confirmations.
-
-| Key | Default text |
-|---|---|
-| `shiftLeftToChange` | `Shift-left-click an empty slot to change.` |
-| `shiftRightToChange` | `Shift-right-click an empty slot to change.` |
-
-#### Tips
-
-| Key | Default text |
-|---|---|
-| `tipToChangeMode` | `(Use <white>/clicksorted sort</white> and <white>/clicksorted click</white> to change modes)` |
-| `tipToReEnable` | `Run <white>/clicksorted shiftclick</white> to re-enable.` |
-| `tipToDisable` | `Run <white>/clicksorted shiftclick</white> to disable.` |
 
 #### Console / player-only error
 

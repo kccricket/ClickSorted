@@ -28,12 +28,36 @@ net.kccricket.clicksorted
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
 ├── events/                  InventorySortEvent
 ├── gui/                     LockGuiHolder, LockGuiListener
-├── sort/                    InventoryClickListener, InventorySortService,
-│                            PrefsCycleHandler, SortEngine
+├── sort/                    InventoryClickListener, InventorySortService, SortEngine
+├── migration/               ValueMigration, Migrations, PlayerMigrationListener
 ├── text/                    MessageUtil, CooldownMessenger, ItemNames
 ├── logging/                 Log, DebugLevel
 └── security/                Permissions
 ```
+
+### Settings migration
+
+`Migrations` is an instance component (constructed in `ClickSortedPlugin.onEnable` before
+`configManager.loadAll()`, retrieved via `plugin.getMigrations()`) that **owns the catalog of what is
+stored where**. Loaders/stores don't name specific settings — they just hand the migrator the store:
+config is migrated in `MainConfig.load()` (`plugin.getMigrations().migrate(plugin.getConfig())`, after
+`normalizeValues()` and before `saveConfig()`), and per-player PDC is migrated by
+`PlayerMigrationListener` on `PlayerJoinEvent` (`plugin.getMigrations().migrate(player)`). `Migrations`
+exposes exactly one entry point per store: `migrate(ConfigurationSection)` and `migrate(Player)`.
+
+Two kinds of catalog rule, applied symmetrically across both stores:
+
+- **Renamed values.** Declare a `ValueMigration` lineage with
+  `ValueMigration.builder().rename(old).to(next).to(newer)…build()`. The last token is the current
+  canonical value; every earlier token maps **directly** to it, so any value ever stored converges in a
+  single pass. Adding a future rename is a pure append (`.to("X")`). The catalog maps each storage
+  location to its lineage (config path `defaults.click_mode` and PDC key `click` both → `CLICK_METHOD`).
+- **Removed settings.** List the deprecated storage location in `DEPRECATED_CONFIG_PATHS` /
+  `DEPRECATED_PDC_KEYS` and the migrator drops it from the store (e.g. `defaults.shift_click` /
+  `shift_click`).
+
+The per-location read→migrate→write and removal logic lives in **private** helpers inside `Migrations`;
+the lineage definitions stay pure data.
 
 ### Core Flow
 
@@ -48,12 +72,12 @@ net.kccricket.clicksorted
 | Class | Package | Role |
 |---|---|---|
 | `ClickSortedPlugin` | root | `JavaPlugin` entry point, wires all components |
-| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, shift-click flag, locked slots) stored via PDC |
+| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, sort-over-items flag, locked slots) stored via PDC |
 | `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier panes and maps chest↔inventory slots |
 | `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; toggles lock state and cancels all real-inventory interaction |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
 | `SortingMethod` | model | Enum (NAME, GROUP) controlling `SortKey.makeSortPrefix()` |
-| `ClickMethod` | model | Enum (SINGLE, DOUBLE, SWAP, DROP, NONE) |
+| `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE) |
 | `InventoryClickListener` | sort | Dispatches click events to sort or cycle prefs |
 | `InventorySortService` | sort | Target resolution, permissions, event lifecycle, write-back |
 | `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) |
@@ -79,7 +103,7 @@ There is a known non-obvious setup required for MockBukkit v4 on Java 16+; see `
 
 ### Command Framework
 
-Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand (`sort`, `click`, `shiftclick`, `lock`, `reload`, `getcfg`, `debug`) is a static builder method. Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
+Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand (`sort`, `click`, `hover`, `lock`, `bundle`, `reload`, `getcfg`, `debug`) is a static builder method. `/clicksorted hover` toggles the per-player "sort over items" flag (server default `defaults.sort_over_items`), which controls whether a sort fires only on an empty slot or also while hovering an occupied one. Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
 
 ### Version Compatibility
 

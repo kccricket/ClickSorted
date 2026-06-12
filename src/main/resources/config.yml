@@ -7,7 +7,7 @@ ignore_plugin_inventory: false
 defaults:
   click_mode: SWAP
   sort_mode: NAME
-  shift_click: true
+  sort_over_items: false
   bundle_inventory: false
   bundle_others: false
   bundle_stack_limit: 12

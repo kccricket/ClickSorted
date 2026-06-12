@@ -40,7 +40,7 @@ public class ClickSortedCommands {
         return Commands.literal("clicksorted")
                 .then(buildSort(plugin))
                 .then(buildClick(plugin))
-                .then(buildShiftClick(plugin))
+                .then(buildHover(plugin))
                 .then(buildLock(plugin))
                 .then(buildBundle(plugin))
                 .then(buildReload(plugin))
@@ -129,9 +129,9 @@ public class ClickSortedCommands {
                         }));
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildShiftClick(ClickSortedPlugin plugin) {
-        return Commands.literal("shiftclick")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.shiftclick"))
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildHover(ClickSortedPlugin plugin) {
+        return Commands.literal("hover")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.hover"))
                 .executes(ctx -> {
                     if (!(ctx.getSource().getExecutor() instanceof Player player)) {
                         MessageUtil.errorMessage(ctx.getSource().getSender(),
@@ -141,19 +141,12 @@ public class ClickSortedCommands {
                     if (throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
-                    boolean current = plugin.getSortingPrefs().getShiftClickAllowed(player);
-                    plugin.getSortingPrefs().setShiftClickAllowed(player, !current);
+                    boolean current = plugin.getSortingPrefs().getSortOverItems(player);
+                    plugin.getSortingPrefs().setSortOverItems(player, !current);
                     String status = current ? "DISABLED" : "ENABLED";
                     MessageUtil.statusMessage(player,
-                            plugin.getConfigManager().lang().getColoredMessage("setShiftClickStatus",
+                            plugin.getConfigManager().lang().getColoredMessage("setSortOverItemsStatus",
                                     Placeholder.unparsed("status", status)));
-                    if (current) {
-                        MessageUtil.statusMessage(player, plugin.getConfigManager().lang().getColoredMessage("tipToReEnable"));
-                        plugin.getMessenger().message(player, "shiftclick", 60,
-                                plugin.getConfigManager().lang().getColoredMessage("tipToChangeMode"));
-                    } else {
-                        MessageUtil.statusMessage(player, plugin.getConfigManager().lang().getColoredMessage("tipToDisable"));
-                    }
                     return Command.SINGLE_SUCCESS;
                 });
     }
@@ -192,9 +185,9 @@ public class ClickSortedCommands {
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(bundleToggle(plugin, "inventory", "setBundlePackInventoryStatus",
-                        plugin.getSortingPrefs()::setBundlePackInventory))
+                        (player, status) -> plugin.getSortingPrefs().setBundlePackInventory(player, status)))
                 .then(bundleToggle(plugin, "others", "setBundlePackOthersStatus",
-                        plugin.getSortingPrefs()::setBundlePackOthers))
+                        (player, status) -> plugin.getSortingPrefs().setBundlePackOthers(player, status)))
                 .then(buildBundleStackLimit(plugin));
     }
 

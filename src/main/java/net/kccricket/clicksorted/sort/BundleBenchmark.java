@@ -139,7 +139,7 @@ public final class BundleBenchmark {
         for (ItemStack is : f.inv) {
             if (is == null) continue;
             SortKey key = new SortKey(is, SortingMethod.NAME);
-            loosePool.merge(key, (long) is.getAmount(), Long::sum);
+            loosePool.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
             samples.putIfAbsent(key, is);
         }
         List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, f.hotbarBundles, 0);

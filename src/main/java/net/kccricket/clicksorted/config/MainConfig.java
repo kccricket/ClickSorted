@@ -39,6 +39,7 @@ public class MainConfig implements ManagedConfig {
         // Just ensure defaults are applied and the file is written, then parse the values.
         applyDefaults();
         normalizeValues();
+        plugin.getMigrations().migrate(plugin.getConfig());
         plugin.saveConfig();
         applyToRuntime();
     }
@@ -82,15 +83,17 @@ public class MainConfig implements ManagedConfig {
                 "Default preferences applied to new players (or any player whose PDC entry is missing)."));
         cfg.setComments("defaults.click_mode", List.of(
                 "How a player triggers a sort.",
-                "Values: SWAP (press the swap-offhand key over a slot), SINGLE (left-click an empty slot),",
-                "        DOUBLE (double-click), NONE (click-sorting disabled)"));
+                "Values: SWAP (press the swap-offhand key over a slot), SINGLE_CLICK (left-click an empty slot),",
+                "        DOUBLE_CLICK (double-click), CONTROL_DROP (Ctrl+Q over a slot),",
+                "        SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE (click-sorting disabled)"));
         cfg.setComments("defaults.sort_mode", List.of(
                 "Algorithm used to order items.",
                 "Values: NAME (alphabetical by display name), GROUP (by group defined in groups.yml).",
                 "GROUP requires at least one group to be configured in groups.yml."));
-        cfg.setComments("defaults.shift_click", List.of(
-                "When true, shift-clicking an empty slot cycles through sort/click modes.",
-                "Players can toggle this per-session with /clicksorted shiftclick."));
+        cfg.setComments("defaults.sort_over_items", List.of(
+                "When true, the configured click method sorts even while hovering an occupied slot;",
+                "when false, sorting only fires on an empty slot.",
+                "Players can toggle this per-session with /clicksorted hover."));
         cfg.setComments("defaults.bundle_inventory", List.of(
                 "When true, sorting a player's own inventory also packs partial stacks into any bundles",
                 "present there. Players can toggle this with /clicksorted bundle inventory on|off."));
@@ -160,8 +163,8 @@ public class MainConfig implements ManagedConfig {
         return ClickMethod.parse(plugin.getConfig().getString("defaults.click_mode"), ClickMethod.DEFAULT);
     }
 
-    public boolean getDefaultShiftClick() {
-        return plugin.getConfig().getBoolean("defaults.shift_click");
+    public boolean getDefaultSortOverItems() {
+        return plugin.getConfig().getBoolean("defaults.sort_over_items");
     }
 
     public boolean getDefaultBundlePackInventory() {

@@ -27,6 +27,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
      * forced non-null currentItem so the listener's null-guard does not short-circuit.
      */
     private void sortMainStorage(PlayerMock player) {
+        plugin.getSortingPrefs().setSortOverItems(player, true);
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         InventoryView view = player.openInventory(chest);
         InventoryClickEvent event = new InventoryClickEvent(
@@ -196,14 +197,15 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     }
 
     // -------------------------------------------------------------------------
-    // DROP click method (Ctrl+Q)
+    // CONTROL_DROP click method (Ctrl+Q)
     // -------------------------------------------------------------------------
 
     @Test
     void controlDropClickMethodTriggersSortAndCancels() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setClickMethod(player, net.kccricket.clicksorted.model.ClickMethod.DROP);
+        plugin.getSortingPrefs().setClickMethod(player, net.kccricket.clicksorted.model.ClickMethod.CONTROL_DROP);
         plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
 
         player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
         player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 10));
@@ -233,6 +235,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     void othersPackingOn_packsChestBundle() {
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setBundlePackOthers(player, true);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         chest.setItem(0, new ItemStack(Material.BUNDLE, 1));
@@ -252,6 +255,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     void othersPackingOff_leavesChestBundleEmpty() {
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setBundlePackOthers(player, false);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         chest.setItem(0, new ItemStack(Material.BUNDLE, 1));

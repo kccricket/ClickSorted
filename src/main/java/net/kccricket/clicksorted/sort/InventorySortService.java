@@ -62,6 +62,11 @@ public class InventorySortService {
      * @return true if the sort completed and the caller should cancel the originating event
      */
     public boolean sortInventory(final InventoryClickEvent event, final SortingMethod sortMethod) {
+        if (!event.getCursor().isEmpty()) {
+            // Prevent sorting when the player is holding an item with the cursor, to avoid accidental sorts and potential dupes.
+            return false;
+        }
+
         Player p = (Player) event.getWhoClicked();
         int slot = event.getSlot();
         Inventory inv = event.getClickedInventory();
@@ -182,7 +187,7 @@ public class InventorySortService {
                 bundles.add(is.clone());
             } else if (BundlePacker.canBundle(is)) {
                 SortKey key = new SortKey(is, SortingMethod.NAME);
-                loosePool.merge(key, (long) is.getAmount(), Long::sum);
+                loosePool.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
                 samples.putIfAbsent(key, is);
             } else {
                 toSort.add(is.clone());
