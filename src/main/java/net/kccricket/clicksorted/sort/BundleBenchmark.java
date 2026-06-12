@@ -258,8 +258,4 @@ public final class BundleBenchmark {
     private static void consume(List<ItemStack> out) {
         SINK[0] += out.size();
     }
-
-    private static void consume(int v) {
-        SINK[0] += v;
-    }
 }
