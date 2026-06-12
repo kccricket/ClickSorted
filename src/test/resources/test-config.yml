@@ -9,8 +9,13 @@ defaults:
   click_mode: SWAP
   sort_mode: NAME
   shift_click: true
+  bundle_inventory: false
+  bundle_others: false
+  bundle_stack_limit: 12
 player_sort_min: 9
 player_sort_max: 36
+# Throttling disabled by default in tests; throttle tests set this explicitly.
+action_cooldown_ms: 0
 sortable_inventories:
   - "PLAYER"
   - "CHEST"

@@ -16,8 +16,11 @@ permissions:
       clicksorted.commands.click: true
       clicksorted.commands.shiftclick: true
       clicksorted.commands.lock: true
+      clicksorted.commands.bundle: true
       clicksorted.commands.getcfg: true
       clicksorted.commands.debug: true
+      clicksorted.commands.benchmark: true
+      clicksorted.throttle.bypass: true
   clicksorted.commands.reload:
     description: Allow use of the /clicksorted reload command
     default: op
@@ -26,6 +29,12 @@ permissions:
     default: op
   clicksorted.commands.debug:
     description: Allow use of the /clicksorted debug command
+    default: op
+  clicksorted.commands.benchmark:
+    description: Allow use of the /clicksorted benchmark command
+    default: op
+  clicksorted.throttle.bypass:
+    description: Exempt from the per-player action throttle (action_cooldown_ms)
     default: op
   clicksorted.commands.sort:
     description: Allow use of the /clicksorted sort command
@@ -38,6 +47,9 @@ permissions:
     default: true
   clicksorted.commands.lock:
     description: Allow use of the /clicksorted lock command
+    default: true
+  clicksorted.commands.bundle:
+    description: Allow use of the /clicksorted bundle command
     default: true
   clicksorted.sort:
     description: Allow all kinds of inventories to be click-sorted

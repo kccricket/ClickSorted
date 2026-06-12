@@ -36,6 +36,20 @@ public class PrefsCycleHandler {
     }
 
     /**
+     * Whether the event would be handled by {@link #tryCycle} as a preference-cycling gesture.
+     * Lets callers gate on a cycle (e.g. apply throttling) before any preference mutation runs.
+     */
+    public boolean isCycleGesture(InventoryClickEvent event, ClickMethod clickMethod, boolean allowShiftClick) {
+        if (event.getCurrentItem() == null
+                || event.getCurrentItem().getType() != Material.AIR
+                || !event.isShiftClick()
+                || !allowShiftClick) {
+            return false;
+        }
+        return (event.isLeftClick() && clickMethod != ClickMethod.NONE) || event.isRightClick();
+    }
+
+    /**
      * Attempt to handle the event as a preference-cycling gesture.
      *
      * @return {@code true} if the event was a cycle gesture and has been handled — the caller

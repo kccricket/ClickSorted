@@ -53,7 +53,7 @@ net.kccricket.clicksorted
 | `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; toggles lock state and cancels all real-inventory interaction |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
 | `SortingMethod` | model | Enum (NAME, GROUP) controlling `SortKey.makeSortPrefix()` |
-| `ClickMethod` | model | Enum (SINGLE, DOUBLE, SWAP, NONE) |
+| `ClickMethod` | model | Enum (SINGLE, DOUBLE, SWAP, DROP, NONE) |
 | `InventoryClickListener` | sort | Dispatches click events to sort or cycle prefs |
 | `InventorySortService` | sort | Target resolution, permissions, event lifecycle, write-back |
 | `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) |

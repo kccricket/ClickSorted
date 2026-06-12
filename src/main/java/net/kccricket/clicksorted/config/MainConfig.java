@@ -91,12 +91,30 @@ public class MainConfig implements ManagedConfig {
         cfg.setComments("defaults.shift_click", List.of(
                 "When true, shift-clicking an empty slot cycles through sort/click modes.",
                 "Players can toggle this per-session with /clicksorted shiftclick."));
+        cfg.setComments("defaults.bundle_inventory", List.of(
+                "When true, sorting a player's own inventory also packs partial stacks into any bundles",
+                "present there. Players can toggle this with /clicksorted bundle inventory on|off."));
+        cfg.setComments("defaults.bundle_others", List.of(
+                "When true, sorting a container (chest, barrel, …) also packs partial stacks into any",
+                "bundles it holds. Players can toggle this with /clicksorted bundle others on|off."));
+        cfg.setComments("defaults.bundle_stack_limit", List.of(
+                "Default max number of distinct item entries per bundle when packing.",
+                "12 = tooltip-preview limit (bundles show the 12 most-recently-added items).",
+                "0 disables the entry limit (weight-only limit applies instead).",
+                "Players can change this with /clicksorted bundle stacklimit <n|off>."));
         cfg.setComments("player_sort_min", List.of(
                 "First inventory slot included when sorting a player's main inventory (inclusive).",
                 "Slot 9 is the first row of main storage (slots 0-8 are the hotbar)."));
         cfg.setComments("player_sort_max", List.of(
                 "Last inventory slot included when sorting a player's main inventory (inclusive).",
                 "Slot 35 is the last main-storage slot; slots 36+ are armor and off-hand."));
+        cfg.setComments("action_cooldown_ms", List.of(
+                "Minimum milliseconds between successive ClickSorted actions per player",
+                "(sorting, bundle-packing, in-inventory mode cycling, lock-GUI toggles, commands).",
+                "Caps how fast a scripted client can spam these; players with the",
+                "clicksorted.throttle.bypass permission (default op) are exempt.",
+                "Lower values feel snappier but may clip rapid legitimate lock-GUI clicking.",
+                "Set to 0 to disable throttling entirely."));
         cfg.setComments("sortable_inventories", List.of(
                 "Inventory types that players are allowed to sort.",
                 "Values must be valid Bukkit InventoryType names (case-sensitive).",
@@ -146,8 +164,31 @@ public class MainConfig implements ManagedConfig {
         return plugin.getConfig().getBoolean("defaults.shift_click");
     }
 
+    public boolean getDefaultBundlePackInventory() {
+        return plugin.getConfig().getBoolean("defaults.bundle_inventory");
+    }
+
+    public boolean getDefaultBundlePackOthers() {
+        return plugin.getConfig().getBoolean("defaults.bundle_others");
+    }
+
+    /**
+     * Default max distinct entries per bundle when packing (0 = weight-only limit).
+     */
+    public int getDefaultBundleStackLimit() {
+        return plugin.getConfig().getInt("defaults.bundle_stack_limit");
+    }
+
     public int getPlayerSortMin() {
         return plugin.getConfig().getInt("player_sort_min");
+    }
+
+    /**
+     * Minimum milliseconds between successive per-player actions ({@code action_cooldown_ms}).
+     * A value ≤ 0 disables the {@link net.kccricket.clicksorted.security.ActionThrottle}.
+     */
+    public int getActionCooldownMs() {
+        return plugin.getConfig().getInt("action_cooldown_ms", 150);
     }
 
     public int getPlayerSortMax() {
