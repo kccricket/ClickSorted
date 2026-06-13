@@ -1,5 +1,7 @@
 # ClickSorted 1.1.0
 
+Release date: 2026-06-13
+
 ClickSorted 1.1.0 adds slot locking and bundle packing, restructures all player preferences under a single `set` command, and introduces a settings-migration framework so stored values survive future renames.
 
 ## Highlights
