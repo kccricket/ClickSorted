@@ -21,6 +21,9 @@ import java.util.stream.Collectors;
  */
 public class MainConfig implements ManagedConfig {
 
+    /** One past the last sortable player slot: slots 36+ are armor and off-hand, never sorted. */
+    private static final int PLAYER_STORAGE_END = 36;
+
     private final ClickSortedPlugin plugin;
     private List<InventoryType> sortableInventories = List.of();
 
@@ -109,8 +112,9 @@ public class MainConfig implements ManagedConfig {
                 "First inventory slot included when sorting a player's main inventory (inclusive).",
                 "Slot 9 is the first row of main storage (slots 0-8 are the hotbar)."));
         cfg.setComments("player_sort_max", List.of(
-                "Last inventory slot included when sorting a player's main inventory (inclusive).",
-                "Slot 35 is the last main-storage slot; slots 36+ are armor and off-hand."));
+                "One past the last inventory slot included when sorting a player's main inventory (exclusive).",
+                "Slot 35 is the last main-storage slot, so 36 sorts all of main storage;",
+                "slots 36+ are armor and off-hand. Values are clamped to the 0..36 range."));
         cfg.setComments("action_cooldown_ms", List.of(
                 "Minimum milliseconds between successive ClickSorted actions per player",
                 "(sorting, bundle-packing, in-inventory mode cycling, lock-GUI toggles, commands).",
@@ -183,7 +187,7 @@ public class MainConfig implements ManagedConfig {
     }
 
     public int getPlayerSortMin() {
-        return plugin.getConfig().getInt("player_sort_min");
+        return Math.max(0, Math.min(plugin.getConfig().getInt("player_sort_min"), PLAYER_STORAGE_END));
     }
 
     /**
@@ -195,7 +199,7 @@ public class MainConfig implements ManagedConfig {
     }
 
     public int getPlayerSortMax() {
-        return plugin.getConfig().getInt("player_sort_max");
+        return Math.max(0, Math.min(plugin.getConfig().getInt("player_sort_max"), PLAYER_STORAGE_END));
     }
 
     /** Returns true if the given player inventory slot falls within the sortable range. */
