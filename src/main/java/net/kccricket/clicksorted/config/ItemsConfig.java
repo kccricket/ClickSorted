@@ -12,8 +12,7 @@ import java.util.Locale;
 
 /**
  * Manages {@code items.yml}: a persistent store of material-name → display-name mappings.
- * Unknown item names encountered at runtime are added to the in-memory config and flushed
- * to disk on {@link #save()} (called during {@code onDisable}).
+ * Lookups for unmapped materials fall back to the material name itself.
  */
 public class ItemsConfig implements ManagedConfig {
 
@@ -73,12 +72,7 @@ public class ItemsConfig implements ManagedConfig {
         if (config == null) {
             return iname;
         }
-        String aname = config.getString(iname);
-        if (aname == null) {
-            aname = iname;
-            config.set(iname, iname);
-        }
-        return aname;
+        return config.getString(iname, iname);
     }
 
     public String getItemType(ItemStack i) {
