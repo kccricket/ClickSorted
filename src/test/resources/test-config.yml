@@ -8,7 +8,9 @@ ignore_plugin_inventory: false
 defaults:
   click_mode: SWAP
   sort_mode: NAME
-  shift_click: true
+  # Tests exercise sorting over occupied slots, so enable this by default here
+  # (production config.yml ships with sort_over_items: false).
+  sort_over_items: true
   bundle_inventory: false
   bundle_others: false
   bundle_stack_limit: 12

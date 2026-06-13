@@ -1,7 +1,6 @@
 package net.kccricket.clicksorted;
 
 import net.kccricket.clicksorted.model.ClickMethod;
-import net.kccricket.clicksorted.model.SortingMethod;
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
@@ -90,6 +89,7 @@ class InventorySortTest extends AbstractClickSortedTest {
         // Fill a chest with two partial STONE stacks and one DIRT stack (unsorted).
         // After the click the stacks should be merged and the total counts preserved.
         PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortOverItems(player, true);
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         chest.setItem(0, stack(Material.STONE, 5));
         chest.setItem(1, stack(Material.STONE, 10));
@@ -115,7 +115,8 @@ class InventorySortTest extends AbstractClickSortedTest {
     void doubleClickSortsChest() {
         PlayerMock player = addOpPlayer("Alice");
         player.setOp(true);
-        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE);
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         chest.setItem(0, stack(Material.SAND, 2));
@@ -135,7 +136,7 @@ class InventorySortTest extends AbstractClickSortedTest {
         // SINGLE mode: LEFT click on an empty (AIR) slot with empty cursor triggers sort.
         PlayerMock player = addOpPlayer("Alice");
         player.setOp(true);
-        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SINGLE);
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SINGLE_CLICK);
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         chest.setItem(0, stack(Material.COBBLESTONE, 7));
@@ -157,6 +158,7 @@ class InventorySortTest extends AbstractClickSortedTest {
     void swapClickCancelsEvent() {
         // For SWAP mode the event must be cancelled so the offhand-swap doesn't actually occur.
         PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortOverItems(player, true);
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         chest.setItem(0, stack(Material.STONE, 1));
         InventoryView view = player.openInventory(chest);
@@ -185,8 +187,9 @@ class InventorySortTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void nullCurrentItemCausesEarlyReturn() {
-        // The handler returns immediately if getCurrentItem() is null — no sort.
+    void emptySlotSortsUnderDefaultBehavior() {
+        // With the default sortOverItems=false, sorting fires ONLY on an empty slot. Paper returns
+        // null from getCurrentItem() for empty slots, so the handler must tolerate null and still sort.
         PlayerMock player = addOpPlayer("Alice");
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         chest.setItem(1, stack(Material.STONE, 5));
@@ -196,12 +199,12 @@ class InventorySortTest extends AbstractClickSortedTest {
         // Slot 0 is empty — view.getItem(0) returns null → InventoryClickEvent.getCurrentItem() null.
         callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
 
-        // STONE stacks should NOT be merged.
+        // STONE stacks should be merged: clicking an empty slot is the default trigger.
         long stoneSlots = 0;
         for (ItemStack item : chest.getContents()) {
             if (item != null && item.getType() == Material.STONE) stoneSlots++;
         }
-        assertEquals(2, stoneSlots, "Null currentItem should cause early return; no sort should occur");
+        assertEquals(1, stoneSlots, "Empty-slot click should sort under the default sortOverItems=false");
     }
 
     @Test
@@ -229,6 +232,7 @@ class InventorySortTest extends AbstractClickSortedTest {
     void sortNonChestContainer() {
         // BARREL is in the sortable_inventories list; sorting should work the same as for CHEST.
         PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortOverItems(player, true);
         Inventory barrel = server.createInventory(null, InventoryType.BARREL);
         barrel.setItem(0, stack(Material.STONE, 5));
         barrel.setItem(1, stack(Material.STONE, 10));
@@ -248,53 +252,89 @@ class InventorySortTest extends AbstractClickSortedTest {
         assertEquals(1, stoneSlots, "Two STONE stacks should have merged into one");
     }
 
-    // --- Shift-click cycling tests ---
+    // --- Shift-click sort methods ---
 
     @Test
-    void shiftLeftOnAirSlotCyclesSortMethod() {
-        // Shift-left-clicking an empty slot advances the player's sort method.
+    void shiftLeftClickSortsWhenMethodIsShiftLeftClick() {
         PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SHIFT_LEFT_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        chest.setItem(2, stack(Material.DIRT, 3));
         InventoryView view = player.openInventory(chest);
 
-        SortingMethod before = plugin.getSortingPrefs().getSortingMethod(player);
-        drainMessages(player);
+        InventoryClickEvent event = fireClick(view, ClickType.SHIFT_LEFT, 0);
 
-        // Override getCurrentItem() to return non-null AIR so the handler doesn't short-circuit.
-        InventoryClickEvent event = clickEventWithCurrentItem(
-                view, ClickType.SHIFT_LEFT, 0, new ItemStack(Material.AIR));
-        callEvent(event);
-
-        SortingMethod after = plugin.getSortingPrefs().getSortingMethod(player);
-        assertNotEquals(before, after, "Shift-left should cycle the sort method");
-
-        // A status message containing the new method name should have been sent.
-        boolean messageFound = false;
-        String msg;
-        while ((msg = player.nextMessage()) != null) {
-            if (msg.contains(after.toString())) {
-                messageFound = true;
-            }
-        }
-        assertTrue(messageFound, "Expected a status message mentioning the new sort method");
+        Map<Material, Integer> counts = countByMaterial(chest);
+        assertEquals(15, counts.getOrDefault(Material.STONE, 0), "STONE stacks should merge to 15");
+        assertEquals(3, counts.getOrDefault(Material.DIRT, 0));
+        assertTrue(event.isCancelled(), "Shift-left sort must cancel the originating shift-move");
     }
 
     @Test
-    void shiftRightOnAirSlotCyclesClickMethod() {
-        // Shift-right-clicking an empty slot advances the player's click method.
+    void shiftRightClickSortsWhenMethodIsShiftRightClick() {
         PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SHIFT_RIGHT_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.SAND, 2));
+        chest.setItem(1, stack(Material.SAND, 8));
         InventoryView view = player.openInventory(chest);
 
-        ClickMethod before = plugin.getSortingPrefs().getClickMethod(player);
-        drainMessages(player);
+        InventoryClickEvent event = fireClick(view, ClickType.SHIFT_RIGHT, 0);
 
-        InventoryClickEvent event = clickEventWithCurrentItem(
-                view, ClickType.SHIFT_RIGHT, 0, new ItemStack(Material.AIR));
-        callEvent(event);
+        Map<Material, Integer> counts = countByMaterial(chest);
+        assertEquals(10, counts.getOrDefault(Material.SAND, 0), "SAND stacks should merge to 10");
+        assertTrue(event.isCancelled(), "Shift-right sort must cancel the originating shift-move");
+    }
 
-        ClickMethod after = plugin.getSortingPrefs().getClickMethod(player);
-        assertNotEquals(before, after, "Shift-right should cycle the click method");
+    // --- "Sort over items" occupancy gate ---
+
+    @Test
+    void occupiedSlotNotSortedWhenSortOverItemsDisabled() {
+        // With sort-over-items disabled, clicking an occupied slot must not sort.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortOverItems(player, false);
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+
+        long stoneSlots = 0;
+        for (ItemStack item : chest.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(2, stoneSlots, "Occupied slot must not be sorted when sort-over-items is disabled");
+    }
+
+    @Test
+    void occupiedSlotSortedButNotCancelledForNonCancellingMethod() {
+        // DOUBLE_CLICK has no side effect needing suppression: sorting over an occupied slot must
+        // still fire, but the originating collect-to-cursor sweep must NOT be cancelled.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.DOUBLE_CLICK, 0);
+
+        long stoneSlots = 0;
+        for (ItemStack item : chest.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(1, stoneSlots, "Occupied slot must be sorted when sort-over-items is enabled");
+        assertFalse(event.isCancelled(),
+                "A non-cancelling method (DOUBLE_CLICK) must not suppress the player's own interaction");
     }
 
     // --- Player inventory sort ---
@@ -304,6 +344,7 @@ class InventorySortTest extends AbstractClickSortedTest {
         // Clicking a hotbar slot (player slots 0–8) sorts only the hotbar; main inventory is untouched.
         // In a 27-slot chest view, rawSlot 54 maps to getSlot() 0 (first hotbar slot).
         PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortOverItems(player, true);
         player.getInventory().setItem(0, stack(Material.STONE, 5));
         player.getInventory().setItem(1, stack(Material.STONE, 10));
         player.getInventory().setItem(9, stack(Material.DIRT, 3));
@@ -331,6 +372,7 @@ class InventorySortTest extends AbstractClickSortedTest {
         // the hotbar is untouched.
         // In a 27-slot chest view, rawSlot 27 maps to getSlot() 9 (first main-inventory slot).
         PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortOverItems(player, true);
         player.getInventory().setItem(9, stack(Material.DIRT, 3));
         player.getInventory().setItem(10, stack(Material.DIRT, 7));
         player.getInventory().setItem(0, stack(Material.STONE, 5));
@@ -355,6 +397,7 @@ class InventorySortTest extends AbstractClickSortedTest {
         PlayerMock player = addOpPlayer("Alice");
         player.getInventory().setHelmet(stack(Material.DIAMOND_HELMET));
         player.getInventory().setItemInOffHand(stack(Material.TORCH));
+        plugin.getSortingPrefs().setSortOverItems(player, true);
         player.getInventory().setItem(0, stack(Material.STONE, 5));
         player.getInventory().setItem(1, stack(Material.STONE, 10));
 
@@ -377,6 +420,7 @@ class InventorySortTest extends AbstractClickSortedTest {
         PlayerMock player = addOpPlayer("Alice");
         player.getInventory().setHelmet(stack(Material.DIAMOND_HELMET));
         player.getInventory().setItemInOffHand(stack(Material.TORCH));
+        plugin.getSortingPrefs().setSortOverItems(player, true);
         player.getInventory().setItem(9, stack(Material.STONE, 5));
         player.getInventory().setItem(10, stack(Material.STONE, 10));
 

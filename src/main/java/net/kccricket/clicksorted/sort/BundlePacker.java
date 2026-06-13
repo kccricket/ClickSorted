@@ -143,7 +143,7 @@ public final class BundlePacker {
         if (bin == null) return;
         for (ItemStack is : bin.pooled) {
             SortKey key = new SortKey(is, SortingMethod.NAME);
-            totals.merge(key, (long) is.getAmount(), Long::sum);
+            totals.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
             samples.putIfAbsent(key, is);
             originBins.computeIfAbsent(key, k -> new HashSet<>()).add(bin.id);
         }
@@ -208,10 +208,10 @@ public final class BundlePacker {
 
     /** Number of distinct item types/meta among a list of stacks. */
     private static int distinctEntriesOf(Iterable<ItemStack> items) {
-        List<ItemStack> seen = new ArrayList<>();
+        Set<SortKey> seen = new HashSet<>();
         for (ItemStack is : items) {
-            if (is != null && !containsSimilar(seen, is)) {
-                seen.add(is);
+            if (is != null) {
+                seen.add(new SortKey(is, SortingMethod.NAME));
             }
         }
         return seen.size();

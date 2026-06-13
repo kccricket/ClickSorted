@@ -18,15 +18,17 @@ import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.security.Permissions;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.ItemStack;
 
 /**
- * Thin event dispatcher. Reads player preferences, delegates pre-sort cycling to
- * {@link PrefsCycleHandler}, checks the trigger via {@link ClickMethod#matchesSortTrigger},
+ * Thin event dispatcher. Reads player preferences, checks the trigger via
+ * {@link ClickMethod#matchesSortTrigger}, applies the universal "sort over items" gate,
  * and hands sorting off to {@link InventorySortService}.
  */
 public class InventoryClickListener implements Listener {
@@ -34,23 +36,17 @@ public class InventoryClickListener implements Listener {
     private final ClickSortedPlugin plugin;
     private final PlayerSortingPrefs prefs;
     private final InventorySortService sortService;
-    private final PrefsCycleHandler cycleHandler;
 
     public InventoryClickListener(ClickSortedPlugin plugin,
-                                  InventorySortService sortService,
-                                  PrefsCycleHandler cycleHandler) {
+                                  InventorySortService sortService) {
         this.plugin = plugin;
         this.prefs = plugin.getSortingPrefs();
         this.sortService = sortService;
-        this.cycleHandler = cycleHandler;
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onInventoryClicked(final InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) {
-            return;
-        }
-        if (event.getCurrentItem() == null) {
             return;
         }
         if (!Permissions.isAllowedTo(player, "clicksorted.sort")) {
@@ -62,23 +58,19 @@ public class InventoryClickListener implements Listener {
 
         SortingMethod sortMethod = prefs.getSortingMethod(player);
         ClickMethod clickMethod = prefs.getClickMethod(player);
-        boolean allowShiftClick = prefs.getShiftClickAllowed(player);
-
-        // Prefs-cycle gesture. Throttle only once we know it is one (not on ordinary clicks),
-        // so the cooldown clock is spent on real actions rather than incidental inventory clicks.
-        if (cycleHandler.isCycleGesture(event, clickMethod, allowShiftClick)) {
-            if (throttled(player)) {
-                return;
-            }
-            cycleHandler.tryCycle(event, player, sortMethod, clickMethod, allowShiftClick);
-            return;
-        }
 
         if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
+            // Universal "sort over items" gate: unless enabled, sorting only fires on an empty slot.
+            ItemStack current = event.getCurrentItem();
+            boolean slotOccupied = current != null && current.getType() != Material.AIR;
+            if (slotOccupied && !prefs.getSortOverItems(player)) {
+                return;
+            }
             if (throttled(player)) {
                 return;
             }
-            if (sortService.sortInventory(event, sortMethod) && clickMethod.shouldCancelEvent()) {
+            if (sortService.sortInventory(event, sortMethod)
+                    && clickMethod.shouldCancelEvent()) {
                 if (clickMethod.needsOffhandReset()) {
                     // Use the Paper entity scheduler so the offhand reset is bound to this player
                     // entity (Folia-safe).

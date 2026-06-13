@@ -30,7 +30,7 @@ public class PlayerSortingPrefs {
     private final ClickSortedPlugin plugin;
     private final NamespacedKey sortKey;
     private final NamespacedKey clickKey;
-    private final NamespacedKey shiftClickKey;
+    private final NamespacedKey sortOverItemsKey;
     private final NamespacedKey lockedSlotsKey;
     private final NamespacedKey bundleInventoryKey;
     private final NamespacedKey bundleOthersKey;
@@ -40,7 +40,7 @@ public class PlayerSortingPrefs {
         this.plugin = plugin;
         this.sortKey = new NamespacedKey(plugin, "sort");
         this.clickKey = new NamespacedKey(plugin, "click");
-        this.shiftClickKey = new NamespacedKey(plugin, "shift_click");
+        this.sortOverItemsKey = new NamespacedKey(plugin, "sort_over_items");
         this.lockedSlotsKey = new NamespacedKey(plugin, "locked_slots");
         this.bundleInventoryKey = new NamespacedKey(plugin, "bundle_inventory");
         this.bundleOthersKey = new NamespacedKey(plugin, "bundle_others");
@@ -65,13 +65,17 @@ public class PlayerSortingPrefs {
         player.getPersistentDataContainer().set(clickKey, PersistentDataType.STRING, clickMethod.name());
     }
 
-    public boolean getShiftClickAllowed(Player player) {
-        Byte stored = player.getPersistentDataContainer().get(shiftClickKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultShiftClick();
+    /**
+     * Returns true if sorting fires even while the player is hovering an occupied slot.
+     * Falls back to the server default when the player has no stored preference.
+     */
+    public boolean getSortOverItems(Player player) {
+        Byte stored = player.getPersistentDataContainer().get(sortOverItemsKey, PersistentDataType.BYTE);
+        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultSortOverItems();
     }
 
-    public void setShiftClickAllowed(Player player, boolean allow) {
-        player.getPersistentDataContainer().set(shiftClickKey, PersistentDataType.BYTE, allow ? (byte) 1 : (byte) 0);
+    public void setSortOverItems(Player player, boolean enabled) {
+        player.getPersistentDataContainer().set(sortOverItemsKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
     }
 
     /**

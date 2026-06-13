@@ -51,7 +51,7 @@ class BundlePackerTest extends AbstractClickSortedTest {
         for (ItemStack is : loose) {
             if (is == null) continue;
             SortKey key = new SortKey(is, SortingMethod.NAME);
-            pool.merge(key, (long) is.getAmount(), Long::sum);
+            pool.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
             samples.putIfAbsent(key, is);
         }
         return BundlePacker.packIntoBundles(pool, samples, bundles, stackLimit);
