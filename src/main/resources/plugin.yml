@@ -17,6 +17,7 @@ permissions:
       clicksorted.commands.hover: true
       clicksorted.commands.lock: true
       clicksorted.commands.bundle: true
+      clicksorted.commands.status: true
       clicksorted.commands.getcfg: true
       clicksorted.commands.debug: true
       clicksorted.commands.benchmark: true
@@ -50,6 +51,9 @@ permissions:
     default: true
   clicksorted.commands.bundle:
     description: Allow use of the /clicksorted bundle command
+    default: true
+  clicksorted.commands.status:
+    description: Allow use of the /clicksorted status command
     default: true
   clicksorted.sort:
     description: Allow all kinds of inventories to be click-sorted
