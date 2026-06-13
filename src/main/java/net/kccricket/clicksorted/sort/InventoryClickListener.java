@@ -24,6 +24,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.ItemStack;
 
 /**
  * Thin event dispatcher. Reads player preferences, checks the trigger via
@@ -48,9 +49,6 @@ public class InventoryClickListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        if (event.getCurrentItem() == null) {
-            return;
-        }
         if (!Permissions.isAllowedTo(player, "clicksorted.sort")) {
             return;
         }
@@ -63,7 +61,8 @@ public class InventoryClickListener implements Listener {
 
         if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
             // Universal "sort over items" gate: unless enabled, sorting only fires on an empty slot.
-            boolean slotOccupied = event.getCurrentItem().getType() != Material.AIR;
+            ItemStack current = event.getCurrentItem();
+            boolean slotOccupied = current != null && current.getType() != Material.AIR;
             if (slotOccupied && !prefs.getSortOverItems(player)) {
                 return;
             }
@@ -71,7 +70,7 @@ public class InventoryClickListener implements Listener {
                 return;
             }
             if (sortService.sortInventory(event, sortMethod)
-                    && (clickMethod.shouldCancelEvent() || slotOccupied)) {
+                    && clickMethod.shouldCancelEvent()) {
                 if (clickMethod.needsOffhandReset()) {
                     // Use the Paper entity scheduler so the offhand reset is bound to this player
                     // entity (Folia-safe).

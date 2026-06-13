@@ -55,78 +55,56 @@ public final class SortEngine {
      * @return a sorted, stack-merged list of items
      */
     public static List<ItemStack> sortAndMerge(Collection<ItemStack> items, SortingMethod sortMethod) {
+        // Fungible (stackable, non-bundle) items are merged by key and quantity-summed; non-fungible
+        // items (bundles and any maxStackSize <= 1 item) carry their own contents/meta and must never
+        // be collapsed — each is kept as a discrete stack, ordered by key but emitted verbatim.
         Map<SortKey, Integer> amounts = new HashMap<>();
+        List<Entry> discretes = new ArrayList<>();
 
-        // Phase 1: extract unique item keys and accumulate quantities
         for (ItemStack is : items) {
-            if (is != null) {
-                SortKey key = new SortKey(is, sortMethod);
+            if (is == null) {
+                continue;
+            }
+            SortKey key = new SortKey(is, sortMethod);
+            if (isFungible(is)) {
                 amounts.merge(key, is.getAmount(), (a, b) -> Integer.sum(a, b));
+            } else {
+                discretes.add(new Entry(key, is));
             }
         }
 
-        // Phase 2: sort the extracted keys and reconstruct stacks respecting max stack size
+        // Phase 2: order fungible keys and discrete items together by SortKey, then emit.
+        for (Map.Entry<SortKey, Integer> e : amounts.entrySet()) {
+            discretes.add(new Entry(e.getKey(), null));
+        }
+        Collections.sort(discretes);
+
         List<ItemStack> sorted = new LinkedList<>();
-        for (SortKey sortKey : asSortedList(amounts.keySet())) {
-            emitStacks(sorted, sortKey, amounts.get(sortKey));
+        for (Entry entry : discretes) {
+            if (entry.stack != null) {
+                sorted.add(entry.stack);
+            } else {
+                emitStacks(sorted, entry.key, amounts.get(entry.key));
+            }
         }
 
         return sorted;
     }
 
+    /** Whether an item is fungible: stackable and not a bundle, so it may be quantity-merged. */
+    private static boolean isFungible(ItemStack is) {
+        return is.getType() != Material.BUNDLE && is.getType().getMaxStackSize() > 1;
+    }
+
     /**
-     * Combine same-item stacks <em>in place</em>, position-indexed. {@code items} is treated as a
-     * slot-aligned list (index = slot position, {@code null} = empty). For each group of like
-     * items, the smallest stacks are drained into the largest ones until only the minimum number
-     * of stacks remain: the largest stacks keep their positions (and grow), and the emptied
-     * positions are set to {@code null}. Stacks that already can't be consolidated are left
-     * untouched — nothing is moved or rebalanced needlessly.
-     *
-     * <p>{@code BUNDLE} items are skipped (they are non-stackable and serve as bins). Non-stackable
-     * items never group.
-     *
-     * @param items slot-aligned items, mutated in place
+     * One orderable output entry: a discrete non-fungible {@code stack} (emitted verbatim), or a
+     * fungible group when {@code stack} is {@code null} (emitted via {@link #emitStacks} using the
+     * accumulated amount for {@code key}). Ordered solely by {@code key}.
      */
-    public static void mergeStacks(List<ItemStack> items) {
-        // Group like, stackable, non-bundle items by identity, in encounter order.
-        Map<SortKey, List<Integer>> groups = new LinkedHashMap<>();
-        for (int i = 0; i < items.size(); i++) {
-            ItemStack is = items.get(i);
-            if (is == null || is.getType() == Material.BUNDLE) continue;
-            if (is.getType().getMaxStackSize() <= 1) continue;
-            groups.computeIfAbsent(new SortKey(is, SortingMethod.NAME), k -> new ArrayList<>()).add(i);
-        }
-
-        for (List<Integer> positions : groups.values()) {
-            if (positions.size() < 2) continue;
-
-            int max = items.get(positions.get(0)).getType().getMaxStackSize();
-            int total = 0;
-            for (int p : positions) total += items.get(p).getAmount();
-            int needed = (total + max - 1) / max; // ceil
-            if (needed == positions.size()) continue; // nothing to drain — leave as-is
-
-            // Largest stacks first: the first `needed` survive (keep their slots), the rest drain.
-            List<Integer> byAmountDesc = new ArrayList<>(positions);
-            byAmountDesc.sort((a, b) -> items.get(b).getAmount() - items.get(a).getAmount());
-
-            int drained = 0;
-            for (int i = needed; i < byAmountDesc.size(); i++) {
-                int pos = byAmountDesc.get(i);
-                drained += items.get(pos).getAmount();
-                items.set(pos, null);
-            }
-
-            // Pour the drained amount into the surviving stacks, largest first.
-            for (int i = 0; i < needed && drained > 0; i++) {
-                ItemStack survivor = items.get(byAmountDesc.get(i));
-                int space = max - survivor.getAmount();
-                int add = Math.min(space, drained);
-                if (add > 0) {
-                    survivor.setAmount(survivor.getAmount() + add);
-                    drained -= add;
-                }
-            }
+    private record Entry(SortKey key, ItemStack stack) implements Comparable<Entry> {
+        @Override
+        public int compareTo(Entry other) {
+            return key.compareTo(other.key);
         }
     }
 
@@ -149,11 +127,5 @@ public final class SortEngine {
             amount -= maxStack;
         }
         out.add(sortKey.toItemStack(amount));
-    }
-
-    private static <T extends Comparable<? super T>> List<T> asSortedList(Collection<T> c) {
-        List<T> list = new ArrayList<>(c);
-        Collections.sort(list);
-        return list;
     }
 }

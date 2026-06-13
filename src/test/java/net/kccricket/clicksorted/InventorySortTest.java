@@ -187,8 +187,9 @@ class InventorySortTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void nullCurrentItemCausesEarlyReturn() {
-        // The handler returns immediately if getCurrentItem() is null — no sort.
+    void emptySlotSortsUnderDefaultBehavior() {
+        // With the default sortOverItems=false, sorting fires ONLY on an empty slot. Paper returns
+        // null from getCurrentItem() for empty slots, so the handler must tolerate null and still sort.
         PlayerMock player = addOpPlayer("Alice");
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
         chest.setItem(1, stack(Material.STONE, 5));
@@ -198,12 +199,12 @@ class InventorySortTest extends AbstractClickSortedTest {
         // Slot 0 is empty — view.getItem(0) returns null → InventoryClickEvent.getCurrentItem() null.
         callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
 
-        // STONE stacks should NOT be merged.
+        // STONE stacks should be merged: clicking an empty slot is the default trigger.
         long stoneSlots = 0;
         for (ItemStack item : chest.getContents()) {
             if (item != null && item.getType() == Material.STONE) stoneSlots++;
         }
-        assertEquals(2, stoneSlots, "Null currentItem should cause early return; no sort should occur");
+        assertEquals(1, stoneSlots, "Empty-slot click should sort under the default sortOverItems=false");
     }
 
     @Test
@@ -313,9 +314,9 @@ class InventorySortTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void occupiedSlotSortedAndCancelledWhenSortOverItemsEnabled() {
-        // DOUBLE does not itself cancel the event; the occupied-slot sort must force the cancel
-        // so the vanilla pickup/move is suppressed.
+    void occupiedSlotSortedButNotCancelledForNonCancellingMethod() {
+        // DOUBLE_CLICK has no side effect needing suppression: sorting over an occupied slot must
+        // still fire, but the originating collect-to-cursor sweep must NOT be cancelled.
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
         plugin.getSortingPrefs().setSortOverItems(player, true);
@@ -332,8 +333,8 @@ class InventorySortTest extends AbstractClickSortedTest {
             if (item != null && item.getType() == Material.STONE) stoneSlots++;
         }
         assertEquals(1, stoneSlots, "Occupied slot must be sorted when sort-over-items is enabled");
-        assertTrue(event.isCancelled(),
-                "Sorting over an occupied slot must cancel even a normally non-cancelling method");
+        assertFalse(event.isCancelled(),
+                "A non-cancelling method (DOUBLE_CLICK) must not suppress the player's own interaction");
     }
 
     // --- Player inventory sort ---

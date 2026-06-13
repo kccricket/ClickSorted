@@ -208,10 +208,10 @@ public final class BundlePacker {
 
     /** Number of distinct item types/meta among a list of stacks. */
     private static int distinctEntriesOf(Iterable<ItemStack> items) {
-        List<ItemStack> seen = new ArrayList<>();
+        Set<SortKey> seen = new HashSet<>();
         for (ItemStack is : items) {
-            if (is != null && !containsSimilar(seen, is)) {
-                seen.add(is);
+            if (is != null) {
+                seen.add(new SortKey(is, SortingMethod.NAME));
             }
         }
         return seen.size();
