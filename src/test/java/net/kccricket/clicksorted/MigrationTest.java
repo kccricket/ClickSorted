@@ -11,7 +11,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,14 +24,11 @@ class MigrationTest extends AbstractClickSortedTest {
 
     @Test
     void valueMigration_remapsCaseInsensitivelyAndPassesUnknownThrough() {
-        ValueMigration m = ValueMigration.of(Map.of("OLD", "NEW"));
+        ValueMigration m = ValueMigration.builder().rename("OLD").to("NEW").build();
         assertEquals("NEW", m.migrate("OLD"));
         assertEquals("NEW", m.migrate("old"));
         assertEquals("KEEP", m.migrate("KEEP"), "Unmapped tokens are returned unchanged");
         assertNull(m.migrate(null), "null is returned unchanged");
-        assertTrue(m.isLegacy("old"));
-        assertFalse(m.isLegacy("NEW"));
-        assertFalse(m.isLegacy(null));
     }
 
     @Test
@@ -44,9 +40,6 @@ class MigrationTest extends AbstractClickSortedTest {
         assertEquals("C", m.migrate("A"));
         assertEquals("C", m.migrate("B"));
         assertEquals("C", m.migrate("C"));
-        assertTrue(m.isLegacy("A"));
-        assertTrue(m.isLegacy("B"));
-        assertFalse(m.isLegacy("C"));
     }
 
     @Test

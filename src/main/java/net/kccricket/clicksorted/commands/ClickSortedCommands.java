@@ -25,15 +25,12 @@ public class ClickSortedCommands {
      * should be dropped.
      */
     private static boolean throttled(ClickSortedPlugin plugin, CommandSourceStack src) {
-        if (!(src.getExecutor() instanceof Player player)) {
-            return false;
-        }
-        if (plugin.getActionThrottle().allow(player)) {
-            return false;
-        }
-        plugin.getMessenger().message(player, "throttle", 3,
-                plugin.getConfigManager().lang().getColoredMessage("actionTooFast"));
-        return true;
+        return src.getExecutor() instanceof Player player && plugin.getActionThrottle().throttled(player);
+    }
+
+    /** The {@code ENABLED}/{@code DISABLED} status label shown for a boolean setting. */
+    private static String enabledLabel(boolean enabled) {
+        return enabled ? "ENABLED" : "DISABLED";
     }
 
     public static LiteralCommandNode<CommandSourceStack> build(ClickSortedPlugin plugin) {
@@ -70,12 +67,8 @@ public class ClickSortedCommands {
                             return builder.buildFuture();
                         })
                         .executes(ctx -> {
-                            if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                                MessageUtil.errorMessage(ctx.getSource().getSender(),
-                                        plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            if (throttled(plugin, ctx.getSource())) {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
                             String arg = StringArgumentType.getString(ctx, "method");
@@ -112,12 +105,8 @@ public class ClickSortedCommands {
                             return builder.buildFuture();
                         })
                         .executes(ctx -> {
-                            if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                                MessageUtil.errorMessage(ctx.getSource().getSender(),
-                                        plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            if (throttled(plugin, ctx.getSource())) {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
                             String arg = StringArgumentType.getString(ctx, "method");
@@ -139,12 +128,8 @@ public class ClickSortedCommands {
         return Commands.literal("hover")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.hover"))
                 .executes(ctx -> {
-                    if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                        MessageUtil.errorMessage(ctx.getSource().getSender(),
-                                plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
-                        return Command.SINGLE_SUCCESS;
-                    }
-                    if (throttled(plugin, ctx.getSource())) {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
                     boolean current = plugin.getSortingPrefs().getSortOverItems(player);
@@ -154,12 +139,8 @@ public class ClickSortedCommands {
                 .then(Commands.argument("value", StringArgumentType.word())
                         .suggests((ctx, b) -> { b.suggest("true"); b.suggest("false"); return b.buildFuture(); })
                         .executes(ctx -> {
-                            if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                                MessageUtil.errorMessage(ctx.getSource().getSender(),
-                                        plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            if (throttled(plugin, ctx.getSource())) {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
                             Boolean value = parseState(StringArgumentType.getString(ctx, "value"));
@@ -173,20 +154,19 @@ public class ClickSortedCommands {
 
     private static void applyHoverSetting(ClickSortedPlugin plugin, Player player, boolean enabled) {
         plugin.getSortingPrefs().setSortOverItems(player, enabled);
-        String status = enabled ? "ENABLED" : "DISABLED";
         MessageUtil.statusMessage(player,
                 plugin.getConfigManager().lang().getColoredMessage("setSortOverItemsStatus",
-                        Placeholder.unparsed("status", status)));
+                        Placeholder.unparsed("status", enabledLabel(enabled))));
     }
 
-    private static final java.util.Set<String> BUNDLE_ON_WORDS = java.util.Set.of("enable", "on", "true", "yes");
-    private static final java.util.Set<String> BUNDLE_OFF_WORDS = java.util.Set.of("disable", "off", "false", "no");
+    private static final java.util.Set<String> ON_WORDS = java.util.Set.of("enable", "on", "true", "yes");
+    private static final java.util.Set<String> OFF_WORDS = java.util.Set.of("disable", "off", "false", "no");
 
     /** {@code true}/{@code false} for recognised on/off words, or {@code null} if unrecognised. */
     private static Boolean parseState(String s) {
         String lower = s.toLowerCase();
-        if (BUNDLE_ON_WORDS.contains(lower)) return true;
-        if (BUNDLE_OFF_WORDS.contains(lower)) return false;
+        if (ON_WORDS.contains(lower)) return true;
+        if (OFF_WORDS.contains(lower)) return false;
         return null;
     }
 
@@ -238,7 +218,7 @@ public class ClickSortedCommands {
                             setter.accept(player, state);
                             MessageUtil.statusMessage(player,
                                     plugin.getConfigManager().lang().getColoredMessage(langKey,
-                                            Placeholder.unparsed("status", state ? "ENABLED" : "DISABLED")));
+                                            Placeholder.unparsed("status", enabledLabel(state))));
                             return Command.SINGLE_SUCCESS;
                         }));
     }
@@ -254,8 +234,8 @@ public class ClickSortedCommands {
                             }
                             String raw = StringArgumentType.getString(ctx, "value");
                             int limit;
-                            if (BUNDLE_OFF_WORDS.contains(raw.toLowerCase())) {
-                                limit = 0;
+                            if (Boolean.FALSE.equals(parseState(raw))) {
+                                limit = 0; // an off-word disables the entry limit
                             } else {
                                 try {
                                     limit = Math.max(0, Integer.parseInt(raw));
@@ -276,9 +256,9 @@ public class ClickSortedCommands {
         var prefs = plugin.getSortingPrefs();
         var lang = plugin.getConfigManager().lang();
         MessageUtil.statusMessage(player, lang.getColoredMessage("setBundlePackInventoryStatus",
-                Placeholder.unparsed("status", prefs.getBundlePackInventory(player) ? "ENABLED" : "DISABLED")));
+                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInventory(player)))));
         MessageUtil.statusMessage(player, lang.getColoredMessage("setBundlePackOthersStatus",
-                Placeholder.unparsed("status", prefs.getBundlePackOthers(player) ? "ENABLED" : "DISABLED")));
+                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackOthers(player)))));
         int limit = prefs.getBundleStackLimit(player);
         MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleStackLimitStatus",
                 Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
@@ -288,12 +268,8 @@ public class ClickSortedCommands {
         return Commands.literal("lock")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.lock"))
                 .executes(ctx -> {
-                    if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                        MessageUtil.errorMessage(ctx.getSource().getSender(),
-                                plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
-                        return Command.SINGLE_SUCCESS;
-                    }
-                    if (throttled(plugin, ctx.getSource())) {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
                     player.openInventory(new LockGuiHolder(plugin, player).getInventory());
@@ -305,9 +281,8 @@ public class ClickSortedCommands {
         return Commands.literal("status")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.status"))
                 .executes(ctx -> {
-                    if (!(ctx.getSource().getExecutor() instanceof Player player)) {
-                        MessageUtil.errorMessage(ctx.getSource().getSender(),
-                                plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null) {
                         return Command.SINGLE_SUCCESS;
                     }
                     var prefs = plugin.getSortingPrefs();
@@ -320,7 +295,7 @@ public class ClickSortedCommands {
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusSortMethod",
                             Placeholder.unparsed("method", sortMethod.toString())));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusHover",
-                            Placeholder.unparsed("status", hover ? "ENABLED" : "DISABLED")));
+                            Placeholder.unparsed("status", enabledLabel(hover))));
                     return Command.SINGLE_SUCCESS;
                 });
     }
