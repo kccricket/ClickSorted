@@ -16,7 +16,6 @@ import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
-import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.security.Permissions;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -56,7 +55,6 @@ public class InventoryClickListener implements Listener {
         Log.debug("inventory click by player " + player.getName() + ": type=" + event.getClick()
                 + " slot=" + event.getSlot() + " rawslot=" + event.getRawSlot());
 
-        SortingMethod sortMethod = prefs.getSortingMethod(player);
         ClickMethod clickMethod = prefs.getClickMethod(player);
 
         if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
@@ -66,10 +64,10 @@ public class InventoryClickListener implements Listener {
             if (slotOccupied && !prefs.getSortOverItems(player)) {
                 return;
             }
-            if (throttled(player)) {
+            if (plugin.getActionThrottle().throttled(player)) {
                 return;
             }
-            if (sortService.sortInventory(event, sortMethod)
+            if (sortService.sortInventory(event, prefs.getSortingMethod(player))
                     && clickMethod.shouldCancelEvent()) {
                 if (clickMethod.needsOffhandReset()) {
                     // Use the Paper entity scheduler so the offhand reset is bound to this player
@@ -81,18 +79,5 @@ public class InventoryClickListener implements Listener {
                 event.setCancelled(true);
             }
         }
-    }
-
-    /**
-     * Shared per-player throttle gate. Returns {@code true} (and sends a rate-limited notice) when
-     * the action should be dropped; {@code false} when it may proceed.
-     */
-    private boolean throttled(Player player) {
-        if (plugin.getActionThrottle().allow(player)) {
-            return false;
-        }
-        plugin.getMessenger().message(player, "throttle", 3,
-                plugin.getConfigManager().lang().getColoredMessage("actionTooFast"));
-        return true;
     }
 }

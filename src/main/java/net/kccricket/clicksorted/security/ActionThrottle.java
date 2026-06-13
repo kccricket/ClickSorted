@@ -59,6 +59,22 @@ public class ActionThrottle {
     }
 
     /**
+     * Shared throttle gate: like {@link #allow(Player)} but, on denial, also sends the player the
+     * rate-limited {@code actionTooFast} notice. Lets every call site collapse to a single check.
+     *
+     * @return {@code true} if the action should be dropped (and the notice was sent);
+     *         {@code false} if it may proceed.
+     */
+    public boolean throttled(Player player) {
+        if (allow(player)) {
+            return false;
+        }
+        plugin.getMessenger().message(player, "throttle", 3,
+                plugin.getConfigManager().lang().getColoredMessage("actionTooFast"));
+        return true;
+    }
+
+    /**
      * Core throttle decision against an explicit cooldown. Exposed (package-private) for tests.
      *
      * <p>On denial the player's timestamp is intentionally <em>not</em> updated, so a sustained flood

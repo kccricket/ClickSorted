@@ -43,16 +43,6 @@ public final class ValueMigration {
     }
 
     /**
-     * Builds a migration from a map of legacy token &rarr; canonical token. Keys are compared
-     * case-insensitively; values are stored verbatim (use the exact canonical spelling).
-     */
-    public static ValueMigration of(Map<String, String> remap) {
-        Map<String, String> upper = new HashMap<>(remap.size());
-        remap.forEach((legacy, canonical) -> upper.put(legacy.toUpperCase(Locale.ROOT), canonical));
-        return new ValueMigration(Map.copyOf(upper));
-    }
-
-    /**
      * @return the canonical token for {@code stored}, or {@code stored} unchanged (including
      *         {@code null}) when no rule applies.
      */
@@ -61,15 +51,6 @@ public final class ValueMigration {
             return null;
         }
         return remap.getOrDefault(stored.toUpperCase(Locale.ROOT), stored);
-    }
-
-    /** @return true if {@code stored} is a legacy token this migration would rewrite. */
-    public boolean isLegacy(String stored) {
-        if (stored == null) {
-            return false;
-        }
-        String canonical = remap.get(stored.toUpperCase(Locale.ROOT));
-        return canonical != null && !canonical.equals(stored);
     }
 
     /** @return a new {@link Builder} for declaring renamed-setting lineages. */

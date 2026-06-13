@@ -178,8 +178,9 @@ public class InventorySortService {
         List<ItemStack> bundles = new ArrayList<>();       // bins (mutated by the packer)
         List<ItemStack> toSort = new ArrayList<>();         // ineligible passthrough + leftovers + bundles
 
+        ItemStack[] contents = inv.getContents();
         for (int slot : sortableSlots) {
-            ItemStack is = inv.getItem(slot);
+            ItemStack is = contents[slot];
             if (is == null) {
                 continue;
             }
