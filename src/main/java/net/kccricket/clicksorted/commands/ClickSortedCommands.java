@@ -38,11 +38,8 @@ public class ClickSortedCommands {
 
     public static LiteralCommandNode<CommandSourceStack> build(ClickSortedPlugin plugin) {
         return Commands.literal("clicksorted")
-                .then(buildSort(plugin))
-                .then(buildClick(plugin))
-                .then(buildHover(plugin))
-                .then(buildLock(plugin))
-                .then(buildBundle(plugin))
+                .then(buildSet(plugin))
+                .then(buildStatus(plugin))
                 .then(buildReload(plugin))
                 .then(buildGetcfg(plugin))
                 .then(buildDebug(plugin))
@@ -50,8 +47,17 @@ public class ClickSortedCommands {
                 .build();
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSort(ClickSortedPlugin plugin) {
-        return Commands.literal("sort")
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSet(ClickSortedPlugin plugin) {
+        return Commands.literal("set")
+                .then(buildSortMethod(plugin))
+                .then(buildClickMethod(plugin))
+                .then(buildHover(plugin))
+                .then(buildBundle(plugin))
+                .then(buildLock(plugin));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSortMethod(ClickSortedPlugin plugin) {
+        return Commands.literal("sort-method")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
                 .then(Commands.argument("method", StringArgumentType.word())
                         .suggests((ctx, builder) -> {
@@ -92,8 +98,8 @@ public class ClickSortedCommands {
                         }));
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildClick(ClickSortedPlugin plugin) {
-        return Commands.literal("click")
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildClickMethod(ClickSortedPlugin plugin) {
+        return Commands.literal("click-method")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.click"))
                 .then(Commands.argument("method", StringArgumentType.word())
                         .suggests((ctx, builder) -> {
@@ -142,13 +148,35 @@ public class ClickSortedCommands {
                         return Command.SINGLE_SUCCESS;
                     }
                     boolean current = plugin.getSortingPrefs().getSortOverItems(player);
-                    plugin.getSortingPrefs().setSortOverItems(player, !current);
-                    String status = current ? "DISABLED" : "ENABLED";
-                    MessageUtil.statusMessage(player,
-                            plugin.getConfigManager().lang().getColoredMessage("setSortOverItemsStatus",
-                                    Placeholder.unparsed("status", status)));
+                    applyHoverSetting(plugin, player, !current);
                     return Command.SINGLE_SUCCESS;
-                });
+                })
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .suggests((ctx, b) -> { b.suggest("true"); b.suggest("false"); return b.buildFuture(); })
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getExecutor() instanceof Player player)) {
+                                MessageUtil.errorMessage(ctx.getSource().getSender(),
+                                        plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            if (throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            Boolean value = parseState(StringArgumentType.getString(ctx, "value"));
+                            if (value == null) {
+                                return Command.SINGLE_SUCCESS; // unrecognised → no-op
+                            }
+                            applyHoverSetting(plugin, player, value);
+                            return Command.SINGLE_SUCCESS;
+                        }));
+    }
+
+    private static void applyHoverSetting(ClickSortedPlugin plugin, Player player, boolean enabled) {
+        plugin.getSortingPrefs().setSortOverItems(player, enabled);
+        String status = enabled ? "ENABLED" : "DISABLED";
+        MessageUtil.statusMessage(player,
+                plugin.getConfigManager().lang().getColoredMessage("setSortOverItemsStatus",
+                        Placeholder.unparsed("status", status)));
     }
 
     private static final java.util.Set<String> BUNDLE_ON_WORDS = java.util.Set.of("enable", "on", "true", "yes");
@@ -191,7 +219,7 @@ public class ClickSortedCommands {
                 .then(buildBundleStackLimit(plugin));
     }
 
-    /** A {@code /clicksorted bundle <literal> <on|off>} boolean toggle persisting via {@code setter}. */
+    /** A {@code /clicksorted set bundle <literal> <on|off>} boolean toggle persisting via {@code setter}. */
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> bundleToggle(
             ClickSortedPlugin plugin, String literal, String langKey,
             java.util.function.BiConsumer<Player, Boolean> setter) {
@@ -269,6 +297,30 @@ public class ClickSortedCommands {
                         return Command.SINGLE_SUCCESS;
                     }
                     player.openInventory(new LockGuiHolder(plugin, player).getInventory());
+                    return Command.SINGLE_SUCCESS;
+                });
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStatus(ClickSortedPlugin plugin) {
+        return Commands.literal("status")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.status"))
+                .executes(ctx -> {
+                    if (!(ctx.getSource().getExecutor() instanceof Player player)) {
+                        MessageUtil.errorMessage(ctx.getSource().getSender(),
+                                plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    var prefs = plugin.getSortingPrefs();
+                    var lang = plugin.getConfigManager().lang();
+                    ClickMethod clickMethod = prefs.getClickMethod(player);
+                    SortingMethod sortMethod = prefs.getSortingMethod(player);
+                    boolean hover = prefs.getSortOverItems(player);
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusClickMethod",
+                            Placeholder.unparsed("method", clickMethod.toString())));
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusSortMethod",
+                            Placeholder.unparsed("method", sortMethod.toString())));
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusHover",
+                            Placeholder.unparsed("status", hover ? "ENABLED" : "DISABLED")));
                     return Command.SINGLE_SUCCESS;
                 });
     }

@@ -13,12 +13,12 @@ import static org.junit.jupiter.api.Assertions.*;
  * the specific command class).
  *
  * Command permissions from plugin.yml:
- *   sort / click / hover        — default true  (any player)
- *   reload / getcfg / debug     — default op
+ *   set sort-method / set click-method / set hover  — default true  (any player)
+ *   reload / getcfg / debug                         — default op
  */
 class CommandsTest extends AbstractClickSortedTest {
 
-    // --- sort ---
+    // --- set sort-method ---
 
     @Test
     void sortCommandChangesSortMethod() {
@@ -29,7 +29,7 @@ class CommandsTest extends AbstractClickSortedTest {
         // Pick a different available method.
         SortingMethod target = initial == SortingMethod.NAME ? SortingMethod.GROUP : SortingMethod.NAME;
 
-        server.dispatchCommand(player, "clicksorted sort " + target.name());
+        server.dispatchCommand(player, "clicksorted set sort-method " + target.name());
 
         assertEquals(target, plugin.getSortingPrefs().getSortingMethod(player));
     }
@@ -40,10 +40,9 @@ class CommandsTest extends AbstractClickSortedTest {
         player.setOp(true);
         drainMessages(player);
 
-        server.dispatchCommand(player, "clicksorted sort NAME");
+        server.dispatchCommand(player, "clicksorted set sort-method NAME");
 
-        // The command sends "Sorting method has been set to: NAME" (with colour prefix).
-        assertTrue(anyMessageContains(player, "NAME", "Sorting method"),
+        assertTrue(anyMessageContains(player, "NAME"),
                 "Expected sort-mode status message");
     }
 
@@ -54,7 +53,7 @@ class CommandsTest extends AbstractClickSortedTest {
         SortingMethod before = plugin.getSortingPrefs().getSortingMethod(player);
         drainMessages(player);
 
-        server.dispatchCommand(player, "clicksorted sort TOTALLY_INVALID");
+        server.dispatchCommand(player, "clicksorted set sort-method TOTALLY_INVALID");
 
         // Sort method should be unchanged.
         assertEquals(before, plugin.getSortingPrefs().getSortingMethod(player));
@@ -64,17 +63,17 @@ class CommandsTest extends AbstractClickSortedTest {
     void sortCommandIsPlayerOnly() {
         // Sending the command from the console should fail with "not from console" text.
         // Should not throw; just fail gracefully.
-        assertDoesNotThrow(() -> server.dispatchCommand(server.getConsoleSender(), "clicksorted sort NAME"));
+        assertDoesNotThrow(() -> server.dispatchCommand(server.getConsoleSender(), "clicksorted set sort-method NAME"));
     }
 
-    // --- click ---
+    // --- set click-method ---
 
     @Test
     void clickCommandChangesClickMethod() {
         PlayerMock player = server.addPlayer("Alice");
         player.setOp(true);
         // DOUBLE_CLICK is always available.
-        server.dispatchCommand(player, "clicksorted click DOUBLE_CLICK");
+        server.dispatchCommand(player, "clicksorted set click-method DOUBLE_CLICK");
         assertEquals(ClickMethod.DOUBLE_CLICK, plugin.getSortingPrefs().getClickMethod(player));
     }
 
@@ -84,13 +83,13 @@ class CommandsTest extends AbstractClickSortedTest {
         player.setOp(true);
         drainMessages(player);
 
-        server.dispatchCommand(player, "clicksorted click DOUBLE_CLICK");
+        server.dispatchCommand(player, "clicksorted set click-method DOUBLE_CLICK");
 
-        assertTrue(anyMessageContains(player, "DOUBLE_CLICK", "Click method"),
+        assertTrue(anyMessageContains(player, "DOUBLE_CLICK"),
                 "Expected click-mode status message");
     }
 
-    // --- hover ---
+    // --- set hover ---
 
     @Test
     void hoverCommandTogglesFlag() {
@@ -98,13 +97,25 @@ class CommandsTest extends AbstractClickSortedTest {
         player.setOp(true);
         boolean initial = plugin.getSortingPrefs().getSortOverItems(player);
 
-        server.dispatchCommand(player, "clicksorted hover");
+        server.dispatchCommand(player, "clicksorted set hover");
         assertEquals(!initial, plugin.getSortingPrefs().getSortOverItems(player),
                 "hover command should toggle the flag");
 
-        server.dispatchCommand(player, "clicksorted hover");
+        server.dispatchCommand(player, "clicksorted set hover");
         assertEquals(initial, plugin.getSortingPrefs().getSortOverItems(player),
                 "Second toggle should restore original value");
+    }
+
+    @Test
+    void hoverCommandSetsExplicitValue() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+
+        server.dispatchCommand(player, "clicksorted set hover true");
+        assertTrue(plugin.getSortingPrefs().getSortOverItems(player), "hover true should enable");
+
+        server.dispatchCommand(player, "clicksorted set hover false");
+        assertFalse(plugin.getSortingPrefs().getSortOverItems(player), "hover false should disable");
     }
 
     @Test
@@ -113,7 +124,7 @@ class CommandsTest extends AbstractClickSortedTest {
         player.setOp(true);
         drainMessages(player);
 
-        server.dispatchCommand(player, "clicksorted hover");
+        server.dispatchCommand(player, "clicksorted set hover");
 
         assertTrue(anyMessageContains(player, "ENABLED", "DISABLED", "Sort over items"),
                 "Expected sort-over-items status message");
