@@ -1,13 +1,16 @@
 # ClickSorted
 
-*Sort any inventory with a click.*
-
 <!-- TODO: replace placeholder badge URLs once distribution pages are live
 ![Version](https://img.shields.io/badge/version-TODO-blue)
 ![License](https://img.shields.io/badge/license-GPL%20v3-green)
 ![Paper](https://img.shields.io/badge/Paper-1.20.6%2B-orange)
 ![Build](https://img.shields.io/badge/build-TODO-lightgrey)
 -->
+
+*Sort any inventory and pack your bundles with a click.*
+
+ClickSorted turns any inventory into a tidy one with a single click. Open a chest, your own inventory, an ender chest, a shulker box and push a button to collapse loose items into merged, ordered stacks. Every player picks their own trigger, sort order, and extras; their choices stick across sessions. Beyond plain sorting, it can lock slots you want left untouched and pack stray remainders into your bundles, so a single action both sorts and consolidates.
+
 ---
 
 ## Contents
@@ -19,8 +22,10 @@
   - [Download \& Installation](#download--installation)
   - [Player Guide](#player-guide)
     - [Sorting an inventory](#sorting-an-inventory)
-    - [Changing preferences in-inventory (shift-click)](#changing-preferences-in-inventory-shift-click)
+    - [Sorting over occupied slots](#sorting-over-occupied-slots)
     - [Your player inventory: two regions](#your-player-inventory-two-regions)
+    - [Locking slots](#locking-slots)
+    - [Bundle packing](#bundle-packing)
     - [Player commands](#player-commands)
   - [Admin Reference](#admin-reference)
     - [Admin commands](#admin-commands)
@@ -36,14 +41,16 @@
     - [`lang.yml`](#langyml)
       - [Sort order feedback](#sort-order-feedback)
       - [Click trigger feedback](#click-trigger-feedback)
-      - [Shift-click toggle feedback](#shift-click-toggle-feedback)
+      - [Sort-over-items toggle feedback](#sort-over-items-toggle-feedback)
+      - [Bundle packing feedback](#bundle-packing-feedback)
+      - [Status command feedback](#status-command-feedback)
+      - [Action throttle](#action-throttle)
       - [Debug commands](#debug-commands)
       - [Reload](#reload)
       - [Inventory overflow](#inventory-overflow)
       - [Sort trigger instructions](#sort-trigger-instructions)
-      - [Shift-cycle prompts](#shift-cycle-prompts)
-      - [Tips](#tips)
       - [Console / player-only error](#console--player-only-error)
+      - [Lock GUI](#lock-gui)
   - [Building from Source](#building-from-source)
   - [License](#license)
 
@@ -60,9 +67,11 @@ with contributions from **chengzi**. The original plugin made inventory sorting 
 
 - Sort player inventories, chests, ender chests, shulker boxes, barrels, hoppers, droppers, dispensers, and any other configured inventory.
 - Two sort orders: **name** (alphabetical by display name) and **group** (creative-tab-style buckets defined in `groups.yml`).
-- Per-player preferences (trigger, sort order, shift-cycling) persist across sessions.
-- Change preferences entirely **in-inventory with the mouse** — commands are optional.
+- **Lock individual inventory slots** so they are never moved by sorting.
+- **Optional bundle packing**: consolidate partial stacks into bundles as part of a sort, with a configurable per-bundle entry limit.
+- Per-player preferences (trigger, sort order, sort-over-items, bundle packing, locked slots) persist across sessions.
 - Identical items are automatically merged into full stacks before sorting.
+- A per-player action throttle caps how fast scripted clients can drive plugin work.
 - Fully configurable: messages (MiniMessage), item groups, sortable inventory types, slot ranges, and more.
 
 ## Download & Installation
@@ -82,25 +91,23 @@ The bundled `groups.yml` was generated from Minecraft 26.1.2 creative tabs.
 
 By default (and out of the box for new players), sorting is triggered by pressing the **swap-offhand key** (usually `F`) while hovering over any slot in a sortable inventory. Your main inventory, chests, ender chest, shulker box, barrel — just open it and press `F` over any slot.
 
-There are four available trigger modes:
+The available trigger modes are:
 
 | Trigger mode | How to sort |
 |---|---|
 | **swap** *(default)* | Hover over any slot and press the swap-offhand key (`F`). |
-| **double** | Double-click any slot. |
-| **single** | Left-click an **empty** slot. |
+| **double_click** | Double-click any slot. |
+| **single_click** | Left-click an **empty** slot. |
+| **control_drop** | Press the drop key (`Ctrl+Q`) over a slot. |
+| **shift_left_click** | Shift-left-click a slot. |
+| **shift_right_click** | Shift-right-click a slot. |
 | **none** | Click-sorting disabled. |
 
-### Changing preferences in-inventory (shift-click)
+Change your trigger with `/clicksorted set click-method <mode>` and your sort order with `/clicksorted set sort-method <name\|group>`.
 
-You don't need to type any commands. While an inventory is open, shift-click an **empty slot**:
+### Sorting over occupied slots
 
-| Gesture | Effect |
-|---|---|
-| **Shift + left-click** an empty slot | Cycle sort order: **name → group → …** |
-| **Shift + right-click** an empty slot | Cycle trigger: **double → single → swap → none** |
-
-> **Note:** These gestures only activate on empty slots, so normal shift-clicking to move items is unaffected — *unless* you shift-click an empty slot, in which case the cycle fires instead. If this gets in the way, run `/clicksorted shiftclick` to disable it and use commands instead.
+By default a sort only fires when your cursor is over an **empty slot**, so your normal clicks on items are never hijacked. If you'd rather have your trigger fire even while hovering an occupied slot, run `/clicksorted set hover` to toggle "sort over items" on (and again to turn it off, or pass an explicit `on`/`off`). When enabled, the originating click is suppressed so the item underneath isn't picked up or moved. Admins set the default with [`defaults.sort_over_items`](#configyml).
 
 ### Your player inventory: two regions
 
@@ -108,15 +115,42 @@ When you sort your own inventory, the **main inventory** (slots 9–35, excludin
 
 *(Admins can adjust which slot range counts as "main" — see [`player_sort_min` / `player_sort_max`](#configyml) below.)*
 
+### Locking slots
+
+Run `/clicksorted set lock` to open the slot-lock GUI. The top of the screen shows a grid of glass panes mirroring your inventory — three rows for the main inventory and one row for the hotbar, separated by a divider.
+
+- **Lime pane** — slot is unlocked and will be sorted normally.
+- **Barrier icon** — slot is locked and will be skipped by sorting.
+- **Black pane** — slot is outside the sortable range (see `player_sort_min`/`player_sort_max`) and is always excluded.
+
+Click any pane to toggle its state. Changes are saved immediately. Close the GUI when done — your locks are active right away.
+
+Locked slots apply only to your own player inventory (both the main region and the hotbar). Container inventories (chests, barrels, etc.) are always sorted in full.
+
+### Bundle packing
+
+If you keep empty or partly-filled **bundles** in an inventory, ClickSorted can fold the loose odds-and-ends of each item type into them as part of a sort — reclaiming slots without you shuffling items by hand. It's off by default; turn it on per region:
+
+- `/clicksorted set bundle inventory on` — pack while sorting your own inventory.
+- `/clicksorted set bundle others on` — pack while sorting containers you open.
+
+When packing, each item type's full stacks stay loose in the inventory and only the leftover remainder is bundled (and only when it's an efficient trade). You can cap how many distinct item types land in a single bundle with `/clicksorted set bundle stacklimit <n>` — `12` matches the bundle tooltip preview; `off` removes the entry cap and uses only the weight limit. Run `/clicksorted set bundle` with no argument to see your current settings. Admins set the defaults with [`defaults.bundle_inventory` / `defaults.bundle_others` / `defaults.bundle_stack_limit`](#configyml).
+
 ### Player commands
 
-All three commands are available to every player by default.
+These commands are available to every player by default.
 
 | Command | Description |
 |---|---|
-| `/clicksorted sort <name\|group>` | Set your sort order. `group` is only available when `groups.yml` is configured. |
-| `/clicksorted click <swap\|single\|double\|none>` | Set your sort trigger. |
-| `/clicksorted shiftclick` | Toggle in-inventory shift-click mode-cycling on or off. |
+| `/clicksorted set sort-method <name\|group>` | Set your sort order. `group` is only available when `groups.yml` is configured. |
+| `/clicksorted set click-method <swap\|single_click\|double_click\|control_drop\|shift_left_click\|shift_right_click\|none>` | Set your sort trigger. |
+| `/clicksorted set hover [on\|off]` | Toggle (or explicitly set) whether sorting fires while hovering an occupied slot (off = empty slots only). |
+| `/clicksorted set lock` | Open the slot-lock GUI to lock or unlock individual inventory slots. |
+| `/clicksorted set bundle` | Show your current bundle-packing settings. |
+| `/clicksorted set bundle inventory <on\|off>` | Toggle bundle packing when sorting your **own** inventory. |
+| `/clicksorted set bundle others <on\|off>` | Toggle bundle packing when sorting **containers** (chests, barrels, …). |
+| `/clicksorted set bundle stacklimit <n\|off>` | Max distinct item entries packed per bundle (`off` = weight-only limit). |
+| `/clicksorted status` | Show your current click method, sort method, and sort-over-items state. |
 
 ## Admin Reference
 
@@ -129,24 +163,30 @@ These commands require the `clicksorted.commands.*` op permissions (see [Permiss
 | `/clicksorted reload` | Reload all config files (`config.yml`, `groups.yml`, `items.yml`, `lang.yml`) without a server restart. |
 | `/clicksorted getcfg` | Print every `config.yml` key/value to the console or chat. |
 | `/clicksorted debug [off\|debug\|trace]` | Set logging verbosity at runtime (not persisted to `config.yml`). With no argument, toggles between `off` and `debug`. |
+| `/clicksorted benchmark [iterations]` | Run an in-situ micro-benchmark of the sort and bundle-repack paths and report per-operation timings. Runs synchronously, briefly pausing the server. Default 2000 iterations (100–50000). |
 
 ### Permissions
 
 | Permission node | Default | Description |
 |---|---|---|
-| `clicksorted.admin` | `op` | Grants all command permissions listed below. |
+| `clicksorted.admin` | `op` | Grants all command permissions listed below, plus `clicksorted.throttle.bypass`. |
 | `clicksorted.commands.reload` | `op` | Use `/clicksorted reload`. |
 | `clicksorted.commands.getcfg` | `op` | Use `/clicksorted getcfg`. |
 | `clicksorted.commands.debug` | `op` | Use `/clicksorted debug`. |
-| `clicksorted.commands.sort` | `true` | Use `/clicksorted sort`. |
-| `clicksorted.commands.click` | `true` | Use `/clicksorted click`. |
-| `clicksorted.commands.shiftclick` | `true` | Use `/clicksorted shiftclick`. |
+| `clicksorted.commands.benchmark` | `op` | Use `/clicksorted benchmark`. |
+| `clicksorted.commands.sort` | `true` | Use `/clicksorted set sort-method`. |
+| `clicksorted.commands.click` | `true` | Use `/clicksorted set click-method`. |
+| `clicksorted.commands.hover` | `true` | Use `/clicksorted set hover`. |
+| `clicksorted.commands.lock` | `true` | Use `/clicksorted set lock`. |
+| `clicksorted.commands.bundle` | `true` | Use `/clicksorted set bundle`. |
+| `clicksorted.commands.status` | `true` | Use `/clicksorted status`. |
+| `clicksorted.throttle.bypass` | `op` | Exempt from the per-player action throttle (`action_cooldown_ms`). |
 | `clicksorted.sort` | `true` | Master gate: allow a player to click-sort any inventory at all. Parent of the three nodes below. |
 | `clicksorted.sort.player` | `true` | Allow sorting the player's own main inventory (excluding hotbar). |
 | `clicksorted.sort.hotbar` | `true` | Allow sorting the player's hotbar. |
 | `clicksorted.sort.container` | `true` | Allow sorting container inventories (chests, barrels, etc.). |
 
-Out of the box, all players can click-sort everything and change their own preferences. Only ops can reload configs, dump config values, or change the debug level.
+Out of the box, all players can click-sort everything and change their own preferences. Only ops can reload configs, dump config values, change the debug level, run the benchmark, or bypass the action throttle.
 
 ### `config.yml`
 
@@ -174,21 +214,36 @@ default_group_name: '000-default'
 # appears in sortable_inventories below.
 ignore_plugin_inventory: false
 
-# Per-player preference defaults. Players can override these with commands or
-# shift-click gestures; their choices are stored persistently.
+# Per-player preference defaults. Players can override these with commands;
+# their choices are stored persistently.
 defaults:
-  # Sort trigger. Values: SWAP, SINGLE, DOUBLE, NONE
+  # Sort trigger. Values: SWAP, SINGLE_CLICK, DOUBLE_CLICK, CONTROL_DROP,
+  #                       SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE
   click_mode: SWAP
   # Sort order. Values: NAME, GROUP
   sort_mode: NAME
-  # Whether shift-click in-inventory mode cycling is enabled for new players.
-  shift_click: true
-  # Slot bounds of the player main-inventory sort region (inclusive lower, exclusive upper).
-  # 9–36 covers the full main inventory (below hotbar, above armor/off-hand).
-  # Set player_sort_min: 0 to include the hotbar in the same sort region,
-  # but note that clicksorted.sort.hotbar controls whether the hotbar can be sorted at all.
-  player_sort_min: 9
-  player_sort_max: 36
+  # When true, the trigger also fires while hovering an occupied slot;
+  # when false, sorting only fires on an empty slot. Toggle with /clicksorted set hover.
+  sort_over_items: false
+  # When true, sorting a player's OWN inventory also packs partial stacks into any bundles there.
+  bundle_inventory: false
+  # When true, sorting a container (chest, barrel, …) also packs partial stacks into its bundles.
+  bundle_others: false
+  # Default max distinct item entries packed per bundle. 12 = bundle tooltip-preview limit;
+  # 0 disables the entry cap (weight-only limit applies instead).
+  bundle_stack_limit: 12
+
+# Slot bounds of the player main-inventory sort region (inclusive lower, exclusive upper).
+# 9–36 covers the full main inventory (below hotbar, above armor/off-hand).
+# Set player_sort_min: 0 to include the hotbar in the same sort region,
+# but note that clicksorted.sort.hotbar controls whether the hotbar can be sorted at all.
+player_sort_min: 9
+player_sort_max: 36
+
+# Minimum milliseconds between successive ClickSorted actions per player (sorting, bundle
+# packing, lock-GUI toggles, commands). Caps how fast a scripted client can spam these;
+# players with clicksorted.throttle.bypass (default op) are exempt. Set to 0 to disable.
+action_cooldown_ms: 150
 
 # List of Bukkit InventoryType names whose containers respond to click-sorting.
 # Remove a type to prevent sorting in that container family.
@@ -291,11 +346,33 @@ All player-facing messages are stored in `lang.yml` and rendered with **[MiniMes
 |---|---|---|
 | `setClickMethodTo` | `Click mode set to <method>. <instruction>` | `<method>`, `<instruction>` |
 
-#### Shift-click toggle feedback
+#### Sort-over-items toggle feedback
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `setShiftClickStatus` | `Shift-click mode cycling: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
+| `setSortOverItemsStatus` | `Sort over items: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
+
+#### Bundle packing feedback
+
+| Key | Default text | Placeholders |
+|---|---|---|
+| `setBundlePackInventoryStatus` | `Bundle packing in your inventory: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
+| `setBundlePackOthersStatus` | `Bundle packing in other containers: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
+| `setBundleStackLimitStatus` | `Bundle stack limit: <limit>.` | `<limit>` — entry count, or `off` for weight-only |
+
+#### Status command feedback
+
+| Key | Default text | Placeholders |
+|---|---|---|
+| `statusClickMethod` | `Click method: <method>` | `<method>` |
+| `statusSortMethod` | `Sort method: <method>` | `<method>` |
+| `statusHover` | `Sort over items: <status>` | `<status>` — `ENABLED` or `DISABLED` |
+
+#### Action throttle
+
+| Key | Default text | Placeholders |
+|---|---|---|
+| `actionTooFast` | `<red>Slow down — you're acting too quickly.` | — |
 
 #### Debug commands
 
@@ -326,30 +403,33 @@ These strings are substituted as `<instruction>` in `setClickMethodTo`.
 | `instructionSingle` | `Left-click an empty slot to sort.` |
 | `instructionDouble` | `Double-click any slot to sort.` |
 | `instructionSwap` | `Press the offhand-swap key to sort.` |
+| `instructionControlDrop` | `Press Ctrl+Q (drop key) over a slot to sort.` |
+| `instructionShiftLeftClick` | `Shift-left-click a slot to sort.` |
+| `instructionShiftRightClick` | `Shift-right-click a slot to sort.` |
 | `instructionDisabled` | `Click-sorting has been disabled.` |
-
-#### Shift-cycle prompts
-
-Shown periodically as tips alongside mode-cycle confirmations.
-
-| Key | Default text |
-|---|---|
-| `shiftLeftToChange` | `Shift-left-click an empty slot to change.` |
-| `shiftRightToChange` | `Shift-right-click an empty slot to change.` |
-
-#### Tips
-
-| Key | Default text |
-|---|---|
-| `tipToChangeMode` | `(Use <white>/clicksorted sort</white> and <white>/clicksorted click</white> to change modes)` |
-| `tipToReEnable` | `Run <white>/clicksorted shiftclick</white> to re-enable.` |
-| `tipToDisable` | `Run <white>/clicksorted shiftclick</white> to disable.` |
 
 #### Console / player-only error
 
 | Key | Default text |
 |---|---|
 | `notFromConsole` | `This command can only be used by a player.` |
+
+#### Lock GUI
+
+| Key | Default text | Placeholders |
+|---|---|---|
+| `lockGuiTitle` | `Slot Locks` | — |
+| `lockPaneUnlocked` | `Unlocked` | — |
+| `lockPaneLocked` | `Locked` | — |
+| `lockPaneSlotInventory` | `Inventory slot <number>` | `<number>` — slot number (1–27) |
+| `lockPaneSlotHotbar` | `Hotbar slot <number>` | `<number>` — slot number (1–9) |
+| `lockPaneUnlockedLore` | `Click to lock this slot.` | — |
+| `lockPaneLockedLore` | `Click to unlock this slot.` | — |
+| `lockPaneUnsortable` | `Not sortable` | — |
+| `lockPaneUnsortableLore` | `This slot is always excluded from sorting.` | — |
+| `lockDividerName` | `--------` | — |
+| `lockHelpHeadName` | `What is this?` | — |
+| `lockHelpHeadLore` | `Locked inventory slots will not be sorted.` | — |
 
 ---
 

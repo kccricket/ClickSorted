@@ -14,11 +14,14 @@ package net.kccricket.clicksorted;
 
 import net.kccricket.clicksorted.commands.ClickSortedCommands;
 import net.kccricket.clicksorted.config.ConfigManager;
+import net.kccricket.clicksorted.gui.LockGuiListener;
 import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.clicksorted.migration.Migrations;
+import net.kccricket.clicksorted.migration.PlayerMigrationListener;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
+import net.kccricket.clicksorted.security.ActionThrottle;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
 import net.kccricket.clicksorted.sort.InventorySortService;
-import net.kccricket.clicksorted.sort.PrefsCycleHandler;
 import net.kccricket.clicksorted.text.CooldownMessenger;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bstats.bukkit.Metrics;
@@ -30,6 +33,9 @@ public class ClickSortedPlugin extends JavaPlugin {
     private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
     private ConfigManager configManager;
+    private InventorySortService sortService;
+    private ActionThrottle actionThrottle;
+    private Migrations migrations;
 
     private static ClickSortedPlugin instance = null;
 
@@ -39,6 +45,8 @@ public class ClickSortedPlugin extends JavaPlugin {
 
         Log.init(this);
 
+        migrations = new Migrations(this);
+
         configManager = new ConfigManager(this);
         configManager.loadAll();
 
@@ -47,12 +55,14 @@ public class ClickSortedPlugin extends JavaPlugin {
         }
 
         sortingPrefs = new PlayerSortingPrefs(this);
+        actionThrottle = new ActionThrottle(this);
 
-        InventorySortService sortService = new InventorySortService(this);
-        PrefsCycleHandler cycleHandler = new PrefsCycleHandler(this);
+        sortService = new InventorySortService(this);
 
         PluginManager pm = this.getServer().getPluginManager();
-        pm.registerEvents(new InventoryClickListener(this, sortService, cycleHandler), this);
+        pm.registerEvents(new InventoryClickListener(this, sortService), this);
+        pm.registerEvents(new LockGuiListener(this), this);
+        pm.registerEvents(new PlayerMigrationListener(this), this);
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(ClickSortedCommands.build(this), "Manage the ClickSorted plugin"));
@@ -84,5 +94,17 @@ public class ClickSortedPlugin extends JavaPlugin {
     /** @return the sorting prefs for all players */
     public PlayerSortingPrefs getSortingPrefs() {
         return sortingPrefs;
+    }
+
+    public InventorySortService getSortService() {
+        return sortService;
+    }
+
+    public ActionThrottle getActionThrottle() {
+        return actionThrottle;
+    }
+
+    public Migrations getMigrations() {
+        return migrations;
     }
 }

@@ -15,10 +15,12 @@ package net.kccricket.clicksorted.sort;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.events.InventorySortEvent;
 import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -28,7 +30,10 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -57,6 +62,11 @@ public class InventorySortService {
      * @return true if the sort completed and the caller should cancel the originating event
      */
     public boolean sortInventory(final InventoryClickEvent event, final SortingMethod sortMethod) {
+        if (!event.getCursor().isEmpty()) {
+            // Prevent sorting when the player is holding an item with the cursor, to avoid accidental sorts and potential dupes.
+            return false;
+        }
+
         Player p = (Player) event.getWhoClicked();
         int slot = event.getSlot();
         Inventory inv = event.getClickedInventory();
@@ -67,6 +77,9 @@ public class InventorySortService {
         Log.debug("clicked inventory window " + inv.getType() + ", slot " + slot);
         int min, max; // slot range to sort
         InventoryType type = inv.getType();
+        var mainCfg = plugin.getConfigManager().main();
+        boolean playerMainStorage = false; // packing applies here (not the hotbar)
+        boolean container = false;
         if (type == InventoryType.PLAYER) {
             if (slot < 9) {
                 // hotbar
@@ -75,13 +88,14 @@ public class InventorySortService {
                 }
                 min = 0;
                 max = 9;
-            } else if (slot < plugin.getConfig().getInt("player_sort_max")) {
+            } else if (slot < mainCfg.getPlayerSortMax()) {
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.player")) {
                     return false;
                 }
                 // main player inventory
-                min = plugin.getConfig().getInt("player_sort_min");
-                max = plugin.getConfig().getInt("player_sort_max");
+                min = mainCfg.getPlayerSortMin();
+                max = mainCfg.getPlayerSortMax();
+                playerMainStorage = true;
             } else {
                 // armor / offhand slots — never sort
                 return false;
@@ -92,6 +106,7 @@ public class InventorySortService {
             }
             min = inv.getHolder() instanceof AbstractHorse ? 2 : 0;
             max = inv.getSize();
+            container = true;
         } else {
             return false;
         }
@@ -103,7 +118,18 @@ public class InventorySortService {
         }
 
         Set<Integer> sortableSlots = sortEvent.getSortableSlots();
-        List<ItemStack> sortedItems = SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
+        if (type == InventoryType.PLAYER) {
+            for (int locked : plugin.getSortingPrefs().getLockedSlots(p)) {
+                sortEvent.excludeSlot(locked);
+            }
+        }
+
+        var prefs = plugin.getSortingPrefs();
+        boolean packEnabled = (playerMainStorage && prefs.getBundlePackInventory(p))
+                || (container && prefs.getBundlePackOthers(p));
+        List<ItemStack> sortedItems = packEnabled
+                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p))
+                : SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
             MessageUtil.errorMessage(p, plugin.getConfigManager().lang().getColoredMessage("invOverFlow"));
@@ -136,6 +162,44 @@ public class InventorySortService {
         }
 
         return true;
+    }
+
+    /**
+     * The unified pack-and-sort step: pool the eligible loose items across {@code sortableSlots}, pack
+     * their bundleable remainders into the bundles in that same region (mutated in place), then sort
+     * the leftover loose stacks together with the bundles and any ineligible items.
+     *
+     * @return the sorted, stack-merged list ready to be written back into {@code sortableSlots}
+     */
+    private List<ItemStack> packAndSort(Inventory inv, Set<Integer> sortableSlots,
+                                        SortingMethod sortMethod, int stackLimit) {
+        Map<SortKey, Long> loosePool = new LinkedHashMap<>();
+        Map<SortKey, ItemStack> samples = new LinkedHashMap<>();
+        List<ItemStack> bundles = new ArrayList<>();       // bins (mutated by the packer)
+        List<ItemStack> toSort = new ArrayList<>();         // ineligible passthrough + leftovers + bundles
+
+        ItemStack[] contents = inv.getContents();
+        for (int slot : sortableSlots) {
+            ItemStack is = contents[slot];
+            if (is == null) {
+                continue;
+            }
+            if (is.getType() == Material.BUNDLE) {
+                bundles.add(is.clone());
+            } else if (BundlePacker.canBundle(is)) {
+                SortKey key = new SortKey(is, SortingMethod.NAME);
+                loosePool.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
+                samples.putIfAbsent(key, is);
+            } else {
+                toSort.add(is.clone());
+            }
+        }
+
+        List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, bundles, stackLimit);
+        toSort.addAll(leftover);
+        toSort.addAll(bundles);
+
+        return SortEngine.sortAndMerge(toSort, sortMethod);
     }
 
     // -------------------------------------------------------------------------

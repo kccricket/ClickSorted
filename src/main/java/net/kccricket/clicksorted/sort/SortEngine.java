@@ -37,48 +37,95 @@ public final class SortEngine {
      * @return a sorted, stack-merged list of items
      */
     public static List<ItemStack> sortAndMerge(ItemStack[] items, Set<Integer> sortableSlots, SortingMethod sortMethod) {
-        Map<SortKey, Integer> amounts = new HashMap<>();
-
-        // Phase 1: extract unique item keys and accumulate quantities
         Log.debug("sortAndMerge: sortable = " + sortableSlots + ", size = " + items.length);
+        List<ItemStack> extracted = new ArrayList<>(sortableSlots.size());
         for (int i : sortableSlots) {
-            ItemStack is = items[i];
-            if (is != null) {
-                SortKey key = new SortKey(is, sortMethod);
-                if (amounts.containsKey(key)) {
-                    amounts.put(key, amounts.get(key) + is.getAmount());
-                } else {
-                    amounts.put(key, is.getAmount());
-                }
+            if (items[i] != null) {
+                extracted.add(items[i]);
+            }
+        }
+        return sortAndMerge(extracted, sortMethod);
+    }
+
+    /**
+     * Sort and merge a flat collection of item stacks (no slot indexing).
+     *
+     * @param items      the item stacks to pool, merge, and sort ({@code null} entries are ignored)
+     * @param sortMethod the ordering strategy
+     * @return a sorted, stack-merged list of items
+     */
+    public static List<ItemStack> sortAndMerge(Collection<ItemStack> items, SortingMethod sortMethod) {
+        // Fungible (stackable, non-bundle) items are merged by key and quantity-summed; non-fungible
+        // items (bundles and any maxStackSize <= 1 item) carry their own contents/meta and must never
+        // be collapsed — each is kept as a discrete stack, ordered by key but emitted verbatim.
+        Map<SortKey, Integer> amounts = new HashMap<>();
+        List<Entry> discretes = new ArrayList<>();
+
+        for (ItemStack is : items) {
+            if (is == null) {
+                continue;
+            }
+            SortKey key = new SortKey(is, sortMethod);
+            if (isFungible(is)) {
+                amounts.merge(key, is.getAmount(), (a, b) -> Integer.sum(a, b));
+            } else {
+                discretes.add(new Entry(key, is));
             }
         }
 
-        // Phase 2: sort the extracted keys and reconstruct stacks respecting max stack size
+        // Phase 2: order fungible keys and discrete items together by SortKey, then emit.
+        for (Map.Entry<SortKey, Integer> e : amounts.entrySet()) {
+            discretes.add(new Entry(e.getKey(), null));
+        }
+        Collections.sort(discretes);
+
         List<ItemStack> sorted = new LinkedList<>();
-        for (SortKey sortKey : asSortedList(amounts.keySet())) {
-            int amount = amounts.get(sortKey);
-            Log.trace("Process item [" + sortKey + "], amount = " + amount);
-            Material mat = sortKey.getMaterial();
-            int maxStack = mat.getMaxStackSize();
-            Log.trace("max stack size for " + mat + " = " + maxStack);
-            if (maxStack == 0) {
-                Log.severe("Item with zero max stack size will be dropped: " + mat + " (amount=" + amount + ")");
-                sorted.add(sortKey.toItemStack(amount));
+        for (Entry entry : discretes) {
+            if (entry.stack != null) {
+                sorted.add(entry.stack);
             } else {
-                while (amount > maxStack) {
-                    sorted.add(sortKey.toItemStack(maxStack));
-                    amount -= maxStack;
-                }
-                sorted.add(sortKey.toItemStack(amount));
+                emitStacks(sorted, entry.key, amounts.get(entry.key));
             }
         }
 
         return sorted;
     }
 
-    private static <T extends Comparable<? super T>> List<T> asSortedList(Collection<T> c) {
-        List<T> list = new ArrayList<>(c);
-        Collections.sort(list);
-        return list;
+    /** Whether an item is fungible: stackable and not a bundle, so it may be quantity-merged. */
+    private static boolean isFungible(ItemStack is) {
+        return is.getType() != Material.BUNDLE && is.getType().getMaxStackSize() > 1;
+    }
+
+    /**
+     * One orderable output entry: a discrete non-fungible {@code stack} (emitted verbatim), or a
+     * fungible group when {@code stack} is {@code null} (emitted via {@link #emitStacks} using the
+     * accumulated amount for {@code key}). Ordered solely by {@code key}.
+     */
+    private record Entry(SortKey key, ItemStack stack) implements Comparable<Entry> {
+        @Override
+        public int compareTo(Entry other) {
+            return key.compareTo(other.key);
+        }
+    }
+
+    /**
+     * Reconstruct {@code amount} of {@code sortKey}'s item as full max-size stacks followed by a
+     * single remainder stack, appending them to {@code out}.
+     */
+    private static void emitStacks(List<ItemStack> out, SortKey sortKey, int amount) {
+        Log.trace("Process item [" + sortKey + "], amount = " + amount);
+        Material mat = sortKey.getMaterial();
+        int maxStack = mat.getMaxStackSize();
+        Log.trace("max stack size for " + mat + " = " + maxStack);
+        if (maxStack == 0) {
+            Log.severe("Item with zero max stack size will be dropped: " + mat + " (amount=" + amount + ")");
+            out.add(sortKey.toItemStack(amount));
+            return;
+        }
+        while (amount > maxStack) {
+            out.add(sortKey.toItemStack(maxStack));
+            amount -= maxStack;
+        }
+        out.add(sortKey.toItemStack(amount));
     }
 }

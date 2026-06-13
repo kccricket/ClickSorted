@@ -21,6 +21,9 @@ import java.util.stream.Collectors;
  */
 public class MainConfig implements ManagedConfig {
 
+    /** One past the last sortable player slot: slots 36+ are armor and off-hand, never sorted. */
+    private static final int PLAYER_STORAGE_END = 36;
+
     private final ClickSortedPlugin plugin;
     private List<InventoryType> sortableInventories = List.of();
 
@@ -39,6 +42,7 @@ public class MainConfig implements ManagedConfig {
         // Just ensure defaults are applied and the file is written, then parse the values.
         applyDefaults();
         normalizeValues();
+        plugin.getMigrations().migrate(plugin.getConfig());
         plugin.saveConfig();
         applyToRuntime();
     }
@@ -82,21 +86,42 @@ public class MainConfig implements ManagedConfig {
                 "Default preferences applied to new players (or any player whose PDC entry is missing)."));
         cfg.setComments("defaults.click_mode", List.of(
                 "How a player triggers a sort.",
-                "Values: SWAP (press the swap-offhand key over a slot), SINGLE (left-click an empty slot),",
-                "        DOUBLE (double-click), NONE (click-sorting disabled)"));
+                "Values: SWAP (press the swap-offhand key over a slot), SINGLE_CLICK (left-click an empty slot),",
+                "        DOUBLE_CLICK (double-click), CONTROL_DROP (Ctrl+Q over a slot),",
+                "        SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE (click-sorting disabled)"));
         cfg.setComments("defaults.sort_mode", List.of(
                 "Algorithm used to order items.",
                 "Values: NAME (alphabetical by display name), GROUP (by group defined in groups.yml).",
                 "GROUP requires at least one group to be configured in groups.yml."));
-        cfg.setComments("defaults.shift_click", List.of(
-                "When true, shift-clicking an empty slot cycles through sort/click modes.",
-                "Players can toggle this per-session with /clicksorted shiftclick."));
+        cfg.setComments("defaults.sort_over_items", List.of(
+                "When true, the configured click method sorts even while hovering an occupied slot;",
+                "when false, sorting only fires on an empty slot.",
+                "Players can toggle this per-session with /clicksorted hover."));
+        cfg.setComments("defaults.bundle_inventory", List.of(
+                "When true, sorting a player's own inventory also packs partial stacks into any bundles",
+                "present there. Players can toggle this with /clicksorted bundle inventory on|off."));
+        cfg.setComments("defaults.bundle_others", List.of(
+                "When true, sorting a container (chest, barrel, …) also packs partial stacks into any",
+                "bundles it holds. Players can toggle this with /clicksorted bundle others on|off."));
+        cfg.setComments("defaults.bundle_stack_limit", List.of(
+                "Default max number of distinct item entries per bundle when packing.",
+                "12 = tooltip-preview limit (bundles show the 12 most-recently-added items).",
+                "0 disables the entry limit (weight-only limit applies instead).",
+                "Players can change this with /clicksorted bundle stacklimit <n|off>."));
         cfg.setComments("player_sort_min", List.of(
                 "First inventory slot included when sorting a player's main inventory (inclusive).",
                 "Slot 9 is the first row of main storage (slots 0-8 are the hotbar)."));
         cfg.setComments("player_sort_max", List.of(
-                "Last inventory slot included when sorting a player's main inventory (inclusive).",
-                "Slot 35 is the last main-storage slot; slots 36+ are armor and off-hand."));
+                "One past the last inventory slot included when sorting a player's main inventory (exclusive).",
+                "Slot 35 is the last main-storage slot, so 36 sorts all of main storage;",
+                "slots 36+ are armor and off-hand. Values are clamped to the 0..36 range."));
+        cfg.setComments("action_cooldown_ms", List.of(
+                "Minimum milliseconds between successive ClickSorted actions per player",
+                "(sorting, bundle-packing, in-inventory mode cycling, lock-GUI toggles, commands).",
+                "Caps how fast a scripted client can spam these; players with the",
+                "clicksorted.throttle.bypass permission (default op) are exempt.",
+                "Lower values feel snappier but may clip rapid legitimate lock-GUI clicking.",
+                "Set to 0 to disable throttling entirely."));
         cfg.setComments("sortable_inventories", List.of(
                 "Inventory types that players are allowed to sort.",
                 "Values must be valid Bukkit InventoryType names (case-sensitive).",
@@ -142,7 +167,45 @@ public class MainConfig implements ManagedConfig {
         return ClickMethod.parse(plugin.getConfig().getString("defaults.click_mode"), ClickMethod.DEFAULT);
     }
 
-    public boolean getDefaultShiftClick() {
-        return plugin.getConfig().getBoolean("defaults.shift_click");
+    public boolean getDefaultSortOverItems() {
+        return plugin.getConfig().getBoolean("defaults.sort_over_items");
+    }
+
+    public boolean getDefaultBundlePackInventory() {
+        return plugin.getConfig().getBoolean("defaults.bundle_inventory");
+    }
+
+    public boolean getDefaultBundlePackOthers() {
+        return plugin.getConfig().getBoolean("defaults.bundle_others");
+    }
+
+    /**
+     * Default max distinct entries per bundle when packing (0 = weight-only limit).
+     */
+    public int getDefaultBundleStackLimit() {
+        return plugin.getConfig().getInt("defaults.bundle_stack_limit");
+    }
+
+    public int getPlayerSortMin() {
+        return Math.max(0, Math.min(plugin.getConfig().getInt("player_sort_min"), PLAYER_STORAGE_END));
+    }
+
+    /**
+     * Minimum milliseconds between successive per-player actions ({@code action_cooldown_ms}).
+     * A value ≤ 0 disables the {@link net.kccricket.clicksorted.security.ActionThrottle}.
+     */
+    public int getActionCooldownMs() {
+        return plugin.getConfig().getInt("action_cooldown_ms", 150);
+    }
+
+    public int getPlayerSortMax() {
+        return Math.max(0, Math.min(plugin.getConfig().getInt("player_sort_max"), PLAYER_STORAGE_END));
+    }
+
+    /** Returns true if the given player inventory slot falls within the sortable range. */
+    public boolean isPlayerSlotSortable(int invSlot) {
+        if (invSlot < 0) return false;
+        if (invSlot < 9) return true; // hotbar: Bukkit slots 0-8
+        return invSlot >= getPlayerSortMin() && invSlot < getPlayerSortMax();
     }
 }

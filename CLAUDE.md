@@ -27,42 +27,75 @@ net.kccricket.clicksorted
 ├── config/                  ConfigManager, ManagedConfig, MainConfig, LangConfig,
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
 ├── events/                  InventorySortEvent
-├── sort/                    InventoryClickListener, InventorySortService,
-│                            PrefsCycleHandler, SortEngine
+├── gui/                     LockGuiHolder, LockGuiListener
+├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
+│                            BundlePacker, BundleBenchmark
+├── migration/               ValueMigration, Migrations, PlayerMigrationListener
 ├── text/                    MessageUtil, CooldownMessenger, ItemNames
 ├── logging/                 Log, DebugLevel
-└── security/                Permissions
+└── security/                Permissions, ActionThrottle
 ```
+
+### Settings migration
+
+`Migrations` is an instance component (constructed in `ClickSortedPlugin.onEnable` before
+`configManager.loadAll()`, retrieved via `plugin.getMigrations()`) that **owns the catalog of what is
+stored where**. Loaders/stores don't name specific settings — they just hand the migrator the store:
+config is migrated in `MainConfig.load()` (`plugin.getMigrations().migrate(plugin.getConfig())`, after
+`normalizeValues()` and before `saveConfig()`), and per-player PDC is migrated by
+`PlayerMigrationListener` on `PlayerJoinEvent` (`plugin.getMigrations().migrate(player)`). `Migrations`
+exposes exactly one entry point per store: `migrate(ConfigurationSection)` and `migrate(Player)`.
+
+Two kinds of catalog rule, applied symmetrically across both stores:
+
+- **Renamed values.** Declare a `ValueMigration` lineage with
+  `ValueMigration.builder().rename(old).to(next).to(newer)…build()`. The last token is the current
+  canonical value; every earlier token maps **directly** to it, so any value ever stored converges in a
+  single pass. Adding a future rename is a pure append (`.to("X")`). The catalog maps each storage
+  location to its lineage (config path `defaults.click_mode` and PDC key `click` both → `CLICK_METHOD`).
+- **Removed settings.** List the deprecated storage location in `DEPRECATED_CONFIG_PATHS` /
+  `DEPRECATED_PDC_KEYS` and the migrator drops it from the store (e.g. `defaults.shift_click` /
+  `shift_click`).
+
+The per-location read→migrate→write and removal logic lives in **private** helpers inside `Migrations`;
+the lineage definitions stay pure data.
 
 ### Core Flow
 
 1. `InventoryClickEvent` fires when a player clicks inside an inventory.
-2. `InventoryClickListener` checks the player's `PlayerSortingPrefs` (stored in Bukkit's Persistent Data Container) to see if the click matches their configured `ClickMethod`.
-3. If it matches, `InventorySortService` delegates to `SortEngine`: items are collapsed into a `HashMap<SortKey, Integer>` (material → quantity), then reconstructed into stacks and written back to the inventory.
-4. A custom `InventorySortEvent` fires after sorting so third-party plugins can intervene.
+2. `InventoryClickListener` checks the player's `PlayerSortingPrefs` (stored in Bukkit's Persistent Data Container) to see if the click matches their configured `ClickMethod`, applies the "sort over items" gate, and runs the shared `ActionThrottle` rate-limiter.
+3. If it matches, `InventorySortService` delegates to `SortEngine`: fungible items are collapsed into a `HashMap<SortKey, Integer>` (material → quantity) and non-fungible items (bundles, non-stackables) are kept discrete, then everything is reconstructed into stacks and written back to the inventory.
+4. When bundle packing is enabled for the target (`defaults.bundle_inventory` / `defaults.bundle_others`, toggled per-player), `InventorySortService` first runs `BundlePacker` to repack partial stacks into bundles before the sort.
+5. A custom `InventorySortEvent` fires after sorting so third-party plugins can intervene.
+6. For player inventories, any slots the player has locked (via `/clicksorted set lock`) are excluded from the sortable set before `SortEngine` runs — locked slots are neither read nor overwritten.
 
 ### Key Classes
 
 | Class | Package | Role |
 |---|---|---|
 | `ClickSortedPlugin` | root | `JavaPlugin` entry point, wires all components |
-| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, shift-click flag) stored via PDC |
+| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, locked slots) stored via PDC |
+| `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier panes and maps chest↔inventory slots |
+| `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; toggles lock state and cancels all real-inventory interaction |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
 | `SortingMethod` | model | Enum (NAME, GROUP) controlling `SortKey.makeSortPrefix()` |
-| `ClickMethod` | model | Enum (SINGLE, DOUBLE, SWAP, NONE) |
-| `InventoryClickListener` | sort | Dispatches click events to sort or cycle prefs |
-| `InventorySortService` | sort | Target resolution, permissions, event lifecycle, write-back |
-| `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) |
+| `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE) |
+| `InventoryClickListener` | sort | Dispatches click events: trigger match, sort-over-items gate, throttle, then hand off to the sort service |
+| `InventorySortService` | sort | Target resolution, permissions, event lifecycle, optional bundle packing, write-back |
+| `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) — fungible merge + discrete passthrough |
+| `BundlePacker` | sort | Pure pool-and-repack of bundle-eligible items into bundles (no plugin state) |
+| `BundleBenchmark` | sort | In-situ micro-benchmark of the sort and bundle-repack paths (`/clicksorted benchmark`) |
 | `ConfigManager` | config | Unified lifecycle for all four config files |
 | `ResourceUpdater` | config | Add-only merge of bundled resource into plugin data folder |
 | `Log`, `DebugLevel` | logging | Plugin logger wrapper with gated debug levels |
 | `MessageUtil` | text | Coloured Adventure `Component` message helpers |
 | `CooldownMessenger` | text | Rate-limits repeated messages to players |
 | `Permissions` | security | Permission-check helper with debug logging |
+| `ActionThrottle` | security | Global per-player rate limiter (`action_cooldown_ms`) gating every plugin-driven action; `throttled()` also sends the rate-limited notice |
 
 ### Configuration Files (src/main/resources)
 
-- `config.yml` — debug level, sortable inventory types, `player_sort_min`/`player_sort_max` slot range
+- `config.yml` — debug level, sortable inventory types, `player_sort_min`/`player_sort_max` slot range, `action_cooldown_ms` throttle, and per-player `defaults` (click/sort mode, sort-over-items, bundle packing)
 - `groups.yml` — item groupings for GROUP sort method
 - `items.yml` — persistent store of material → display-name mappings
 - `lang.yml` — all user-facing messages (MiniMessage format)
@@ -75,7 +108,17 @@ There is a known non-obvious setup required for MockBukkit v4 on Java 16+; see `
 
 ### Command Framework
 
-Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand (`sort`, `click`, `shiftclick`, `reload`, `getcfg`, `debug`) is a static builder method. Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
+Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand is a static builder method. The tree is:
+
+- **`set`** — per-player preferences: `set sort-method <NAME|GROUP>`, `set click-method <…>`, `set hover [on|off]` (toggles when no arg), `set lock` (opens the lock GUI), and `set bundle` (no-arg prints status; `set bundle inventory|others <on|off>`; `set bundle stacklimit <n|off>`).
+- **`status`** — print the player's current click method, sort method, and sort-over-items state.
+- **`reload`**, **`getcfg`**, **`debug [level]`**, **`benchmark [iterations]`** — admin/diagnostic commands.
+
+`set hover` toggles the per-player "sort over items" flag (server default `defaults.sort_over_items`), which controls whether a sort fires only on an empty slot or also while hovering an occupied one.
+
+Player-facing command handlers resolve the executor via the shared `requirePlayer(plugin, ctx)` helper and gate on `ActionThrottle.throttled(player)`; both return early on failure. Boolean on/off arguments are parsed via `parseState` (the sole consumer of the `ON_WORDS`/`OFF_WORDS` vocabularies).
+
+Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
 
 ### Version Compatibility
 
@@ -91,6 +134,14 @@ ClickSorted <version> <one-sentence summary of the release theme>.
 ## Highlights
 
 - <bullet> — <one-line description>
+
+## Breaking Changes
+
+<!-- Optional — omit this section entirely if the release has no breaking changes.
+     Lead with what broke and the exact migration step. Cover: renamed/removed commands,
+     permission nodes, config keys, or stored-value formats; changed defaults; removed features. -->
+
+- <what changed> — <what users must do; note if migration is automatic>
 
 ## New Features
 
