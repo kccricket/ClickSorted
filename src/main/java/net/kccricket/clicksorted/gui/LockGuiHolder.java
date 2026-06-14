@@ -19,7 +19,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -43,7 +42,7 @@ import java.util.Set;
  *   <li>Chest slot 36-44 ↔  Player inventory slot (chestSlot - 36)</li>
  * </ul>
  */
-public class LockGuiHolder implements InventoryHolder {
+public class LockGuiHolder implements ClickSortedHolder {
 
     /** First chest slot of the divider row. */
     public static final int DIVIDER_START = 27;
@@ -117,16 +116,6 @@ public class LockGuiHolder implements InventoryHolder {
         return pane;
     }
 
-    /**
-     * Returns true if the given player inventory slot should be interactive in the GUI.
-     * Hotbar slots (0-8) are always sortable; main-storage slots are gated by config range.
-     */
-    public static boolean isInvSlotSortable(int invSlot, int sortMin, int sortMax) {
-        if (invSlot < 0) return false;
-        if (invSlot < 9) return true;
-        return invSlot >= sortMin && invSlot < sortMax;
-    }
-
     public static ItemStack buildUnsortablePane(LangConfig lang) {
         ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
@@ -170,10 +159,4 @@ public class LockGuiHolder implements InventoryHolder {
         }
     }
 
-    /**
-     * Returns true if the given chest slot is part of the divider row.
-     */
-    public static boolean isDividerSlot(int chestSlot) {
-        return chestSlot >= DIVIDER_START && chestSlot < DIVIDER_END;
-    }
 }

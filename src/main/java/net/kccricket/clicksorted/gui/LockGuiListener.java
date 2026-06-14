@@ -39,7 +39,11 @@ public class LockGuiListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getView().getTopInventory().getHolder() instanceof LockGuiHolder)) {
+        // Use InventoryEvent.getInventory() (the top inventory) rather than
+        // getView().getTopInventory(): invoking methods on InventoryView from our own
+        // bytecode breaks across versions where InventoryView is a class (≤1.20.6) vs an
+        // interface (1.21+), throwing IncompatibleClassChangeError.
+        if (!(event.getInventory().getHolder() instanceof LockGuiHolder)) {
             return;
         }
 
@@ -70,13 +74,13 @@ public class LockGuiListener implements Listener {
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
         boolean nowLocked = prefs.toggleSlotLocked(player, invSlot);
 
-        event.getView().getTopInventory().setItem(rawSlot,
+        event.getInventory().setItem(rawSlot,
                 LockGuiHolder.buildPane(plugin.getConfigManager().lang(), nowLocked, rawSlot));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (event.getView().getTopInventory().getHolder() instanceof LockGuiHolder) {
+        if (event.getInventory().getHolder() instanceof LockGuiHolder) {
             event.setCancelled(true);
         }
     }

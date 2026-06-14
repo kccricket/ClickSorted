@@ -1,11 +1,10 @@
 # ClickSorted item display-name store.
 #
-# This file is populated automatically as the plugin encounters items at runtime,
-# and is saved to disk when the server shuts down. Entries take the form:
+# Optional overrides for how materials are labeled under the NAME sort mode.
+# Add entries of the form:
 #
 #   MATERIAL_NAME: "Display Name"
 #
-# You may edit the display-name values to customize how items are labeled for
-# the NAME sort mode. The MATERIAL_NAME keys are Bukkit Material enum names and
-# should not be changed. If this file is deleted it will be repopulated over time
-# as players interact with their inventories.
+# The MATERIAL_NAME keys are Bukkit Material enum names (e.g. STONE, DIAMOND_SWORD).
+# Any material not listed here is labeled by its Material name as-is. Items a player
+# or plugin has renamed always use that custom name and ignore this file.

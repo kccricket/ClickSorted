@@ -168,6 +168,26 @@ class InventorySortTest extends AbstractClickSortedTest {
     }
 
     @Test
+    void swapClickLeavesOffhandUntouched() {
+        // Server-side contract: a SWAP-triggered sort cancels the event and never writes the offhand,
+        // even across a tick. (The real-client "flash" is client-side prediction reconciled by the
+        // protocol ack system and is not reproducible here — this guards against any future code
+        // reintroducing a server-side offhand write.)
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+        player.getInventory().setItemInOffHand(stack(Material.TORCH));
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 1));
+        InventoryView view = player.openInventory(chest);
+
+        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+        server.getScheduler().performTicks(1);
+
+        assertEquals(Material.TORCH, player.getInventory().getItemInOffHand().getType(),
+                "Offhand item must be unchanged after a SWAP-triggered sort");
+    }
+
+    @Test
     void nonSortableInventoryTypeIsIgnored() {
         // HOPPER is not in the sortable_inventories list — no sort should occur.
         PlayerMock player = addOpPlayer("Alice");

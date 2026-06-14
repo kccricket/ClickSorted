@@ -13,6 +13,7 @@ package net.kccricket.clicksorted.sort;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.gui.ClickSortedHolder;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
@@ -48,6 +49,14 @@ public class InventoryClickListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
+        // Never treat one of our own GUIs as a sortable target. They are CHEST-type inventories, so
+        // with ignore_plugin_inventory=false (the default) they would otherwise match the sortable set
+        // and a sort-trigger click would rearrange their contents (or the real inventory below them)
+        // before the GUI's own listener — which runs after us at the same priority — cancels the
+        // interaction. The marker interface covers every current and future ClickSorted GUI.
+        if (event.getInventory().getHolder() instanceof ClickSortedHolder) {
+            return;
+        }
         if (!Permissions.isAllowedTo(player, "clicksorted.sort")) {
             return;
         }
@@ -69,13 +78,6 @@ public class InventoryClickListener implements Listener {
             }
             if (sortService.sortInventory(event, prefs.getSortingMethod(player))
                     && clickMethod.shouldCancelEvent()) {
-                if (clickMethod.needsOffhandReset()) {
-                    // Use the Paper entity scheduler so the offhand reset is bound to this player
-                    // entity (Folia-safe).
-                    player.getScheduler().runDelayed(plugin, task ->
-                            player.getInventory().setItemInOffHand(player.getInventory().getItemInOffHand()),
-                            null, 1L);
-                }
                 event.setCancelled(true);
             }
         }

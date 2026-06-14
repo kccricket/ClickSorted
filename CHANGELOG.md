@@ -1,3 +1,52 @@
+# ClickSorted 1.1.1
+
+Release date: 2026-06-14
+
+ClickSorted 1.1.1 adds explicit Folia support, hardens shared state for Folia's per-region worker threads, and fixes sorting from inside ClickSorted's own GUIs.
+
+## Highlights
+
+- **Explicit Folia support** — the plugin now declares `folia-supported` and makes all shared mutable state safe for Folia's per-region worker threads.
+- **Lock GUI no longer sortable** — sort triggers inside ClickSorted's own GUIs are now ignored unconditionally, so a click in the lock GUI can no longer rearrange its panes or the inventory beneath it.
+- **Atomic action throttle** — the per-player throttle window is now updated atomically, closing a race under concurrent clicks.
+
+## Bug Fixes
+
+- ClickSorted's own GUIs are never sorted — the lock GUI is a CHEST-type inventory that matched the sortable set, so a sort-trigger click inside it could rearrange its panes before the GUI listener cancelled the interaction. A `ClickSortedHolder` marker interface now makes the sort listener bail on any ClickSorted GUI, independent of `ignore_plugin_inventory`.
+- The action throttle window is now atomic, preventing a race when a player's clicks arrive concurrently.
+
+## Other Improvements
+
+- Hardened shared mutable state for Folia: `CooldownMessenger`'s cooldown map is now a `ConcurrentHashMap` (keyed by player UUID), `GroupsConfig` mappings are built locally and swapped atomically on reload, and `ItemsConfig`/`MainConfig` reload swaps are published via `volatile`.
+- Dropped the obsolete `SWAP_OFFHAND` offhand-reset workaround — modern Paper's inventory ack/sequence system reconciles the client prediction, so cancelling the event suffices. This removes the plugin's only `getScheduler()` call; an integration test pins the contract that a SWAP-triggered sort leaves the offhand untouched across a tick.
+- Replaced `plugin.yml` with `paper-plugin.yml`.
+- Avoided `InventoryView` method calls from plugin bytecode in `LockGuiListener` (using `InventoryEvent.getInventory()`), preventing `IncompatibleClassChangeError` across 1.20.6/1.21.
+- `MessageUtil` now takes an Adventure `Audience` instead of `CommandSender`, making the Adventure routing explicit and allowing any audience to be passed.
+- Made item-name lookup a pure read and removed test-only public methods with no production callers.
+- Added a GitHub Actions CI workflow that runs the test suite on PRs (Java 25, matching the Paper API requirement).
+
+## Compatibility
+
+✔️ Paper/Folia 1.20.6 – 26.1.x
+✔️ Java 21
+
+## Upgrading
+
+1. Stop your server.
+2. Replace the old jar in `plugins/` with this release.
+3. Start your server.
+
+## What's Changed
+
+- Support Folia explicitly and harden cross-thread/version safety by @kccricket in #43
+- Never sort ClickSorted's own GUIs by @kccricket
+- Make the action throttle window atomic by @kccricket
+- Convert `plugin.yml` to `paper-plugin.yml` by @kccricket
+- Optimize Adventure usage in `MessageUtil` by @kccricket in #41
+- Add GitHub Actions CI workflow to run tests on PRs by @kccricket in #42
+
+---
+
 # ClickSorted 1.1.0
 
 Release date: 2026-06-13
