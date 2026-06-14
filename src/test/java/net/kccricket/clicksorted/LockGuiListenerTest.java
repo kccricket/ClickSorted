@@ -111,7 +111,7 @@ class LockGuiListenerTest extends AbstractClickSortedTest {
 
         guiClick(view, 0);
 
-        assertTrue(plugin.getSortingPrefs().isSlotLocked(player, 9),
+        assertTrue(plugin.getSortingPrefs().getLockedSlots(player).contains(9),
                 "Player inv slot 9 should be locked after clicking chest slot 0");
         assertEquals(Material.BARRIER,
                 view.getTopInventory().getItem(0).getType(),
@@ -131,7 +131,7 @@ class LockGuiListenerTest extends AbstractClickSortedTest {
 
         guiClick(view, 0);
 
-        assertFalse(plugin.getSortingPrefs().isSlotLocked(player, 9),
+        assertFalse(plugin.getSortingPrefs().getLockedSlots(player).contains(9),
                 "Player inv slot 9 should be unlocked after clicking");
         assertEquals(Material.LIME_STAINED_GLASS_PANE,
                 view.getTopInventory().getItem(0).getType(),
@@ -146,7 +146,7 @@ class LockGuiListenerTest extends AbstractClickSortedTest {
         // Chest slot 36 maps to hotbar slot 0.
         guiClick(view, 36);
 
-        assertTrue(plugin.getSortingPrefs().isSlotLocked(player, 0),
+        assertTrue(plugin.getSortingPrefs().getLockedSlots(player).contains(0),
                 "Hotbar slot 0 should be locked after clicking chest slot 36");
     }
 

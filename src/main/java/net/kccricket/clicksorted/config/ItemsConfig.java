@@ -52,15 +52,6 @@ public class ItemsConfig implements ManagedConfig {
     // Item name lookups
     // -------------------------------------------------------------------------
 
-    public String getItemFullName(ItemStack i) {
-        String name = getItemName(getItemType(i));
-        if (i.hasItemMeta() && i.getItemMeta().hasDisplayName()) {
-            return name + " (" + PlainTextComponentSerializer.plainText().serialize(
-                    i.getItemMeta().displayName()) + ")";
-        }
-        return name;
-    }
-
     public String getItemName(ItemStack i) {
         if (i.hasItemMeta() && i.getItemMeta().hasDisplayName()) {
             return PlainTextComponentSerializer.plainText().serialize(i.getItemMeta().displayName());

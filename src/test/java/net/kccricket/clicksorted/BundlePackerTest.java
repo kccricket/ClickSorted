@@ -107,38 +107,18 @@ class BundlePackerTest extends AbstractClickSortedTest {
         assertEquals(64, BundlePacker.stackWeight(new ItemStack(Material.COBBLESTONE, 64)));
     }
 
-    // -------------------------------------------------------------------------
-    // bundleUsedWeight / distinctEntries / isExistingEntry
-    // -------------------------------------------------------------------------
-
-    @Test
-    void bundleUsedWeight_withItems_sumsCorrectly() {
-        ItemStack b = bundle(new ItemStack(Material.COBBLESTONE, 10), new ItemStack(Material.ENDER_PEARL, 3));
-        assertEquals(22, BundlePacker.bundleUsedWeight((BundleMeta) b.getItemMeta()));
+    private static int usedWeight(ItemStack bundle) {
+        int t = 0;
+        for (ItemStack is : ((BundleMeta) bundle.getItemMeta()).getItems())
+            if (is != null) t += BundlePacker.stackWeight(is);
+        return t;
     }
 
-    @Test
-    void distinctEntries_twoSameType_countsAsOne() {
-        ItemStack b = bundle(new ItemStack(Material.STONE, 5), new ItemStack(Material.STONE, 3));
-        assertEquals(1, BundlePacker.distinctEntries((BundleMeta) b.getItemMeta()));
-    }
-
-    @Test
-    void distinctEntries_twoDifferentTypes_countsAsTwo() {
-        ItemStack b = bundle(new ItemStack(Material.STONE, 5), new ItemStack(Material.DIRT, 3));
-        assertEquals(2, BundlePacker.distinctEntries((BundleMeta) b.getItemMeta()));
-    }
-
-    @Test
-    void isExistingEntry_matchingType_true() {
-        ItemStack b = bundle(new ItemStack(Material.GRAVEL, 10));
-        assertTrue(BundlePacker.isExistingEntry((BundleMeta) b.getItemMeta(), new ItemStack(Material.GRAVEL, 5)));
-    }
-
-    @Test
-    void isExistingEntry_differentType_false() {
-        ItemStack b = bundle(new ItemStack(Material.GRAVEL, 10));
-        assertFalse(BundlePacker.isExistingEntry((BundleMeta) b.getItemMeta(), new ItemStack(Material.SAND, 5)));
+    private static int distinctTypes(ItemStack bundle) {
+        java.util.Set<Material> seen = new java.util.HashSet<>();
+        for (ItemStack is : ((BundleMeta) bundle.getItemMeta()).getItems())
+            if (is != null) seen.add(is.getType());
+        return seen.size();
     }
 
     // -------------------------------------------------------------------------
@@ -262,7 +242,7 @@ class BundlePackerTest extends AbstractClickSortedTest {
                 new ItemStack(Material.SAND, 20),
                 new ItemStack(Material.COBBLESTONE, 30)), bundles, 0);
 
-        assertEquals(40, BundlePacker.bundleUsedWeight((BundleMeta) bundles.get(0).getItemMeta()),
+        assertEquals(40, usedWeight(bundles.get(0)),
                 "The two light remainders consolidate into the first bundle");
         assertEquals(30, bundleAmount(bundles.get(1), Material.COBBLESTONE),
                 "The heavy remainder spills into the second bundle when the first can't hold it");
@@ -278,7 +258,7 @@ class BundlePackerTest extends AbstractClickSortedTest {
                 new ItemStack(Material.DIRT, 20),
                 new ItemStack(Material.SAND, 20)), bundles, 0);
 
-        assertEquals(40, BundlePacker.bundleUsedWeight((BundleMeta) bundles.get(0).getItemMeta()),
+        assertEquals(40, usedWeight(bundles.get(0)),
                 "Two 20-weight remainders fit");
         assertEquals(30, looseAmount(leftover, Material.COBBLESTONE), "The heavy 30 stays loose");
     }
@@ -310,7 +290,7 @@ class BundlePackerTest extends AbstractClickSortedTest {
                 new ItemStack(Material.DIRT, 5),
                 new ItemStack(Material.SAND, 5)), bundles, 2);
 
-        assertEquals(2, BundlePacker.distinctEntries((BundleMeta) bundles.get(0).getItemMeta()),
+        assertEquals(2, distinctTypes(bundles.get(0)),
                 "Only two entries fit under the cap");
         int looseTotal = looseAmount(leftover, Material.COBBLESTONE)
                 + looseAmount(leftover, Material.DIRT) + looseAmount(leftover, Material.SAND);

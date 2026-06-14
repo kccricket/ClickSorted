@@ -25,10 +25,6 @@ import org.bukkit.inventory.ItemStack;
 public enum SortingMethod {
     NAME, GROUP;
 
-    public SortingMethod cycle() {
-        return values()[(ordinal() + 1) % values().length];
-    }
-
     public boolean isAvailable() {
         return switch (this) {
             case GROUP -> ClickSortedPlugin.getInstance().getConfigManager().groups().isAvailable();

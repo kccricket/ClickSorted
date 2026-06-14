@@ -146,9 +146,4 @@ public class PlayerSortingPrefs {
         }
     }
 
-    public boolean isSlotLocked(Player player, int slot) {
-        return getLockedSlots(player).contains(slot);
-    }
-
-
 }

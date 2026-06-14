@@ -178,10 +178,6 @@ public final class BundlePacker {
         return stack;
     }
 
-    // -------------------------------------------------------------------------
-    // Public helpers (tested directly in BundlePackerTest)
-    // -------------------------------------------------------------------------
-
     /**
      * Weight a single ItemStack occupies inside a bundle.
      * Formula: {@code amount × (64 / maxStackSize)}, integer division.
@@ -190,20 +186,6 @@ public final class BundlePacker {
         int maxStack = is.getType().getMaxStackSize();
         if (maxStack <= 0) return 64;
         return is.getAmount() * 64 / maxStack;
-    }
-
-    /** Total weight already consumed by all items inside a bundle. */
-    public static int bundleUsedWeight(BundleMeta meta) {
-        int total = 0;
-        for (ItemStack is : meta.getItems()) {
-            if (is != null) total += stackWeight(is);
-        }
-        return total;
-    }
-
-    /** Number of distinct item types/meta already stored in the bundle. */
-    public static int distinctEntries(BundleMeta meta) {
-        return distinctEntriesOf(meta.getItems());
     }
 
     /** Number of distinct item types/meta among a list of stacks. */
@@ -215,22 +197,6 @@ public final class BundlePacker {
             }
         }
         return seen.size();
-    }
-
-    /**
-     * Returns true if the candidate item is similar (same type + meta) to any item already in
-     * the bundle, meaning it would merge into an existing entry rather than adding a new one.
-     */
-    public static boolean isExistingEntry(BundleMeta meta, ItemStack candidate) {
-        return containsSimilar(meta.getItems(), candidate);
-    }
-
-    /** Shared similarity predicate: true if any non-null item in {@code items} isSimilar to {@code candidate}. */
-    private static boolean containsSimilar(Iterable<ItemStack> items, ItemStack candidate) {
-        for (ItemStack is : items) {
-            if (is != null && is.isSimilar(candidate)) return true;
-        }
-        return false;
     }
 
     /**

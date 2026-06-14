@@ -128,17 +128,6 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void isSlotLockedReturnsTrueForLockedSlot() {
-        PlayerMock player = server.addPlayer("Alice");
-        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-
-        prefs.setLockedSlots(player, Set.of(12));
-
-        assertTrue(prefs.isSlotLocked(player, 12));
-        assertFalse(prefs.isSlotLocked(player, 11));
-    }
-
-    @Test
     void getLockedSlotsEmptyReturnsUnmodifiableSet() {
         PlayerMock player = server.addPlayer("Alice");
         Set<Integer> slots = plugin.getSortingPrefs().getLockedSlots(player);
@@ -162,7 +151,7 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
         assertTrue(prefs.toggleSlotLocked(player, 5),
                 "toggleSlotLocked should return true when the slot was not previously locked");
-        assertTrue(prefs.isSlotLocked(player, 5));
+        assertTrue(prefs.getLockedSlots(player).contains(5));
     }
 
     @Test
@@ -172,7 +161,7 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
         prefs.toggleSlotLocked(player, 5);
         assertFalse(prefs.toggleSlotLocked(player, 5),
                 "toggleSlotLocked should return false when the slot was already locked");
-        assertFalse(prefs.isSlotLocked(player, 5));
+        assertFalse(prefs.getLockedSlots(player).contains(5));
     }
 
     @Test
@@ -180,9 +169,9 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
         PlayerMock player = server.addPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
         prefs.toggleSlotLocked(player, 12);
-        assertTrue(prefs.isSlotLocked(player, 12), "Slot should be locked after one toggle");
+        assertTrue(prefs.getLockedSlots(player).contains(12), "Slot should be locked after one toggle");
         prefs.toggleSlotLocked(player, 12);
-        assertFalse(prefs.isSlotLocked(player, 12), "Slot should be unlocked after second toggle");
+        assertFalse(prefs.getLockedSlots(player).contains(12), "Slot should be unlocked after second toggle");
     }
 
 }

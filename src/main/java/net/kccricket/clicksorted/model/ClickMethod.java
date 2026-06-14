@@ -9,10 +9,6 @@ public enum ClickMethod {
 
     public static final ClickMethod DEFAULT = SWAP;
 
-    public ClickMethod cycle() {
-        return values()[(ordinal() + 1) % values().length];
-    }
-
     /**
      * @return true if triggering this method requires cancelling the originating click event
      *         (SWAP would swap the offhand item; CONTROL_DROP would drop the hovered item;
