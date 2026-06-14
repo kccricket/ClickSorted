@@ -13,6 +13,7 @@ package net.kccricket.clicksorted.sort;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.gui.ClickSortedHolder;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
@@ -46,6 +47,14 @@ public class InventoryClickListener implements Listener {
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onInventoryClicked(final InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        // Never treat one of our own GUIs as a sortable target. They are CHEST-type inventories, so
+        // with ignore_plugin_inventory=false (the default) they would otherwise match the sortable set
+        // and a sort-trigger click would rearrange their contents (or the real inventory below them)
+        // before the GUI's own listener — which runs after us at the same priority — cancels the
+        // interaction. The marker interface covers every current and future ClickSorted GUI.
+        if (event.getInventory().getHolder() instanceof ClickSortedHolder) {
             return;
         }
         if (!Permissions.isAllowedTo(player, "clicksorted.sort")) {

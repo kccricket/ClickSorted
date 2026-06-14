@@ -19,7 +19,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -43,7 +42,7 @@ import java.util.Set;
  *   <li>Chest slot 36-44 ↔  Player inventory slot (chestSlot - 36)</li>
  * </ul>
  */
-public class LockGuiHolder implements InventoryHolder {
+public class LockGuiHolder implements ClickSortedHolder {
 
     /** First chest slot of the divider row. */
     public static final int DIVIDER_START = 27;
