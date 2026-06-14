@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * server.dispatchCommand (which routes through ClickSortedPlugin.onCommand → CommandManager →
  * the specific command class).
  *
- * Command permissions from plugin.yml:
+ * Command permissions from paper-plugin.yml:
  *   set sort-method / set click-method / set hover  — default true  (any player)
  *   reload / getcfg / debug                         — default op
  */
