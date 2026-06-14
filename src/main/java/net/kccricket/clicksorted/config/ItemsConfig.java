@@ -12,15 +12,15 @@ import java.util.Locale;
 
 /**
  * Manages {@code items.yml}: a persistent store of material-name → display-name mappings.
- * Unknown item names encountered at runtime are added to the in-memory config and flushed
- * to disk on {@link #save()} (called during {@code onDisable}).
+ * Lookups for unmapped materials fall back to the material name itself.
  */
 public class ItemsConfig implements ManagedConfig {
 
     private static final String FILE_NAME = "items.yml";
 
     private final Plugin plugin;
-    private FileConfiguration config;
+    // Reassigned on reload; read by getItemName on Folia region threads, so publish via volatile.
+    private volatile FileConfiguration config;
     private File file;
 
     public ItemsConfig(Plugin plugin) {
@@ -53,15 +53,6 @@ public class ItemsConfig implements ManagedConfig {
     // Item name lookups
     // -------------------------------------------------------------------------
 
-    public String getItemFullName(ItemStack i) {
-        String name = getItemName(getItemType(i));
-        if (i.hasItemMeta() && i.getItemMeta().hasDisplayName()) {
-            return name + " (" + PlainTextComponentSerializer.plainText().serialize(
-                    i.getItemMeta().displayName()) + ")";
-        }
-        return name;
-    }
-
     public String getItemName(ItemStack i) {
         if (i.hasItemMeta() && i.getItemMeta().hasDisplayName()) {
             return PlainTextComponentSerializer.plainText().serialize(i.getItemMeta().displayName());
@@ -73,12 +64,7 @@ public class ItemsConfig implements ManagedConfig {
         if (config == null) {
             return iname;
         }
-        String aname = config.getString(iname);
-        if (aname == null) {
-            aname = iname;
-            config.set(iname, iname);
-        }
-        return aname;
+        return config.getString(iname, iname);
     }
 
     public String getItemType(ItemStack i) {

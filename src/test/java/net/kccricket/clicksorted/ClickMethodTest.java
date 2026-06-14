@@ -19,15 +19,6 @@ class ClickMethodTest {
     }
 
     @Test
-    void needsOffhandReset_onlySwap() {
-        assertTrue(ClickMethod.SWAP.needsOffhandReset());
-        assertFalse(ClickMethod.CONTROL_DROP.needsOffhandReset());
-        assertFalse(ClickMethod.DOUBLE_CLICK.needsOffhandReset());
-        assertFalse(ClickMethod.SINGLE_CLICK.needsOffhandReset());
-        assertFalse(ClickMethod.NONE.needsOffhandReset());
-    }
-
-    @Test
     void parse_controlDropRoundTrips() {
         assertEquals(ClickMethod.CONTROL_DROP, ClickMethod.parse("CONTROL_DROP", ClickMethod.SWAP));
     }

@@ -9,10 +9,6 @@ public enum ClickMethod {
 
     public static final ClickMethod DEFAULT = SWAP;
 
-    public ClickMethod cycle() {
-        return values()[(ordinal() + 1) % values().length];
-    }
-
     /**
      * @return true if triggering this method requires cancelling the originating click event
      *         (SWAP would swap the offhand item; CONTROL_DROP would drop the hovered item;
@@ -21,14 +17,6 @@ public enum ClickMethod {
     public boolean shouldCancelEvent() {
         return this == SWAP || this == CONTROL_DROP
                 || this == SHIFT_LEFT_CLICK || this == SHIFT_RIGHT_CLICK;
-    }
-
-    /**
-     * @return true if this method needs the post-sort offhand reset (SWAP only); the offhand item is
-     *         momentarily consumed by the swap key and must be restored on the next tick.
-     */
-    public boolean needsOffhandReset() {
-        return this == SWAP;
     }
 
     /**

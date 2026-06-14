@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 
 /**
@@ -89,13 +90,17 @@ public class ActionThrottle {
             return true;
         }
         long now = clock.getAsLong();
-        UUID id = player.getUniqueId();
-        Long last = lastAction.get(id);
-        if (last != null && now - last < cooldownMs) {
-            return false;
-        }
-        lastAction.put(id, now);
-        return true;
+        // Atomic check-then-act: a single compute() decides and conditionally advances the
+        // window so concurrent callers for the same player can't both pass the gate.
+        AtomicBoolean allowed = new AtomicBoolean(false);
+        lastAction.compute(player.getUniqueId(), (id, last) -> {
+            if (last == null || now - last >= cooldownMs) {
+                allowed.set(true);
+                return now;          // allowed: advance the window
+            }
+            return last;             // denied: leave the timestamp untouched
+        });
+        return allowed.get();
     }
 
     /** Test seam: override the time source. */

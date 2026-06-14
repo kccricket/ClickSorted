@@ -25,7 +25,8 @@ public class MainConfig implements ManagedConfig {
     private static final int PLAYER_STORAGE_END = 36;
 
     private final ClickSortedPlugin plugin;
-    private List<InventoryType> sortableInventories = List.of();
+    // Reassigned on reload; read on Folia region threads, so publish via volatile.
+    private volatile List<InventoryType> sortableInventories = List.of();
 
     public MainConfig(ClickSortedPlugin plugin) {
         this.plugin = plugin;
