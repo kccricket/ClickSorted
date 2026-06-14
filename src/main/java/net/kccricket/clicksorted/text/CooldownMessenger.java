@@ -3,12 +3,12 @@ package net.kccricket.clicksorted.text;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class CooldownMessenger {
-    private final Map<String, Long> cooldowns = new HashMap<>();
+    private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
 
     public void message(Player player, String cooldown, int secs, Component message) {
         long last = getLast(player, cooldown);

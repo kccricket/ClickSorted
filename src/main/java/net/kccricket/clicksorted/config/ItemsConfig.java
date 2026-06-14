@@ -19,7 +19,8 @@ public class ItemsConfig implements ManagedConfig {
     private static final String FILE_NAME = "items.yml";
 
     private final Plugin plugin;
-    private FileConfiguration config;
+    // Reassigned on reload; read by getItemName on Folia region threads, so publish via volatile.
+    private volatile FileConfiguration config;
     private File file;
 
     public ItemsConfig(Plugin plugin) {

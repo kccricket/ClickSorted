@@ -124,6 +124,8 @@ Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs 
 
 `ClickMethod` and `SortingMethod` are plain enums. `SortingMethod.isAvailable()` checks whether `groups.yml` has any mappings loaded (GROUP requires a populated groups file).
 
+**Never invoke `InventoryView` methods from plugin bytecode** (e.g. `event.getView().getTopInventory()`). `InventoryView` is a concrete class on ≤1.20.6 but an interface on 1.21+; compiling against the newer API and running on an older server makes the JVM throw `IncompatibleClassChangeError` ("Found class … but interface was expected") at the call site. Use `InventoryEvent.getInventory()` (resolved inside the API jar, returns the stable `Inventory` interface) instead. Passing a `getView()` result as a plain argument is fine — only *calling methods on* the view from our bytecode breaks.
+
 ## Release Notes Template
 
 Use this format when drafting GitHub release notes. Omit sections that have no entries.

@@ -69,13 +69,6 @@ public class InventoryClickListener implements Listener {
             }
             if (sortService.sortInventory(event, prefs.getSortingMethod(player))
                     && clickMethod.shouldCancelEvent()) {
-                if (clickMethod.needsOffhandReset()) {
-                    // Use the Paper entity scheduler so the offhand reset is bound to this player
-                    // entity (Folia-safe).
-                    player.getScheduler().runDelayed(plugin, task ->
-                            player.getInventory().setItemInOffHand(player.getInventory().getItemInOffHand()),
-                            null, 1L);
-                }
                 event.setCancelled(true);
             }
         }

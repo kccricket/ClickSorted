@@ -20,14 +20,6 @@ public enum ClickMethod {
     }
 
     /**
-     * @return true if this method needs the post-sort offhand reset (SWAP only); the offhand item is
-     *         momentarily consumed by the swap key and must be restored on the next tick.
-     */
-    public boolean needsOffhandReset() {
-        return this == SWAP;
-    }
-
-    /**
      * @return true if {@code event} matches the trigger for this click method
      */
     public boolean matchesSortTrigger(InventoryClickEvent event) {

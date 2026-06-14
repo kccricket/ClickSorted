@@ -5,6 +5,7 @@ version: ${project.version}
 description: Super-convenient inventory sorting
 website: https://github.com/kccricket/ClickSorted
 api-version: 1.20.6
+folia-supported: true
 
 permissions:
   clicksorted.admin:
