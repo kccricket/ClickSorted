@@ -305,6 +305,9 @@ public class ClickSortedCommands {
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.reload"))
                 .executes(ctx -> {
                     plugin.getConfigManager().reloadAll();
+                    if (plugin.getConfigManager().main().getCheckForUpdates()) {
+                        plugin.getUpdateChecker().check();
+                    }
                     MessageUtil.statusMessage(ctx.getSource().getSender(),
                             plugin.getConfigManager().lang().getColoredMessage("configReloaded"));
                     return Command.SINGLE_SUCCESS;

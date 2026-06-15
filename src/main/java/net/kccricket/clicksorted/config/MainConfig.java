@@ -70,6 +70,10 @@ public class MainConfig implements ManagedConfig {
         cfg.setComments("enable_metrics", List.of(
                 "Send anonymous usage statistics to bStats (https://bstats.org).",
                 "Set to false to opt out."));
+        cfg.setComments("check_for_updates", List.of(
+                "Check Modrinth for a newer release on startup and reload, logging a notice to the",
+                "console when one is available. Set to false to disable. No data beyond the request",
+                "itself is sent."));
         cfg.setComments("debug_level", List.of(
                 "Logging verbosity for the plugin.",
                 "Values: OFF (no debug output), DEBUG (high-level flow), TRACE (per-item verbose)"));
@@ -158,6 +162,10 @@ public class MainConfig implements ManagedConfig {
 
     public List<InventoryType> getSortableInventories() {
         return sortableInventories;
+    }
+
+    public boolean getCheckForUpdates() {
+        return plugin.getConfig().getBoolean("check_for_updates", true);
     }
 
     public SortingMethod getDefaultSortingMethod() {
