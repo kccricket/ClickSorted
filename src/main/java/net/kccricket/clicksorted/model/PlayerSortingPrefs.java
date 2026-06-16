@@ -35,6 +35,8 @@ public class PlayerSortingPrefs {
     private final NamespacedKey bundleInventoryKey;
     private final NamespacedKey bundleOthersKey;
     private final NamespacedKey bundleStackLimitKey;
+    private final NamespacedKey startCornerKey;
+    private final NamespacedKey fillAxisKey;
 
     public PlayerSortingPrefs(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -45,6 +47,8 @@ public class PlayerSortingPrefs {
         this.bundleInventoryKey = new NamespacedKey(plugin, "bundle_inventory");
         this.bundleOthersKey = new NamespacedKey(plugin, "bundle_others");
         this.bundleStackLimitKey = new NamespacedKey(plugin, "bundle_stack_limit");
+        this.startCornerKey = new NamespacedKey(plugin, "start_corner");
+        this.fillAxisKey = new NamespacedKey(plugin, "fill_axis");
     }
 
     public SortingMethod getSortingMethod(Player player) {
@@ -63,6 +67,24 @@ public class PlayerSortingPrefs {
 
     public void setClickMethod(Player player, ClickMethod clickMethod) {
         player.getPersistentDataContainer().set(clickKey, PersistentDataType.STRING, clickMethod.name());
+    }
+
+    public StartCorner getStartCorner(Player player) {
+        String stored = player.getPersistentDataContainer().get(startCornerKey, PersistentDataType.STRING);
+        return stored != null ? StartCorner.parse(stored) : plugin.getConfigManager().main().getDefaultStartCorner();
+    }
+
+    public void setStartCorner(Player player, StartCorner corner) {
+        player.getPersistentDataContainer().set(startCornerKey, PersistentDataType.STRING, corner.name());
+    }
+
+    public FillAxis getFillAxis(Player player) {
+        String stored = player.getPersistentDataContainer().get(fillAxisKey, PersistentDataType.STRING);
+        return stored != null ? FillAxis.parse(stored) : plugin.getConfigManager().main().getDefaultFillAxis();
+    }
+
+    public void setFillAxis(Player player, FillAxis axis) {
+        player.getPersistentDataContainer().set(fillAxisKey, PersistentDataType.STRING, axis.name());
     }
 
     /**

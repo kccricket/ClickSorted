@@ -272,6 +272,61 @@ class InventorySortTest extends AbstractClickSortedTest {
         assertEquals(1, stoneSlots, "Two STONE stacks should have merged into one");
     }
 
+    // --- Sort direction (start corner / fill axis) ---
+
+    @Test
+    void verticalFillPlacesItemsColumnMajor() {
+        // With fill-axis VERTICAL from the default TOP_LEFT corner, the first sorted item lands in
+        // slot 0 and the second continues *down* the first column (slot 9), not across to slot 1.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setFillAxis(player, net.kccricket.clicksorted.model.FillAxis.VERTICAL);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(1, stack(Material.DIAMOND, 1));   // "Diamond" sorts before "Emerald"
+        chest.setItem(2, stack(Material.EMERALD, 1));
+        InventoryView view = player.openInventory(chest);
+
+        // Empty-slot trigger (default sort-over-items=false): click empty slot 0.
+        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+
+        assertEquals(Material.DIAMOND, chest.getItem(0).getType(), "First item should land in the top-left slot");
+        assertEquals(Material.EMERALD, chest.getItem(9).getType(),
+                "Second item should continue down the first column (slot 9), not across to slot 1");
+        assertNull(chest.getItem(1), "Slot 1 must be empty under vertical fill");
+    }
+
+    @Test
+    void treemapSortMethodAnchorsDominantTypeInABlock() {
+        // TREEMAP ranks types by stack count and lays each out as a proportional block, the
+        // most-numerous type anchored at the start corner (default TOP_LEFT). On a double chest,
+        // a dominant DIRT pile (20 stacks) forms a contiguous block anchored at slot 0, with the
+        // rare types tiling beside it and the empty space pooled away from the anchor.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortingMethod(player, net.kccricket.clicksorted.model.SortingMethod.TREEMAP);
+        plugin.getSortingPrefs().setStartCorner(player, net.kccricket.clicksorted.model.StartCorner.TOP_LEFT);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
+        Inventory chest = server.createInventory(null, 54); // double chest: 9×6
+        for (int i = 0; i < 20; i++) {
+            chest.setItem(i, stack(Material.DIRT, 64));
+        }
+        chest.setItem(20, stack(Material.STONE, 64));
+        chest.setItem(21, stack(Material.SAND, 64));
+        chest.setItem(22, stack(Material.GRAVEL, 64));
+        InventoryView view = player.openInventory(chest);
+
+        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+
+        assertEquals(Material.DIRT, chest.getItem(0).getType(), "the dominant type anchors the start corner");
+        assertEquals(20, countSlotsWithMaterial(chest, Material.DIRT, 0, 54),
+                "every DIRT stack is placed as its own block cell");
+        assertEquals(1280, countByMaterial(chest).getOrDefault(Material.DIRT, 0), "DIRT total preserved");
+        // The rare types survive the repack too.
+        assertEquals(64, countByMaterial(chest).getOrDefault(Material.STONE, 0), "STONE total preserved");
+        assertEquals(64, countByMaterial(chest).getOrDefault(Material.SAND, 0), "SAND total preserved");
+        assertEquals(64, countByMaterial(chest).getOrDefault(Material.GRAVEL, 0), "GRAVEL total preserved");
+    }
+
     // --- Shift-click sort methods ---
 
     @Test

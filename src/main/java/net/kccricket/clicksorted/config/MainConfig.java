@@ -4,7 +4,9 @@ import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.logging.DebugLevel;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
+import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kccricket.clicksorted.model.StartCorner;
 import org.bukkit.event.inventory.InventoryType;
 
 import java.util.List;
@@ -95,9 +97,20 @@ public class MainConfig implements ManagedConfig {
                 "        DOUBLE_CLICK (double-click), CONTROL_DROP (Ctrl+Q over a slot),",
                 "        SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE (click-sorting disabled)"));
         cfg.setComments("defaults.sort_mode", List.of(
-                "Algorithm used to order items.",
-                "Values: NAME (alphabetical by display name), GROUP (by group defined in groups.yml).",
+                "Algorithm used to order and lay out items.",
+                "Values: NAME (alphabetical by display name), GROUP (by group defined in groups.yml),",
+                "        TREEMAP (group by type and lay each type out as a proportional block sized to its",
+                "        stack count, packed to fill the container with empty space pooled in one corner;",
+                "        the most-numerous type anchors start_corner. Ignores fill_axis).",
                 "GROUP requires at least one group to be configured in groups.yml."));
+        cfg.setComments("defaults.start_corner", List.of(
+                "The grid corner where a sorted layout begins.",
+                "Values: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT.",
+                "Players can change this with /clicksorted set start-corner <corner>."));
+        cfg.setComments("defaults.fill_axis", List.of(
+                "The direction a sorted layout flows from the start corner (NAME/GROUP sort modes only).",
+                "Values: HORIZONTAL (fill rows), VERTICAL (fill columns).",
+                "Players can change this with /clicksorted set fill-axis <axis>."));
         cfg.setComments("defaults.sort_over_items", List.of(
                 "When true, the configured click method sorts even while hovering an occupied slot;",
                 "when false, sorting only fires on an empty slot.",
@@ -174,6 +187,14 @@ public class MainConfig implements ManagedConfig {
 
     public ClickMethod getDefaultClickMethod() {
         return ClickMethod.parse(plugin.getConfig().getString("defaults.click_mode"), ClickMethod.DEFAULT);
+    }
+
+    public StartCorner getDefaultStartCorner() {
+        return StartCorner.parse(plugin.getConfig().getString("defaults.start_corner"), StartCorner.DEFAULT);
+    }
+
+    public FillAxis getDefaultFillAxis() {
+        return FillAxis.parse(plugin.getConfig().getString("defaults.fill_axis"), FillAxis.DEFAULT);
     }
 
     public boolean getDefaultSortOverItems() {

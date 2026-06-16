@@ -15,8 +15,10 @@ package net.kccricket.clicksorted.sort;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.events.InventorySortEvent;
 import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.Bukkit;
@@ -31,6 +33,8 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -136,20 +140,17 @@ public class InventorySortService {
             return false;
         }
 
-        for (int i : sortableSlots) {
-            if (!sortedItems.isEmpty()) {
-                ItemStack newItem = sortedItems.remove(0);
-                inv.setItem(i, newItem);
-            } else {
-                inv.clear(i);
-            }
-        }
+        int width = SlotOrder.widthFor(type);
+        int rows = Math.max(1, (max - min + width - 1) / width);
+        List<ItemStack> overflow = sortMethod.isTreemap()
+                ? writeTreemap(inv, sortableSlots, sortedItems, min, width, rows, prefs.getStartCorner(p))
+                : writeLinear(inv, sortableSlots, sortedItems, min, width, prefs.getStartCorner(p), prefs.getFillAxis(p));
 
-        if (!sortedItems.isEmpty()) {
+        if (!overflow.isEmpty()) {
             // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
             // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
             MessageUtil.alertMessage(p, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
-            for (ItemStack item : sortedItems) {
+            for (ItemStack item : overflow) {
                 Log.debug("dropping " + item + " by player " + p.getName());
                 p.getWorld().dropItemNaturally(p.getLocation(), item);
             }
@@ -162,6 +163,54 @@ public class InventorySortService {
         }
 
         return true;
+    }
+
+    /**
+     * Writes the sorted sequence linearly: order the slots by start-corner/fill-axis, then write the
+     * i-th sorted stack to the i-th slot, clearing any slot past the end of the sequence.
+     *
+     * @return the stacks that did not fit (to be dropped); empty in the normal case
+     */
+    private List<ItemStack> writeLinear(Inventory inv, Set<Integer> sortableSlots, List<ItemStack> sortedItems,
+                                        int base, int width, StartCorner startCorner, FillAxis fillAxis) {
+        List<Integer> fillOrder = SlotOrder.order(sortableSlots, base, width, startCorner, fillAxis);
+        for (int i : fillOrder) {
+            if (!sortedItems.isEmpty()) {
+                inv.setItem(i, sortedItems.remove(0));
+            } else {
+                inv.clear(i);
+            }
+        }
+        return sortedItems;
+    }
+
+    /**
+     * Writes the {@code TREEMAP} placement: {@link TreemapPacker} lays each item type out as a
+     * proportional block packed to fill the container; we write the resulting slot→stack map and
+     * clear every other sortable slot.
+     *
+     * @return the stacks that did not fit (to be dropped); empty in the normal case
+     */
+    private List<ItemStack> writeTreemap(Inventory inv, Set<Integer> sortableSlots, List<ItemStack> sortedItems,
+                                         int base, int width, int rows, StartCorner startCorner) {
+        Map<Integer, ItemStack> placement = TreemapPacker.pack(sortedItems, sortableSlots, base, width, rows, startCorner);
+        Set<ItemStack> placed = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (int i : sortableSlots) {
+            ItemStack item = placement.get(i);
+            if (item != null) {
+                inv.setItem(i, item);
+                placed.add(item);
+            } else {
+                inv.clear(i);
+            }
+        }
+        List<ItemStack> overflow = new ArrayList<>();
+        for (ItemStack item : sortedItems) {
+            if (!placed.contains(item)) {
+                overflow.add(item);
+            }
+        }
+        return overflow;
     }
 
     /**

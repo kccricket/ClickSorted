@@ -11,7 +11,9 @@ import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.logging.DebugLevel;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
+import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -48,9 +50,75 @@ public class ClickSortedCommands {
         return Commands.literal("set")
                 .then(buildSortMethod(plugin))
                 .then(buildClickMethod(plugin))
+                .then(buildStartCorner(plugin))
+                .then(buildFillAxis(plugin))
                 .then(buildHover(plugin))
                 .then(buildBundle(plugin))
                 .then(buildLock(plugin));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStartCorner(ClickSortedPlugin plugin) {
+        return Commands.literal("start-corner")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
+                .then(Commands.argument("corner", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            String input = builder.getRemaining().toUpperCase();
+                            for (StartCorner c : StartCorner.values()) {
+                                if (c.name().startsWith(input)) {
+                                    builder.suggest(c.name().toLowerCase());
+                                }
+                            }
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            String arg = StringArgumentType.getString(ctx, "corner");
+                            try {
+                                StartCorner corner = StartCorner.valueOf(arg.toUpperCase());
+                                plugin.getSortingPrefs().setStartCorner(player, corner);
+                                MessageUtil.statusMessage(player,
+                                        plugin.getConfigManager().lang().getColoredMessage("setStartCornerTo",
+                                                Placeholder.unparsed("corner", corner.toString())));
+                            } catch (IllegalArgumentException ignored) {
+                                // invalid value → no-op
+                            }
+                            return Command.SINGLE_SUCCESS;
+                        }));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildFillAxis(ClickSortedPlugin plugin) {
+        return Commands.literal("fill-axis")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
+                .then(Commands.argument("axis", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            String input = builder.getRemaining().toUpperCase();
+                            for (FillAxis a : FillAxis.values()) {
+                                if (a.name().startsWith(input)) {
+                                    builder.suggest(a.name().toLowerCase());
+                                }
+                            }
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            String arg = StringArgumentType.getString(ctx, "axis");
+                            try {
+                                FillAxis axis = FillAxis.valueOf(arg.toUpperCase());
+                                plugin.getSortingPrefs().setFillAxis(player, axis);
+                                MessageUtil.statusMessage(player,
+                                        plugin.getConfigManager().lang().getColoredMessage("setFillAxisTo",
+                                                Placeholder.unparsed("axis", axis.toString())));
+                            } catch (IllegalArgumentException ignored) {
+                                // invalid value → no-op
+                            }
+                            return Command.SINGLE_SUCCESS;
+                        }));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSortMethod(ClickSortedPlugin plugin) {
@@ -289,11 +357,17 @@ public class ClickSortedCommands {
                     var lang = plugin.getConfigManager().lang();
                     ClickMethod clickMethod = prefs.getClickMethod(player);
                     SortingMethod sortMethod = prefs.getSortingMethod(player);
+                    StartCorner startCorner = prefs.getStartCorner(player);
+                    FillAxis fillAxis = prefs.getFillAxis(player);
                     boolean hover = prefs.getSortOverItems(player);
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusClickMethod",
                             Placeholder.unparsed("method", clickMethod.toString())));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusSortMethod",
                             Placeholder.unparsed("method", sortMethod.toString())));
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusStartCorner",
+                            Placeholder.unparsed("corner", startCorner.toString())));
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusFillAxis",
+                            Placeholder.unparsed("axis", fillAxis.toString())));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusHover",
                             Placeholder.unparsed("status", enabledLabel(hover))));
                     return Command.SINGLE_SUCCESS;
