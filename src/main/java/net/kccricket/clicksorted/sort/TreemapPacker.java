@@ -12,6 +12,7 @@ package net.kccricket.clicksorted.sort;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
+import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
@@ -63,10 +64,13 @@ public final class TreemapPacker {
      * @param width         grid width in columns
      * @param rows          grid height in rows
      * @param start         the corner that receives the most-numerous type
+     * @param axis          the direction the layout flows: {@code HORIZONTAL} grows shelves left-to-right
+     *                      (bands stacked top-to-bottom); {@code VERTICAL} grows them top-to-bottom
+     *                      (columns placed left-to-right)
      * @return a slot → stack map for the slots that should be filled; the caller clears the rest
      */
     public static Map<Integer, ItemStack> pack(List<ItemStack> sortedStacks, Set<Integer> sortableSlots,
-                                               int base, int width, int rows, StartCorner start) {
+                                               int base, int width, int rows, StartCorner start, FillAxis axis) {
         Map<Integer, ItemStack> placement = new LinkedHashMap<>();
         if (width <= 0 || rows <= 0) {
             return placement;
@@ -79,8 +83,12 @@ public final class TreemapPacker {
             return placement;
         }
 
-        // 2. Assign each type a rectangle of grid cells (top-left origin).
-        shelfPack(blocks, rows, width);
+        // 2. Assign each type a rectangle of grid cells (top-left origin). The shelf-packer always lays
+        //    horizontal bands; a VERTICAL fill axis runs the identical algorithm on a transposed grid
+        //    (rows/width swapped) so its bands become columns. The resulting cells are then in
+        //    transposed coordinates and are mapped back to the real grid when emitting (step 3).
+        boolean transpose = axis == FillAxis.VERTICAL;
+        shelfPack(blocks, transpose ? width : rows, transpose ? rows : width);
 
         // 3. Reflect onto the chosen anchor corner and emit the slot → stack map; cells whose slot is
         //    locked/missing are skipped and their stacks spill to a leftover queue.
@@ -90,8 +98,11 @@ public final class TreemapPacker {
         for (Block b : blocks) {
             List<Integer> slots = new ArrayList<>(b.cells.size());
             for (int[] cell : b.cells) {
-                int r = flipRow ? rows - 1 - cell[0] : cell[0];
-                int c = flipCol ? width - 1 - cell[1] : cell[1];
+                // Undo the transpose (if any) so cellRow/cellCol address the real rows×width grid.
+                int cellRow = transpose ? cell[1] : cell[0];
+                int cellCol = transpose ? cell[0] : cell[1];
+                int r = flipRow ? rows - 1 - cellRow : cellRow;
+                int c = flipCol ? width - 1 - cellCol : cellCol;
                 slots.add(base + r * width + c);
             }
             slots.sort(Comparator.naturalOrder());
@@ -107,11 +118,9 @@ public final class TreemapPacker {
             leftover.addAll(stacks); // displaced by locked/missing cells
         }
 
-        // Displaced stacks fill the remaining free sortable slots in reading order; any that still do
-        // not fit are left for the caller's overflow/drop path.
-        List<Integer> free = new ArrayList<>(sortableSlots);
-        free.sort(Comparator.naturalOrder());
-        for (int slot : free) {
+        // Displaced stacks fill the remaining free sortable slots, flowing from the chosen corner along
+        // the chosen axis; any that still do not fit are left for the caller's overflow/drop path.
+        for (int slot : SlotOrder.order(sortableSlots, base, width, start, axis)) {
             if (leftover.isEmpty()) {
                 break;
             }

@@ -58,14 +58,36 @@ public class ClickSortedCommands {
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStartCorner(ClickSortedPlugin plugin) {
-        return Commands.literal("start-corner")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
-                .then(Commands.argument("corner", StringArgumentType.word())
+        return enumPref(plugin, "start-corner", "clicksorted.commands.sort", "corner",
+                StartCorner.values(), "setStartCornerTo", "corner",
+                (player, corner) -> plugin.getSortingPrefs().setStartCorner(player, corner));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildFillAxis(ClickSortedPlugin plugin) {
+        return enumPref(plugin, "fill-axis", "clicksorted.commands.sort", "axis",
+                FillAxis.values(), "setFillAxisTo", "axis",
+                (player, axis) -> plugin.getSortingPrefs().setFillAxis(player, axis));
+    }
+
+    /**
+     * A {@code /clicksorted set <literal> <value>} subcommand that parses {@code value} (case-insensitive)
+     * into one of {@code values} and persists it via {@code setter}, echoing {@code langKey} with the
+     * chosen value under the {@code placeholder} tag. Unrecognised input is a silent no-op, matching the
+     * other per-player preference setters. Suited to plain enum preferences with no extra validation;
+     * {@code sort-method} and {@code click-method} keep bespoke builders for their availability check and
+     * instruction text.
+     */
+    private static <E extends Enum<E>> com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> enumPref(
+            ClickSortedPlugin plugin, String literal, String permission, String argName, E[] values,
+            String langKey, String placeholder, java.util.function.BiConsumer<Player, E> setter) {
+        return Commands.literal(literal)
+                .requires(src -> src.getSender().hasPermission(permission))
+                .then(Commands.argument(argName, StringArgumentType.word())
                         .suggests((ctx, builder) -> {
                             String input = builder.getRemaining().toUpperCase();
-                            for (StartCorner c : StartCorner.values()) {
-                                if (c.name().startsWith(input)) {
-                                    builder.suggest(c.name().toLowerCase());
+                            for (E value : values) {
+                                if (value.name().startsWith(input)) {
+                                    builder.suggest(value.name().toLowerCase());
                                 }
                             }
                             return builder.buildFuture();
@@ -75,50 +97,26 @@ public class ClickSortedCommands {
                             if (player == null || throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
-                            String arg = StringArgumentType.getString(ctx, "corner");
-                            try {
-                                StartCorner corner = StartCorner.valueOf(arg.toUpperCase());
-                                plugin.getSortingPrefs().setStartCorner(player, corner);
-                                MessageUtil.statusMessage(player,
-                                        plugin.getConfigManager().lang().getColoredMessage("setStartCornerTo",
-                                                Placeholder.unparsed("corner", corner.toString())));
-                            } catch (IllegalArgumentException ignored) {
-                                // invalid value → no-op
+                            E value = parseEnum(values, StringArgumentType.getString(ctx, argName));
+                            if (value == null) {
+                                return Command.SINGLE_SUCCESS; // unrecognised → no-op
                             }
+                            setter.accept(player, value);
+                            MessageUtil.statusMessage(player,
+                                    plugin.getConfigManager().lang().getColoredMessage(langKey,
+                                            Placeholder.unparsed(placeholder, value.toString())));
                             return Command.SINGLE_SUCCESS;
                         }));
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildFillAxis(ClickSortedPlugin plugin) {
-        return Commands.literal("fill-axis")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
-                .then(Commands.argument("axis", StringArgumentType.word())
-                        .suggests((ctx, builder) -> {
-                            String input = builder.getRemaining().toUpperCase();
-                            for (FillAxis a : FillAxis.values()) {
-                                if (a.name().startsWith(input)) {
-                                    builder.suggest(a.name().toLowerCase());
-                                }
-                            }
-                            return builder.buildFuture();
-                        })
-                        .executes(ctx -> {
-                            Player player = requirePlayer(plugin, ctx);
-                            if (player == null || throttled(plugin, ctx.getSource())) {
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            String arg = StringArgumentType.getString(ctx, "axis");
-                            try {
-                                FillAxis axis = FillAxis.valueOf(arg.toUpperCase());
-                                plugin.getSortingPrefs().setFillAxis(player, axis);
-                                MessageUtil.statusMessage(player,
-                                        plugin.getConfigManager().lang().getColoredMessage("setFillAxisTo",
-                                                Placeholder.unparsed("axis", axis.toString())));
-                            } catch (IllegalArgumentException ignored) {
-                                // invalid value → no-op
-                            }
-                            return Command.SINGLE_SUCCESS;
-                        }));
+    /** The matching enum constant for {@code raw} (case-insensitive), or {@code null} if none match. */
+    private static <E extends Enum<E>> E parseEnum(E[] values, String raw) {
+        for (E value : values) {
+            if (value.name().equalsIgnoreCase(raw)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSortMethod(ClickSortedPlugin plugin) {
@@ -306,7 +304,10 @@ public class ClickSortedCommands {
                                 limit = 0; // an off-word disables the entry limit
                             } else {
                                 try {
-                                    limit = Math.max(0, Integer.parseInt(raw));
+                                    // A bundle holds at most 64 weight-units (64 single non-stackable items),
+                                    // so any entry cap above 64 can never bind; clamp so a huge value doesn't
+                                    // silently behave as "no limit" while the status still reports the number.
+                                    limit = Math.min(64, Math.max(0, Integer.parseInt(raw)));
                                 } catch (NumberFormatException e) {
                                     return Command.SINGLE_SUCCESS; // unrecognised → no-op
                                 }

@@ -140,11 +140,10 @@ public class InventorySortService {
             return false;
         }
 
-        int width = SlotOrder.widthFor(type);
-        int rows = Math.max(1, (max - min + width - 1) / width);
+        GridGeometry grid = GridGeometry.of(type, inv.getHolder(), min, max);
         List<ItemStack> overflow = sortMethod.isTreemap()
-                ? writeTreemap(inv, sortableSlots, sortedItems, min, width, rows, prefs.getStartCorner(p))
-                : writeLinear(inv, sortableSlots, sortedItems, min, width, prefs.getStartCorner(p), prefs.getFillAxis(p));
+                ? writeTreemap(inv, sortableSlots, sortedItems, grid.base(), grid.width(), grid.rows(), prefs.getStartCorner(p), prefs.getFillAxis(p))
+                : writeLinear(inv, sortableSlots, sortedItems, grid.base(), grid.width(), prefs.getStartCorner(p), prefs.getFillAxis(p));
 
         if (!overflow.isEmpty()) {
             // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
@@ -192,8 +191,8 @@ public class InventorySortService {
      * @return the stacks that did not fit (to be dropped); empty in the normal case
      */
     private List<ItemStack> writeTreemap(Inventory inv, Set<Integer> sortableSlots, List<ItemStack> sortedItems,
-                                         int base, int width, int rows, StartCorner startCorner) {
-        Map<Integer, ItemStack> placement = TreemapPacker.pack(sortedItems, sortableSlots, base, width, rows, startCorner);
+                                         int base, int width, int rows, StartCorner startCorner, FillAxis fillAxis) {
+        Map<Integer, ItemStack> placement = TreemapPacker.pack(sortedItems, sortableSlots, base, width, rows, startCorner, fillAxis);
         Set<ItemStack> placed = Collections.newSetFromMap(new IdentityHashMap<>());
         for (int i : sortableSlots) {
             ItemStack item = placement.get(i);

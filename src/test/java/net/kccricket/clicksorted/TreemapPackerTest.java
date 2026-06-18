@@ -1,5 +1,6 @@
 package net.kccricket.clicksorted;
 
+import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.sort.SortEngine;
@@ -122,9 +123,53 @@ class TreemapPackerTest extends AbstractClickSortedTest {
     private Map<Material, Integer> cellCounts(Map<Integer, ItemStack> placement) {
         Map<Material, Integer> counts = new HashMap<>();
         for (ItemStack item : placement.values()) {
-            counts.merge(item.getType(), 1, Integer::sum);
+            counts.merge(item.getType(), 1, (a, b) -> Integer.sum(a, b));
         }
         return counts;
+    }
+
+    private int minRow(Map<Integer, ItemStack> placement, Material mat) {
+        return slotsOf(placement, mat).stream().mapToInt(s -> s / WIDTH).min().orElseThrow();
+    }
+
+    private int maxRow(Map<Integer, ItemStack> placement, Material mat) {
+        return slotsOf(placement, mat).stream().mapToInt(s -> s / WIDTH).max().orElseThrow();
+    }
+
+    private int minCol(Map<Integer, ItemStack> placement, Material mat) {
+        return slotsOf(placement, mat).stream().mapToInt(s -> s % WIDTH).min().orElseThrow();
+    }
+
+    private int maxCol(Map<Integer, ItemStack> placement, Material mat) {
+        return slotsOf(placement, mat).stream().mapToInt(s -> s % WIDTH).max().orElseThrow();
+    }
+
+    @Test
+    void verticalAxisStacksBlocksDownwardInsteadOfRightward() {
+        // Same input, two layouts. DIRT(12) is the dominant block; STONE(6) is the runner-up. A
+        // HORIZONTAL axis flows the runner-up to the RIGHT of the dominant block (shelves are rows); a
+        // VERTICAL axis flows it BELOW (shelves are columns). Both anchor the dominant block top-left.
+        List<ItemStack> raw = new ArrayList<>();
+        raw.addAll(fullStacks(Material.DIRT, 12));
+        raw.addAll(fullStacks(Material.STONE, 6));
+
+        Map<Integer, ItemStack> horizontal =
+                TreemapPacker.pack(sorted(raw), chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+        assertEquals(Material.DIRT, typeAt(horizontal, 0), "the dominant block anchors the top-left corner");
+        assertTrue(minCol(horizontal, Material.STONE) > maxCol(horizontal, Material.DIRT),
+                "HORIZONTAL places the runner-up to the right of the dominant block");
+
+        Map<Integer, ItemStack> vertical =
+                TreemapPacker.pack(sorted(raw), chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.VERTICAL);
+        assertEquals(Material.DIRT, typeAt(vertical, 0), "the dominant block still anchors the top-left corner");
+        assertTrue(minRow(vertical, Material.STONE) > maxRow(vertical, Material.DIRT),
+                "VERTICAL places the runner-up below the dominant block");
+
+        // The vertical layout is still complete and every type stays one contiguous block.
+        assertEquals(sorted(raw).size(), vertical.size(), "every stack is placed under the vertical axis");
+        for (Material mat : new Material[]{Material.DIRT, Material.STONE}) {
+            assertTrue(isContiguous(slotsOf(vertical, mat)), mat + " must be one contiguous block");
+        }
     }
 
     @Test
@@ -137,7 +182,7 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         List<ItemStack> sortedStacks = sorted(raw);
 
         Map<Integer, ItemStack> placement =
-                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT);
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
 
         // The most-numerous type owns the anchor corner.
         assertEquals(Material.DIRT, typeAt(placement, 0), "the dominant type anchors the top-left corner");
@@ -158,7 +203,7 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         List<ItemStack> sortedStacks = sorted(fullStacks(Material.DIRT, 7));
 
         Map<Integer, ItemStack> placement =
-                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT);
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
 
         assertEquals(Material.DIRT, typeAt(placement, 0), "the lone type anchors the start corner");
         assertEquals(7, placement.size(), "all 7 stacks placed despite the prime count");
@@ -174,11 +219,11 @@ class TreemapPackerTest extends AbstractClickSortedTest {
 
         // TOP_LEFT anchors the largest block at slot 0; BOTTOM_RIGHT reflects it to the last slot.
         Map<Integer, ItemStack> topLeft =
-                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT);
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
         assertEquals(Material.DIRT, typeAt(topLeft, 0), "DIRT anchors the top-left corner");
 
         Map<Integer, ItemStack> bottomRight =
-                TreemapPacker.pack(sorted(raw), chestSlots(), 0, WIDTH, ROWS, StartCorner.BOTTOM_RIGHT);
+                TreemapPacker.pack(sorted(raw), chestSlots(), 0, WIDTH, ROWS, StartCorner.BOTTOM_RIGHT, FillAxis.HORIZONTAL);
         assertEquals(Material.DIRT, typeAt(bottomRight, CELLS - 1),
                 "DIRT anchors the bottom-right corner when start-corner is reflected");
     }
@@ -193,7 +238,7 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         List<ItemStack> sortedStacks = sorted(raw);
 
         Map<Integer, ItemStack> placement =
-                TreemapPacker.pack(sortedStacks, chestSlots(1), 0, WIDTH, ROWS, StartCorner.TOP_LEFT);
+                TreemapPacker.pack(sortedStacks, chestSlots(1), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
 
         assertFalse(placement.containsKey(1), "the locked slot is never written");
         assertEquals(sortedStacks.size(), placement.size(), "all stacks placed despite the locked cell");
@@ -211,7 +256,7 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         List<ItemStack> sortedStacks = sorted(raw);
 
         Map<Integer, ItemStack> placement =
-                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT);
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
 
         assertEquals(sortedStacks.size(), placement.size(), "every stack is placed");
         for (Material mat : new Material[]{Material.DIRT, Material.STONE, Material.SAND}) {
@@ -230,7 +275,7 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         List<ItemStack> sortedStacks = sorted(raw);
 
         Map<Integer, ItemStack> placement =
-                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT);
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
 
         assertEquals(sortedStacks.size(), placement.size(), "every stack is placed");
         for (Material mat : new Material[]{Material.DIRT, Material.SAND, Material.STONE}) {
@@ -254,7 +299,7 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         List<ItemStack> sortedStacks = sorted(raw);
 
         Map<Integer, ItemStack> placement =
-                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT);
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
 
         assertEquals(CELLS, placement.size(), "a full chest fills every cell");
         assertEquals(sortedStacks.size(), placement.size(), "no stack is dropped from a full chest");
@@ -275,7 +320,7 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         List<ItemStack> sortedStacks = sorted(fullStacks(Material.DIRT, 5));
 
         Map<Integer, ItemStack> placement =
-                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT);
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
 
         assertEquals(5, placement.size(), "only the real stacks are placed");
         assertTrue(placement.keySet().stream().allMatch(s -> s >= 0 && s < CELLS),

@@ -27,12 +27,12 @@ public class SortKey implements Comparable<SortKey> {
             this.sortPrefix = prefix;
         }
         this.material = stack.getType();
-        if (stack.getItemMeta() instanceof Damageable damageable) {
-            this.durability = damageable.getDamage();
-        } else {
-            this.durability = 0;
-        }
-        this.meta = stack.getItemMeta();
+        // getItemMeta() returns a fresh deep copy on each call, so read it once and reuse it for both
+        // the durability probe and the stored meta (Damageable is an ItemMeta) to avoid a redundant
+        // clone per SortKey on the sort hot path.
+        ItemMeta itemMeta = stack.getItemMeta();
+        this.durability = itemMeta instanceof Damageable damageable ? damageable.getDamage() : 0;
+        this.meta = itemMeta;
         this.metaStr = makeMetaString();
     }
 
