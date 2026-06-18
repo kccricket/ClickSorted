@@ -36,6 +36,28 @@ class GridGeometryTest extends AbstractClickSortedTest {
     }
 
     @Test
+    void playerStorageRoundsTheOriginToARowBoundary() {
+        // Default range is already row-aligned: base stays 9, nothing moves.
+        GridGeometry aligned = GridGeometry.of(InventoryType.PLAYER, null, 9, 36);
+        assertEquals(9, aligned.base());
+        assertEquals(9, aligned.width());
+        assertEquals(3, aligned.rows());
+
+        // A skip-a-whole-row range is also aligned (18 is a boundary).
+        GridGeometry twoRows = GridGeometry.of(InventoryType.PLAYER, null, 18, 36);
+        assertEquals(18, twoRows.base());
+        assertEquals(2, twoRows.rows());
+
+        // A mid-row min (11) rounds DOWN to its row boundary (9) so the grid stays aligned to the real
+        // inventory rows; the row span still reaches the last row. Slots 9..10 fall outside the sortable
+        // range and are handled downstream as gaps, exactly like locked slots.
+        GridGeometry midRow = GridGeometry.of(InventoryType.PLAYER, null, 11, 36);
+        assertEquals(9, midRow.base());
+        assertEquals(9, midRow.width());
+        assertEquals(3, midRow.rows());
+    }
+
+    @Test
     void donkeyAndMuleChestsAreFiveWideThreeTall() {
         DonkeyMock donkey = new DonkeyMock(server, UUID.randomUUID());
         GridGeometry d = GridGeometry.of(InventoryType.CHEST, donkey, 2, 17);

@@ -21,8 +21,9 @@ import org.bukkit.inventory.InventoryHolder;
  * The grid the corner/axis/treemap placement reasons about for a sortable inventory: the slot index
  * of its top-left cell ({@code base}), its column {@code width}, and its {@code rows}.
  * <p>
- * Most containers are a simple {@code width}-wide block from {@code base = min}, with the row count
- * derived from the sortable range. Chested mounts are the exception: a donkey/mule chest is a fixed
+ * Most containers are a simple {@code width}-wide block whose origin is the start of the row that
+ * holds {@code min} (rounded to a row boundary so the grid stays aligned to the real inventory rows),
+ * with the row count derived from the sortable range. Chested mounts are the exception: a donkey/mule chest is a fixed
  * {@code 5×3} grid and a llama chest is {@code strength×3}, both starting after the two leading
  * equipment slots. Verified on Paper 26.1.2: for all chested mounts the storage is the trailing block
  * at slots {@code 2..size-1}, so {@code base = min = 2} and only the column width varies.
@@ -46,7 +47,16 @@ public record GridGeometry(int base, int width, int rows) {
             return new GridGeometry(min, columns, MOUNT_CHEST_ROWS);
         }
         int width = SlotOrder.widthFor(type);
-        int rows = Math.max(1, (max - min + width - 1) / width);
-        return new GridGeometry(min, width, rows);
+        // Normal inventories are anchored at slot 0, so the grid origin is the start of the row that
+        // contains `min` — round `min` down to a row boundary rather than using it directly. For every
+        // current config this is a no-op (containers start at 0, player storage at 9, both already
+        // aligned), and even when it isn't, the linear layout is unaffected (shifting the origin by
+        // whole rows can't change the fill order). It only matters when an admin carves
+        // `player_sort_min` mid-row: using `min` as the origin would shear every row/col, scrambling
+        // the non-default corners/axes and the treemap; rounding keeps the grid aligned to the real
+        // inventory rows, with the leading out-of-range slots simply treated as gaps (like locked ones).
+        int rowStart = min / width;
+        int rowEnd = (max - 1) / width;
+        return new GridGeometry(rowStart * width, width, Math.max(1, rowEnd - rowStart + 1));
     }
 }

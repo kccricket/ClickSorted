@@ -62,6 +62,25 @@ class SlotOrderTest {
     }
 
     @Test
+    void partialTopRowAndLockedSlotComposeOverAnAlignedBase() {
+        // Player main storage with a mid-row player_sort_min (11) and a locked slot (13). GridGeometry
+        // hands SlotOrder the row-aligned base (9), so slots 9..10 are out-of-range gaps and 13 is a
+        // locked gap — both just absent from the set. BOTTOM_LEFT proves the partial physical top row
+        // (11,12,14..17) stays grouped as one row and fills last, with the lock a hole inside it.
+        List<Integer> slots = new ArrayList<>();
+        for (int s = 11; s <= 35; s++) {
+            if (s != 13) {
+                slots.add(s);
+            }
+        }
+        List<Integer> expected = List.of(
+                27, 28, 29, 30, 31, 32, 33, 34, 35,   // bottom physical row first
+                18, 19, 20, 21, 22, 23, 24, 25, 26,   // middle row
+                11, 12, 14, 15, 16, 17);              // partial top row, slot 13 locked
+        assertEquals(expected, SlotOrder.order(slots, 9, 9, StartCorner.BOTTOM_LEFT, FillAxis.HORIZONTAL));
+    }
+
+    @Test
     void rectilinear_skipsGapsButKeepsRelativeOrder() {
         // Locked slots 0 and 26 removed; default direction must still cover exactly the present slots.
         List<Integer> slots = new ArrayList<>(chestSlots());
