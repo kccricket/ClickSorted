@@ -412,6 +412,53 @@ class InventorySortTest extends AbstractClickSortedTest {
                 "A non-cancelling method (DOUBLE_CLICK) must not suppress the player's own interaction");
     }
 
+    @Test
+    void occupiedSlotSortedAndCancelledForSingleClick() {
+        // SINGLE_CLICK over an occupied slot (sort-over-items on) sorts AND must cancel the event:
+        // otherwise the vanilla LEFT click picks the just-sorted stack onto the cursor, undoing the sort.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SINGLE_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.LEFT, 0);
+
+        long stoneSlots = 0;
+        for (ItemStack item : chest.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(1, stoneSlots, "Occupied slot must be sorted when sort-over-items is enabled");
+        assertTrue(event.isCancelled(),
+                "SINGLE_CLICK over an occupied slot must cancel so the vanilla pickup is suppressed");
+    }
+
+    @Test
+    void emptySlotSingleClickSortsButIsNotCancelled() {
+        // On an empty slot a LEFT click with an empty cursor is a vanilla no-op, so SINGLE_CLICK sorts
+        // without needing to cancel — the cancel only kicks in for the occupied case above.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SINGLE_CLICK);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(1, stack(Material.COBBLESTONE, 7));
+        chest.setItem(2, stack(Material.COBBLESTONE, 3));
+        InventoryView view = player.openInventory(chest);
+
+        // Slot 0 is empty — getCurrentItem overridden to a non-null AIR item (mirrors production's empty slot).
+        InventoryClickEvent event = clickEventWithCurrentItem(
+                view, ClickType.LEFT, 0, new ItemStack(Material.AIR));
+        callEvent(event);
+
+        assertEquals(10, countByMaterial(chest).getOrDefault(Material.COBBLESTONE, 0),
+                "Empty-slot single click should still sort");
+        assertFalse(event.isCancelled(),
+                "SINGLE_CLICK on an empty slot has no vanilla side-effect, so it need not be cancelled");
+    }
+
     // --- Player inventory sort ---
 
     @Test

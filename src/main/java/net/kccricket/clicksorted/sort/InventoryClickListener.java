@@ -73,18 +73,25 @@ public class InventoryClickListener implements Listener {
             if (slotOccupied && !prefs.getSortOverItems(player)) {
                 return;
             }
+            // Whether the originating click would otherwise perform a vanilla side-effect we must suppress.
+            // shouldCancelEvent() covers the methods that are destructive regardless of slot contents
+            // (SWAP swaps the offhand item, CONTROL_DROP drops the stack, shift-click moves it). A plain
+            // LEFT click (SINGLE_CLICK) has a side-effect only when the slot is occupied — it would pick
+            // the just-sorted stack onto the cursor — so it must be cancelled in exactly that case.
+            // DOUBLE_CLICK is intentionally left uncancelled for now, pending manual testing of its
+            // two-event collect-to-cursor behavior.
+            boolean cancelVanilla = clickMethod.shouldCancelEvent()
+                    || (slotOccupied && clickMethod == ClickMethod.SINGLE_CLICK);
             if (plugin.getActionThrottle().throttled(player)) {
                 // The trigger matched but we're rate-limited, so no sort runs. We must still cancel the
-                // originating click for methods with a destructive vanilla side-effect (SWAP would swap
-                // the offhand item, CONTROL_DROP would drop the stack, shift-click would move it);
-                // otherwise a throttled sort-click silently performs that vanilla action instead.
-                if (clickMethod.shouldCancelEvent()) {
+                // originating click when it has a vanilla side-effect; otherwise a throttled sort-click
+                // silently performs that vanilla action instead.
+                if (cancelVanilla) {
                     event.setCancelled(true);
                 }
                 return;
             }
-            if (sortService.sortInventory(event, prefs.getSortingMethod(player))
-                    && clickMethod.shouldCancelEvent()) {
+            if (sortService.sortInventory(event, prefs.getSortingMethod(player)) && cancelVanilla) {
                 // Cancelling the event is sufficient to suppress the vanilla side-effect on all tested
                 // server versions (Paper 1.20.6 and 1.26.1.2); no explicit offhand resync is required.
                 event.setCancelled(true);
