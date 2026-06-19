@@ -2,11 +2,13 @@ package net.kccricket.clicksorted;
 
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.sort.SortEngine;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.block.ShulkerBox;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.BundleMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -91,9 +93,49 @@ class SortEngineTest extends AbstractClickSortedTest {
         assertEquals(2, shulkers, "Two identical shulker boxes must not collapse into one");
     }
 
+    @Test
+    void sortAndMerge_fungibleSameMaterialDifferentMeta_doNotMerge() {
+        // Feathers are fungible (maxStackSize 64), so merging is governed entirely by SortKey equality.
+        // A plain feather and two feathers with distinct custom metadata must stay as three separate
+        // stacks — merging any of them would silently destroy a custom/plugin item's metadata.
+        ItemStack plain = new ItemStack(Material.FEATHER, 1);
+        ItemStack metaX = namedItem(Material.FEATHER, 1, "X");
+        ItemStack metaY = namedItem(Material.FEATHER, 1, "Y");
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(plain, metaX, metaY), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(3, feathers.size(), "plain + two differently-named feathers must remain distinct");
+        int total = feathers.stream().mapToInt(ItemStack::getAmount).sum();
+        assertEquals(3, total, "no feathers lost");
+    }
+
+    @Test
+    void sortAndMerge_fungibleSameMaterialSameMeta_merge() {
+        // The flip side: identical material AND identical metadata are still quantity-merged, and the
+        // merged stack keeps the custom metadata.
+        ItemStack a = namedItem(Material.FEATHER, 10, "X");
+        ItemStack b = namedItem(Material.FEATHER, 5, "X");
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(a, b), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(1, feathers.size(), "same material and same meta merge into one stack");
+        assertEquals(15, feathers.get(0).getAmount());
+        assertTrue(feathers.get(0).getItemMeta().hasDisplayName(), "merged stack retains the custom name");
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private static ItemStack namedItem(Material mat, int amount, String name) {
+        ItemStack is = new ItemStack(mat, amount);
+        ItemMeta meta = is.getItemMeta();
+        meta.displayName(Component.text(name));
+        is.setItemMeta(meta);
+        return is;
+    }
 
     private static ItemStack bundleOf(ItemStack content) {
         ItemStack bundle = new ItemStack(Material.BUNDLE, 1);
