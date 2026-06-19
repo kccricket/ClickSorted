@@ -23,7 +23,6 @@ import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -108,7 +107,7 @@ public class InventorySortService {
             if (!Permissions.isAllowedTo(p, "clicksorted.sort.container")) {
                 return false;
             }
-            min = inv.getHolder() instanceof AbstractHorse ? 2 : 0;
+            min = GridGeometry.storageOffset(inv.getHolder());
             max = inv.getSize();
             container = true;
         } else {

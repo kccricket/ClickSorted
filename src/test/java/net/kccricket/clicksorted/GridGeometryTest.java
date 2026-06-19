@@ -88,6 +88,34 @@ class GridGeometryTest extends AbstractClickSortedTest {
     }
 
     @Test
+    void storageOffsetIsTheSingleSourceForTheRangeStartAndGridBase() {
+        // Non-mount holders (and null) start at slot 0; every horse-like mount skips its 2 leading
+        // equipment slots. The grid's base for a chested mount is derived from this same offset, so the
+        // sortable-range lower bound the service computes can never drift from the grid origin.
+        assertEquals(0, GridGeometry.storageOffset(null));
+
+        DonkeyMock donkey = new DonkeyMock(server, UUID.randomUUID());
+        assertEquals(2, GridGeometry.storageOffset(donkey));
+        assertEquals(GridGeometry.storageOffset(donkey),
+                GridGeometry.of(InventoryType.CHEST, donkey, GridGeometry.storageOffset(donkey), 17).base());
+
+        HorseMock horse = new HorseMock(server, UUID.randomUUID());
+        assertEquals(2, GridGeometry.storageOffset(horse), "a plain horse still has 2 leading equipment slots");
+    }
+
+    @Test
+    void chestedMountGridOriginFollowsTheGivenMinNotAReDerivedOffset() {
+        // The grid base must track the sortable range the caller built from min, so of() honors the min
+        // it is given rather than recomputing storageOffset internally. Passing an off-nominal min (5,
+        // not the donkey's real offset of 2) proves base follows min — guarding against a regression
+        // where the chested branch re-derives the offset and shears the grid against the sorted slots.
+        GridGeometry g = GridGeometry.of(InventoryType.CHEST, new DonkeyMock(server, UUID.randomUUID()), 5, 17);
+        assertEquals(5, g.base(), "chested-mount base must equal the supplied min");
+        assertEquals(5, g.width());
+        assertEquals(3, g.rows());
+    }
+
+    @Test
     void regularHorseIsNotGivenAChestGrid() {
         // A plain horse isn't a ChestedHorse, so it falls through to the generic path rather than the
         // 3-row mount-chest grid (it has no storage anyway).
