@@ -17,9 +17,6 @@ package net.kccricket.clicksorted.model;
  along with ClickSorted.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.Log;
-
 /**
  * The direction a sorted layout flows from its {@link StartCorner}.
  * <ul>
@@ -32,20 +29,7 @@ public enum FillAxis {
 
     public static final FillAxis DEFAULT = HORIZONTAL;
 
-    public static FillAxis parse(String axis) {
-        ClickSortedPlugin inst = ClickSortedPlugin.getInstance();
-        return parse(axis, inst != null ? inst.getConfigManager().main().getDefaultFillAxis() : DEFAULT);
-    }
-
     public static FillAxis parse(String axis, FillAxis defaultAxis) {
-        if (axis == null) {
-            return defaultAxis;
-        }
-        try {
-            return FillAxis.valueOf(axis);
-        } catch (IllegalArgumentException e) {
-            Log.warning("invalid fill axis " + axis + " - default to " + defaultAxis);
-            return defaultAxis;
-        }
+        return EnumParse.parse(FillAxis.class, axis, defaultAxis);
     }
 }

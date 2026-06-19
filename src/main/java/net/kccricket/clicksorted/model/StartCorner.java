@@ -17,9 +17,6 @@ package net.kccricket.clicksorted.model;
  along with ClickSorted.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.Log;
-
 /**
  * The grid corner where a sorted layout begins. Combined with {@link FillAxis} it determines the
  * order in which sorted items are written back into the inventory's slots.
@@ -39,20 +36,7 @@ public enum StartCorner {
         return this == TOP_LEFT || this == BOTTOM_LEFT;
     }
 
-    public static StartCorner parse(String corner) {
-        ClickSortedPlugin inst = ClickSortedPlugin.getInstance();
-        return parse(corner, inst != null ? inst.getConfigManager().main().getDefaultStartCorner() : DEFAULT);
-    }
-
     public static StartCorner parse(String corner, StartCorner defaultCorner) {
-        if (corner == null) {
-            return defaultCorner;
-        }
-        try {
-            return StartCorner.valueOf(corner);
-        } catch (IllegalArgumentException e) {
-            Log.warning("invalid start corner " + corner + " - default to " + defaultCorner);
-            return defaultCorner;
-        }
+        return EnumParse.parse(StartCorner.class, corner, defaultCorner);
     }
 }

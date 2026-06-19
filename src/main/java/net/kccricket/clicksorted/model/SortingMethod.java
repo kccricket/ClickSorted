@@ -18,7 +18,6 @@ package net.kccricket.clicksorted.model;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.text.ItemNames;
 import org.bukkit.inventory.ItemStack;
 
@@ -49,23 +48,12 @@ public enum SortingMethod {
                 String grp = ClickSortedPlugin.getInstance().getConfigManager().groups().getGroup(stack);
                 yield String.format("%s-%s", grp, stack.getType());
             }
-            default -> "";
         };
     }
 
     public static final SortingMethod DEFAULT = NAME;
 
-    public static SortingMethod parse(String sortingMethod) {
-        ClickSortedPlugin inst = ClickSortedPlugin.getInstance();
-        return parse(sortingMethod, inst != null ? inst.getConfigManager().main().getDefaultSortingMethod() : DEFAULT);
-    }
-
     public static SortingMethod parse(String sortingMethod, SortingMethod defaultMethod) {
-        try {
-            return SortingMethod.valueOf(sortingMethod);
-        } catch (IllegalArgumentException e) {
-            Log.warning("invalid sort method " + sortingMethod + " - default to " + defaultMethod);
-            return defaultMethod;
-        }
+        return EnumParse.parse(SortingMethod.class, sortingMethod, defaultMethod);
     }
 }

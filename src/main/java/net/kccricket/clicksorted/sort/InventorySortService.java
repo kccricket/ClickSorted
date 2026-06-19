@@ -236,7 +236,7 @@ public class InventorySortService {
                 bundles.add(is.clone());
             } else if (BundlePacker.canBundle(is)) {
                 SortKey key = new SortKey(is, SortingMethod.NAME);
-                loosePool.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
+                loosePool.merge(key, (long) is.getAmount(), Long::sum);
                 samples.putIfAbsent(key, is);
             } else {
                 toSort.add(is.clone());

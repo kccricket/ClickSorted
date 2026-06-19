@@ -8,7 +8,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 
 public class SortKey implements Comparable<SortKey> {
     private final String sortPrefix;
@@ -105,7 +104,10 @@ public class SortKey implements Comparable<SortKey> {
         }
 
         SortKey sortKey = (SortKey) o;
-        return durability == sortKey.durability && material == sortKey.material && Objects.equals(meta, sortKey.meta)
+        // Identity keys on metaStr (the serialized form of meta), not the ItemMeta object itself: this
+        // keeps the deep ItemMeta.equals/hashCode off the sort hot path and keeps equals consistent with
+        // compareTo, which already orders by metaStr. The meta field is retained only for toItemStack.
+        return durability == sortKey.durability && material == sortKey.material
                 && metaStr.equals(sortKey.metaStr) && sortPrefix.equals(sortKey.sortPrefix);
     }
 
@@ -115,7 +117,6 @@ public class SortKey implements Comparable<SortKey> {
         result = 31 * result + material.hashCode();
         result = 31 * result + durability;
         result = 31 * result + metaStr.hashCode();
-        result = 31 * result + (meta != null ? meta.hashCode() : 0);
         return result;
     }
 

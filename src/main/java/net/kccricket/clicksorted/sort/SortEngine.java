@@ -67,7 +67,7 @@ public final class SortEngine {
             }
             SortKey key = new SortKey(is, sortMethod);
             if (isFungible(is)) {
-                amounts.merge(key, is.getAmount(), (a, b) -> Integer.sum(a, b));
+                amounts.merge(key, is.getAmount(), Integer::sum);
             } else {
                 discretes.add(new Entry(key, is));
             }

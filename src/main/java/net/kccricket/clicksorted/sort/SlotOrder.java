@@ -49,21 +49,28 @@ public final class SlotOrder {
         int rowSign = corner.topRow() ? 1 : -1;   // top edge → rows ascend; bottom edge → rows descend
         int colSign = corner.leftCol() ? 1 : -1;  // left edge → cols ascend; right edge → cols descend
 
-        Comparator<Integer> cmp = Comparator
-                .comparingInt((Integer slot) -> {
-                    int r = slot - base;
-                    int row = r / width, col = r % width;
-                    return axis == FillAxis.VERTICAL ? colSign * col : rowSign * row;
-                })
-                .thenComparingInt(slot -> {
-                    int r = slot - base;
-                    int row = r / width, col = r % width;
-                    return axis == FillAxis.VERTICAL ? rowSign * row : colSign * col;
-                });
+        // Decorate each slot with its (primary, secondary) ordering keys once — computing the row/col
+        // decomposition inline in the comparator would redo it O(n log n) times per stage. The fill axis
+        // chooses which coordinate dominates: HORIZONTAL fills along rows first, VERTICAL along columns.
+        List<Ranked> ranked = new ArrayList<>(slots.size());
+        for (int slot : slots) {
+            int r = slot - base;
+            int row = r / width, col = r % width;
+            int primary = axis == FillAxis.VERTICAL ? colSign * col : rowSign * row;
+            int secondary = axis == FillAxis.VERTICAL ? rowSign * row : colSign * col;
+            ranked.add(new Ranked(slot, primary, secondary));
+        }
+        ranked.sort(Comparator.comparingInt((Ranked x) -> x.primary).thenComparingInt(x -> x.secondary));
 
-        List<Integer> ordered = new ArrayList<>(slots);
-        ordered.sort(cmp);
+        List<Integer> ordered = new ArrayList<>(ranked.size());
+        for (Ranked x : ranked) {
+            ordered.add(x.slot);
+        }
         return ordered;
+    }
+
+    /** A slot decorated with its precomputed fill-order keys, so the sort never recomputes the grid math. */
+    private record Ranked(int slot, int primary, int secondary) {
     }
 
     /** The grid width (columns) for an inventory type. Most containers and the player grid are 9 wide. */

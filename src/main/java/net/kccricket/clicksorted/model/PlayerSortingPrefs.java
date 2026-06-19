@@ -53,7 +53,7 @@ public class PlayerSortingPrefs {
 
     public SortingMethod getSortingMethod(Player player) {
         String stored = player.getPersistentDataContainer().get(sortKey, PersistentDataType.STRING);
-        return stored != null ? SortingMethod.parse(stored) : plugin.getConfigManager().main().getDefaultSortingMethod();
+        return SortingMethod.parse(stored, plugin.getConfigManager().main().getDefaultSortingMethod());
     }
 
     public void setSortingMethod(Player player, SortingMethod sortMethod) {
@@ -62,7 +62,7 @@ public class PlayerSortingPrefs {
 
     public ClickMethod getClickMethod(Player player) {
         String stored = player.getPersistentDataContainer().get(clickKey, PersistentDataType.STRING);
-        return stored != null ? ClickMethod.parse(stored) : plugin.getConfigManager().main().getDefaultClickMethod();
+        return ClickMethod.parse(stored, plugin.getConfigManager().main().getDefaultClickMethod());
     }
 
     public void setClickMethod(Player player, ClickMethod clickMethod) {
@@ -71,7 +71,7 @@ public class PlayerSortingPrefs {
 
     public StartCorner getStartCorner(Player player) {
         String stored = player.getPersistentDataContainer().get(startCornerKey, PersistentDataType.STRING);
-        return stored != null ? StartCorner.parse(stored) : plugin.getConfigManager().main().getDefaultStartCorner();
+        return StartCorner.parse(stored, plugin.getConfigManager().main().getDefaultStartCorner());
     }
 
     public void setStartCorner(Player player, StartCorner corner) {
@@ -80,7 +80,7 @@ public class PlayerSortingPrefs {
 
     public FillAxis getFillAxis(Player player) {
         String stored = player.getPersistentDataContainer().get(fillAxisKey, PersistentDataType.STRING);
-        return stored != null ? FillAxis.parse(stored) : plugin.getConfigManager().main().getDefaultFillAxis();
+        return FillAxis.parse(stored, plugin.getConfigManager().main().getDefaultFillAxis());
     }
 
     public void setFillAxis(Player player, FillAxis axis) {

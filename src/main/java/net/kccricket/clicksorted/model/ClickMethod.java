@@ -51,20 +51,8 @@ public enum ClickMethod {
         };
     }
 
-    public static ClickMethod parse(String clickMethod) {
-        ClickSortedPlugin inst = ClickSortedPlugin.getInstance();
-        return parse(clickMethod, inst != null ? inst.getConfigManager().main().getDefaultClickMethod() : DEFAULT);
-    }
-
     public static ClickMethod parse(String clickMethod, ClickMethod defaultMethod) {
-        if (clickMethod == null) {
-            return defaultMethod;
-        }
-        try {
-            return ClickMethod.valueOf(clickMethod);
-        } catch (IllegalArgumentException e) {
-            return defaultMethod;
-        }
+        return EnumParse.parse(ClickMethod.class, clickMethod, defaultMethod);
     }
 
 }
