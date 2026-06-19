@@ -4,6 +4,7 @@ import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.sort.SortEngine;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.block.ShulkerBox;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
@@ -125,9 +126,33 @@ class SortEngineTest extends AbstractClickSortedTest {
         assertTrue(feathers.get(0).getItemMeta().hasDisplayName(), "merged stack retains the custom name");
     }
 
+    @Test
+    void sortAndMerge_fungibleSameMaterialDifferentEnchants_doNotMerge() {
+        // Enchantments are part of the meta, so two otherwise-identical fungible stacks that carry
+        // different enchantments must remain distinct rather than collapse and lose one's enchantment.
+        // (Enchanted on a feather via unsafe addEnchant so the item stays fungible — enchanted tools are
+        // non-stackable and would take the discrete path instead.)
+        ItemStack sharp = enchantedFeather(Enchantment.SHARPNESS, 1);
+        ItemStack unbreaking = enchantedFeather(Enchantment.UNBREAKING, 1);
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(sharp, unbreaking), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(2, feathers.size(), "feathers with different enchantments must stay distinct");
+        assertEquals(2, feathers.stream().mapToInt(ItemStack::getAmount).sum(), "no feathers lost");
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private static ItemStack enchantedFeather(Enchantment enchant, int level) {
+        ItemStack is = new ItemStack(Material.FEATHER, 1);
+        ItemMeta meta = is.getItemMeta();
+        meta.addEnchant(enchant, level, true);
+        is.setItemMeta(meta);
+        return is;
+    }
 
     private static ItemStack namedItem(Material mat, int amount, String name) {
         ItemStack is = new ItemStack(mat, amount);
