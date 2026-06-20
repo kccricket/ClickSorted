@@ -1,5 +1,6 @@
 # See https://github.com/kccricket/clicksort
 enable_metrics: true
+check_for_updates: true
 debug_level: 'OFF'
 drop_excess: true
 default_group_name: '000-default'
