@@ -8,12 +8,14 @@ import static org.junit.jupiter.api.Assertions.*;
 class ClickMethodTest {
 
     @Test
-    void shouldCancelEvent_swapAndControlDrop() {
+    void shouldCancelEvent_dedicatedGestureMethods() {
+        // SWAP/CONTROL_DROP/shift-click/DOUBLE_CLICK all carry a vanilla side-effect that a sort must
+        // suppress. SINGLE_CLICK only ever sorts an empty slot (a vanilla no-op), so it does not cancel.
         assertTrue(ClickMethod.SWAP.shouldCancelEvent());
         assertTrue(ClickMethod.CONTROL_DROP.shouldCancelEvent());
         assertTrue(ClickMethod.SHIFT_LEFT_CLICK.shouldCancelEvent());
         assertTrue(ClickMethod.SHIFT_RIGHT_CLICK.shouldCancelEvent());
-        assertFalse(ClickMethod.DOUBLE_CLICK.shouldCancelEvent());
+        assertTrue(ClickMethod.DOUBLE_CLICK.shouldCancelEvent());
         assertFalse(ClickMethod.SINGLE_CLICK.shouldCancelEvent());
         assertFalse(ClickMethod.NONE.shouldCancelEvent());
     }

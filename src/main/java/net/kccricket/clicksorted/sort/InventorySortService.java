@@ -65,11 +65,10 @@ public class InventorySortService {
      * @return true if the sort completed and the caller should cancel the originating event
      */
     public boolean sortInventory(final InventoryClickEvent event, final SortingMethod sortMethod) {
-        if (!event.getCursor().isEmpty()) {
-            // Prevent sorting when the player is holding an item with the cursor, to avoid accidental sorts and potential dupes.
-            return false;
-        }
-
+        // No cursor-state guard here: the only cursor-empty requirement belongs to SINGLE_CLICK (so a
+        // held item can still be placed), and ClickMethod.matchesSortTrigger already enforces that before
+        // we are ever called. Other methods may sort with a held cursor item — the event is cancelled and
+        // the cursor stack is left untouched.
         Player p = (Player) event.getWhoClicked();
         int slot = event.getSlot();
         Inventory inv = event.getClickedInventory();

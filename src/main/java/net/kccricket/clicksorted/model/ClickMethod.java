@@ -15,7 +15,7 @@ public enum ClickMethod {
      *         the shift-click methods would shift-move it)
      */
     public boolean shouldCancelEvent() {
-        return this == SWAP || this == CONTROL_DROP
+        return this == SWAP || this == CONTROL_DROP || this == DOUBLE_CLICK
                 || this == SHIFT_LEFT_CLICK || this == SHIFT_RIGHT_CLICK;
     }
 
@@ -23,12 +23,12 @@ public enum ClickMethod {
      * @return true if {@code event} matches the trigger for this click method
      */
     public boolean matchesSortTrigger(InventoryClickEvent event) {
-        if (!event.getCursor().isEmpty()) {
-            // Prevent sorting when the player is holding an item with the cursor, to avoid accidental sorts and potential dupes.
-            return false; 
-        }
         return switch (this) {
-            case SINGLE_CLICK -> event.getClick() == ClickType.LEFT;
+            // The empty-cursor requirement is SINGLE_CLICK-only: with sort-over-items on, a plain LEFT
+            // click while holding an item must place that item normally rather than sort, or the
+            // inventory becomes unusable. The other methods use dedicated keys/clicks that don't
+            // conflict with placing a held item, so they may trigger regardless of cursor state.
+            case SINGLE_CLICK -> event.getClick() == ClickType.LEFT && event.getCursor().isEmpty();
             case DOUBLE_CLICK -> event.getClick() == ClickType.DOUBLE_CLICK;
             case SWAP -> event.getClick() == ClickType.SWAP_OFFHAND;
             case CONTROL_DROP -> event.getClick() == ClickType.CONTROL_DROP;

@@ -389,9 +389,9 @@ class InventorySortTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void occupiedSlotSortedButNotCancelledForNonCancellingMethod() {
-        // DOUBLE_CLICK has no side effect needing suppression: sorting over an occupied slot must
-        // still fire, but the originating collect-to-cursor sweep must NOT be cancelled.
+    void occupiedSlotSortedAndCancelledForDoubleClick() {
+        // DOUBLE_CLICK's vanilla gesture gathers matching stacks to the cursor, so a sort over an
+        // occupied slot must fire AND cancel the event to suppress that gather.
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
         plugin.getSortingPrefs().setSortOverItems(player, true);
@@ -408,14 +408,15 @@ class InventorySortTest extends AbstractClickSortedTest {
             if (item != null && item.getType() == Material.STONE) stoneSlots++;
         }
         assertEquals(1, stoneSlots, "Occupied slot must be sorted when sort-over-items is enabled");
-        assertFalse(event.isCancelled(),
-                "A non-cancelling method (DOUBLE_CLICK) must not suppress the player's own interaction");
+        assertTrue(event.isCancelled(),
+                "DOUBLE_CLICK must cancel so the vanilla gather-to-cursor is suppressed");
     }
 
     @Test
-    void occupiedSlotSortedAndCancelledForSingleClick() {
-        // SINGLE_CLICK over an occupied slot (sort-over-items on) sorts AND must cancel the event:
-        // otherwise the vanilla LEFT click picks the just-sorted stack onto the cursor, undoing the sort.
+    void occupiedSlotSingleClickDoesNotSortEvenWithHoverOn() {
+        // SINGLE_CLICK treats sort-over-items as always off: a LEFT click on an occupied slot must let
+        // the player pick the item up (no sort), even when the hover preference is enabled — otherwise
+        // the inventory would be unusable for moving items.
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SINGLE_CLICK);
         plugin.getSortingPrefs().setSortOverItems(player, true);
@@ -431,9 +432,9 @@ class InventorySortTest extends AbstractClickSortedTest {
         for (ItemStack item : chest.getContents()) {
             if (item != null && item.getType() == Material.STONE) stoneSlots++;
         }
-        assertEquals(1, stoneSlots, "Occupied slot must be sorted when sort-over-items is enabled");
-        assertTrue(event.isCancelled(),
-                "SINGLE_CLICK over an occupied slot must cancel so the vanilla pickup is suppressed");
+        assertEquals(2, stoneSlots, "SINGLE_CLICK on an occupied slot must not sort, regardless of hover");
+        assertFalse(event.isCancelled(),
+                "SINGLE_CLICK on an occupied slot must not cancel the player's pickup");
     }
 
     @Test

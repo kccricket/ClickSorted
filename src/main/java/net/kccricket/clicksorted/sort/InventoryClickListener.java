@@ -67,21 +67,21 @@ public class InventoryClickListener implements Listener {
         ClickMethod clickMethod = prefs.getClickMethod(player);
 
         if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
-            // Universal "sort over items" gate: unless enabled, sorting only fires on an empty slot.
+            // "Sort over items" gate: unless enabled, sorting only fires on an empty slot. SINGLE_CLICK
+            // forces it off regardless of the player's preference — with it on, every empty-cursor LEFT
+            // click on an occupied slot would sort instead of letting the player pick the item up, making
+            // the inventory unusable. So SINGLE_CLICK only ever sorts an empty slot.
             ItemStack current = event.getCurrentItem();
             boolean slotOccupied = current != null && current.getType() != Material.AIR;
-            if (slotOccupied && !prefs.getSortOverItems(player)) {
+            boolean sortOverItems = clickMethod != ClickMethod.SINGLE_CLICK && prefs.getSortOverItems(player);
+            if (slotOccupied && !sortOverItems) {
                 return;
             }
-            // Whether the originating click would otherwise perform a vanilla side-effect we must suppress.
-            // shouldCancelEvent() covers the methods that are destructive regardless of slot contents
-            // (SWAP swaps the offhand item, CONTROL_DROP drops the stack, shift-click moves it). A plain
-            // LEFT click (SINGLE_CLICK) has a side-effect only when the slot is occupied — it would pick
-            // the just-sorted stack onto the cursor — so it must be cancelled in exactly that case.
-            // DOUBLE_CLICK is intentionally left uncancelled for now, pending manual testing of its
-            // two-event collect-to-cursor behavior.
-            boolean cancelVanilla = clickMethod.shouldCancelEvent()
-                    || (slotOccupied && clickMethod == ClickMethod.SINGLE_CLICK);
+            // Cancel the originating click for methods whose vanilla gesture has a side-effect we must
+            // suppress (SWAP swaps the offhand item, CONTROL_DROP drops the stack, shift-click moves it,
+            // DOUBLE_CLICK gathers matching stacks to the cursor). SINGLE_CLICK only ever sorts an empty
+            // slot, where the LEFT click is a vanilla no-op, so it never needs cancelling.
+            boolean cancelVanilla = clickMethod.shouldCancelEvent();
             if (plugin.getActionThrottle().throttled(player)) {
                 // The trigger matched but we're rate-limited, so no sort runs. We must still cancel the
                 // originating click when it has a vanilla side-effect; otherwise a throttled sort-click
