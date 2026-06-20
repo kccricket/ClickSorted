@@ -30,4 +30,17 @@ class ClickMethodTest {
         assertEquals(ClickMethod.SWAP, ClickMethod.parse("TOTALLY_INVALID", ClickMethod.SWAP));
         assertEquals(ClickMethod.SWAP, ClickMethod.parse(null, ClickMethod.SWAP));
     }
+
+    @Test
+    void requiredSortOverItems_governedMethodsForceAValue() {
+        // SINGLE_CLICK with hover on is unusable → forced off; CONTROL_DROP can only fire on an occupied
+        // slot → forced on. Every other method leaves hover to the player.
+        assertEquals(java.util.Optional.of(false), ClickMethod.SINGLE_CLICK.requiredSortOverItems());
+        assertEquals(java.util.Optional.of(true), ClickMethod.CONTROL_DROP.requiredSortOverItems());
+        assertTrue(ClickMethod.SWAP.requiredSortOverItems().isEmpty());
+        assertTrue(ClickMethod.DOUBLE_CLICK.requiredSortOverItems().isEmpty());
+        assertTrue(ClickMethod.SHIFT_LEFT_CLICK.requiredSortOverItems().isEmpty());
+        assertTrue(ClickMethod.SHIFT_RIGHT_CLICK.requiredSortOverItems().isEmpty());
+        assertTrue(ClickMethod.NONE.requiredSortOverItems().isEmpty());
+    }
 }

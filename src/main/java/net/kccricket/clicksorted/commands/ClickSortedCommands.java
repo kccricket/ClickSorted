@@ -9,6 +9,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.logging.DebugLevel;
+import net.kccricket.clicksorted.migration.PreferenceRepair;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
@@ -183,6 +184,9 @@ public class ClickSortedCommands {
                                         plugin.getConfigManager().lang().getColoredMessage("setClickMethodTo",
                                                 Placeholder.unparsed("method", method.toString()),
                                                 Placeholder.unparsed("instruction", method.getInstruction())));
+                                // Methods that govern hover (SINGLE_CLICK, CONTROL_DROP) force the player's
+                                // hover preference to the only usable value, messaging them on any change.
+                                PreferenceRepair.enforceHover(plugin, player, method);
                             } catch (IllegalArgumentException ignored) {
                                 // invalid value → no-op
                             }
@@ -219,6 +223,14 @@ public class ClickSortedCommands {
     }
 
     private static void applyHoverSetting(ClickSortedPlugin plugin, Player player, boolean enabled) {
+        ClickMethod clickMethod = plugin.getSortingPrefs().getClickMethod(player);
+        if (clickMethod.requiredSortOverItems().isPresent()) {
+            // The active click method governs hover; refuse to change the stored value and explain why.
+            MessageUtil.statusMessage(player,
+                    plugin.getConfigManager().lang().getColoredMessage("hoverGovernedByClickMethod",
+                            Placeholder.unparsed("method", clickMethod.name())));
+            return;
+        }
         plugin.getSortingPrefs().setSortOverItems(player, enabled);
         MessageUtil.statusMessage(player,
                 plugin.getConfigManager().lang().getColoredMessage("setSortOverItemsStatus",

@@ -475,6 +475,33 @@ class InventorySortTest extends AbstractClickSortedTest {
     }
 
     @Test
+    void controlDropSortsOccupiedSlotEvenWithStoredHoverOff() {
+        // CONTROL_DROP only ever fires on an occupied slot, so it requires sort-over-items on. The runtime
+        // gate forces it on via ClickMethod.requiredSortOverItems(), regardless of the stored preference.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.CONTROL_DROP);
+        plugin.getSortingPrefs().setSortOverItems(player, false); // stored off — runtime must override
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        chest.setItem(2, stack(Material.DIRT, 3));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.CONTROL_DROP, 0);
+
+        Map<Material, Integer> counts = countByMaterial(chest);
+        assertEquals(15, counts.getOrDefault(Material.STONE, 0), "STONE stacks should merge to 15");
+        assertEquals(3, counts.getOrDefault(Material.DIRT, 0));
+        long stoneSlots = 0;
+        for (ItemStack item : chest.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(1, stoneSlots, "CONTROL_DROP must sort an occupied slot even with stored hover off");
+        assertTrue(event.isCancelled(), "CONTROL_DROP must cancel so the vanilla drop is suppressed");
+    }
+
+    @Test
     void emptySlotSingleClickSortsButIsNotCancelled() {
         // On an empty slot a LEFT click with an empty cursor is a vanilla no-op, so SINGLE_CLICK sorts
         // without needing to cancel — the cancel only kicks in for the occupied case above.

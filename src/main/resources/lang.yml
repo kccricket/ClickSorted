@@ -26,6 +26,16 @@ setFillAxisTo: "Sort fill direction set to <axis>."
 # Command feedback — sort-over-items toggle (/clicksorted hover)
 # Placeholder: <status> (ENABLED or DISABLED)
 setSortOverItemsStatus: "Sort over items: <status>."
+# Shown when a click method governs hover and forces it to a value.
+# Placeholders: <status> (ENABLED or DISABLED), <method>
+hoverForcedByClickMethod: "Sort over items <status> automatically because your click mode is <method>."
+# Shown when the player tries to change hover but their click method controls it.
+# Placeholder: <method>
+hoverGovernedByClickMethod: "Sort over items is controlled by your click mode (<method>) and can't be changed."
+
+# Shown (to the player) at join when a stored preference held an invalid value and was reset.
+# Placeholders: <pref>, <value>, <default>
+prefResetInvalid: "Your saved <pref> '<value>' was invalid and has been reset to <default>."
 
 # Command feedback — bundle packing toggles (/clicksorted bundle inventory|others on|off)
 # Placeholder: <status> (ENABLED or DISABLED)

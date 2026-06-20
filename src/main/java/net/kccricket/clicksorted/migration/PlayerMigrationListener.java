@@ -33,5 +33,6 @@ public class PlayerMigrationListener implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         plugin.getMigrations().migrate(event.getPlayer());
+        PreferenceRepair.repair(plugin, event.getPlayer());
     }
 }

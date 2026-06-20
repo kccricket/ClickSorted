@@ -67,13 +67,15 @@ public class InventoryClickListener implements Listener {
         ClickMethod clickMethod = prefs.getClickMethod(player);
 
         if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
-            // "Sort over items" gate: unless enabled, sorting only fires on an empty slot. SINGLE_CLICK
-            // forces it off regardless of the player's preference — with it on, every empty-cursor LEFT
-            // click on an occupied slot would sort instead of letting the player pick the item up, making
-            // the inventory unusable. So SINGLE_CLICK only ever sorts an empty slot.
+            // "Sort over items" gate: unless enabled, sorting only fires on an empty slot. Some click
+            // methods override the player's preference via ClickMethod.requiredSortOverItems():
+            // SINGLE_CLICK forces it off (with it on, every empty-cursor LEFT click on an occupied slot
+            // would sort instead of letting the player pick the item up, making the inventory unusable),
+            // and CONTROL_DROP forces it on (a ctrl-drop only ever fires on an occupied slot, so it could
+            // never sort otherwise).
             ItemStack current = event.getCurrentItem();
             boolean slotOccupied = current != null && current.getType() != Material.AIR;
-            boolean sortOverItems = clickMethod != ClickMethod.SINGLE_CLICK && prefs.getSortOverItems(player);
+            boolean sortOverItems = clickMethod.requiredSortOverItems().orElseGet(() -> prefs.getSortOverItems(player));
             if (slotOccupied && !sortOverItems) {
                 return;
             }

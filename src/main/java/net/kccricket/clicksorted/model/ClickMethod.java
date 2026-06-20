@@ -4,10 +4,21 @@ import net.kccricket.clicksorted.ClickSortedPlugin;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 
+import java.util.Optional;
+
 public enum ClickMethod {
     DOUBLE_CLICK, SINGLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE;
 
     public static final ClickMethod DEFAULT = SWAP;
+
+    /** The hover (sort-over-items) value this method requires, or empty if it leaves it to the player. */
+    public Optional<Boolean> requiredSortOverItems() {
+        return switch (this) {
+            case SINGLE_CLICK -> Optional.of(false); // hover on would hijack every click → unusable
+            case CONTROL_DROP -> Optional.of(true);  // ctrl-drop only fires on occupied slots → needs hover
+            default -> Optional.empty();
+        };
+    }
 
     /**
      * @return true if triggering this method requires cancelling the originating click event
