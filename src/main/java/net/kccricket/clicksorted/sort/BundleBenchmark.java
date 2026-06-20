@@ -138,7 +138,9 @@ public final class BundleBenchmark {
         List<ItemStack> toSort = new ArrayList<>();
         for (ItemStack is : f.inv) {
             if (is == null) continue;
-            SortKey key = new SortKey(is, SortingMethod.NAME);
+            SortKey key = SortKey.poolKey(is);
+            // Lambda, not Long::sum: a method ref binds the boxed map values straight to
+            // primitive params, tripping JDT's "needs unchecked conversion" null warning.
             loosePool.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
             samples.putIfAbsent(key, is);
         }

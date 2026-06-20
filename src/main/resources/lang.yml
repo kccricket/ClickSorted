@@ -17,9 +17,25 @@ sortingMethodNotAvailable: "Sort mode <method> is not available — configure gr
 # Placeholders: <method>, <instruction>
 setClickMethodTo: "Click mode set to <method>. <instruction>"
 
+# Command feedback — sort layout (/clicksorted set start-corner|fill-axis)
+# Placeholder: <corner>
+setStartCornerTo: "Sort start corner set to <corner>."
+# Placeholder: <axis>
+setFillAxisTo: "Sort fill direction set to <axis>."
+
 # Command feedback — sort-over-items toggle (/clicksorted hover)
 # Placeholder: <status> (ENABLED or DISABLED)
 setSortOverItemsStatus: "Sort over items: <status>."
+# Shown when a click method governs hover and forces it to a value.
+# Placeholders: <status> (ENABLED or DISABLED), <method>
+hoverForcedByClickMethod: "Sort over items <status> automatically because your click mode is <method>."
+# Shown when the player tries to change hover but their click method controls it.
+# Placeholder: <method>
+hoverGovernedByClickMethod: "Sort over items is controlled by your click mode (<method>) and can't be changed."
+
+# Shown (to the player) at join when a stored preference held an invalid value and was reset.
+# Placeholders: <pref>, <value>, <default>
+prefResetInvalid: "Your saved <pref> '<value>' was invalid and has been reset to <default>."
 
 # Command feedback — bundle packing toggles (/clicksorted bundle inventory|others on|off)
 # Placeholder: <status> (ENABLED or DISABLED)
@@ -35,6 +51,10 @@ setBundleStackLimitStatus: "Bundle stack limit: <limit>."
 statusClickMethod: "Click method: <method>"
 # Placeholder: <method>
 statusSortMethod: "Sort method: <method>"
+# Placeholder: <corner>
+statusStartCorner: "Start corner: <corner>"
+# Placeholder: <axis>
+statusFillAxis: "Fill direction: <axis>"
 # Placeholder: <status> (ENABLED or DISABLED)
 statusHover: "Sort over items: <status>"
 

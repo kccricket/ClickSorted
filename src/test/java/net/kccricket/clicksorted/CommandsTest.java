@@ -89,6 +89,52 @@ class CommandsTest extends AbstractClickSortedTest {
                 "Expected click-mode status message");
     }
 
+    @Test
+    void clickCommandSingleClickForcesHoverOff() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set click-method single_click");
+
+        assertFalse(plugin.getSortingPrefs().getSortOverItems(player),
+                "SINGLE_CLICK must force hover off");
+        assertTrue(anyMessageContains(player, "DISABLED", "automatically"),
+                "Expected a hover-forced message");
+    }
+
+    @Test
+    void clickCommandControlDropForcesHoverOn() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        plugin.getSortingPrefs().setSortOverItems(player, false);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set click-method control_drop");
+
+        assertTrue(plugin.getSortingPrefs().getSortOverItems(player),
+                "CONTROL_DROP must force hover on");
+        assertTrue(anyMessageContains(player, "ENABLED", "automatically"),
+                "Expected a hover-forced message");
+    }
+
+    @Test
+    void hoverCommandRejectedForGovernedClickMethod() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.CONTROL_DROP);
+        plugin.getSortingPrefs().setSortOverItems(player, true); // CONTROL_DROP requires on
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set hover off");
+
+        assertTrue(plugin.getSortingPrefs().getSortOverItems(player),
+                "hover must be unchanged when the click method governs it");
+        assertTrue(anyMessageContains(player, "controlled by your click mode"),
+                "Expected a hover-governed message");
+    }
+
     // --- set hover ---
 
     @Test

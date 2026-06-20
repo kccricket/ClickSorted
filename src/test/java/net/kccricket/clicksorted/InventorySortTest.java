@@ -272,6 +272,61 @@ class InventorySortTest extends AbstractClickSortedTest {
         assertEquals(1, stoneSlots, "Two STONE stacks should have merged into one");
     }
 
+    // --- Sort direction (start corner / fill axis) ---
+
+    @Test
+    void verticalFillPlacesItemsColumnMajor() {
+        // With fill-axis VERTICAL from the default TOP_LEFT corner, the first sorted item lands in
+        // slot 0 and the second continues *down* the first column (slot 9), not across to slot 1.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setFillAxis(player, net.kccricket.clicksorted.model.FillAxis.VERTICAL);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(1, stack(Material.DIAMOND, 1));   // "Diamond" sorts before "Emerald"
+        chest.setItem(2, stack(Material.EMERALD, 1));
+        InventoryView view = player.openInventory(chest);
+
+        // Empty-slot trigger (default sort-over-items=false): click empty slot 0.
+        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+
+        assertEquals(Material.DIAMOND, chest.getItem(0).getType(), "First item should land in the top-left slot");
+        assertEquals(Material.EMERALD, chest.getItem(9).getType(),
+                "Second item should continue down the first column (slot 9), not across to slot 1");
+        assertNull(chest.getItem(1), "Slot 1 must be empty under vertical fill");
+    }
+
+    @Test
+    void treemapSortMethodAnchorsDominantTypeInABlock() {
+        // TREEMAP ranks types by stack count and lays each out as a proportional block, the
+        // most-numerous type anchored at the start corner (default TOP_LEFT). On a double chest,
+        // a dominant DIRT pile (20 stacks) forms a contiguous block anchored at slot 0, with the
+        // rare types tiling beside it and the empty space pooled away from the anchor.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setSortingMethod(player, net.kccricket.clicksorted.model.SortingMethod.TREEMAP);
+        plugin.getSortingPrefs().setStartCorner(player, net.kccricket.clicksorted.model.StartCorner.TOP_LEFT);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
+        Inventory chest = server.createInventory(null, 54); // double chest: 9×6
+        for (int i = 0; i < 20; i++) {
+            chest.setItem(i, stack(Material.DIRT, 64));
+        }
+        chest.setItem(20, stack(Material.STONE, 64));
+        chest.setItem(21, stack(Material.SAND, 64));
+        chest.setItem(22, stack(Material.GRAVEL, 64));
+        InventoryView view = player.openInventory(chest);
+
+        callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+
+        assertEquals(Material.DIRT, chest.getItem(0).getType(), "the dominant type anchors the start corner");
+        assertEquals(20, countSlotsWithMaterial(chest, Material.DIRT, 0, 54),
+                "every DIRT stack is placed as its own block cell");
+        assertEquals(1280, countByMaterial(chest).getOrDefault(Material.DIRT, 0), "DIRT total preserved");
+        // The rare types survive the repack too.
+        assertEquals(64, countByMaterial(chest).getOrDefault(Material.STONE, 0), "STONE total preserved");
+        assertEquals(64, countByMaterial(chest).getOrDefault(Material.SAND, 0), "SAND total preserved");
+        assertEquals(64, countByMaterial(chest).getOrDefault(Material.GRAVEL, 0), "GRAVEL total preserved");
+    }
+
     // --- Shift-click sort methods ---
 
     @Test
@@ -334,9 +389,46 @@ class InventorySortTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void occupiedSlotSortedButNotCancelledForNonCancellingMethod() {
-        // DOUBLE_CLICK has no side effect needing suppression: sorting over an occupied slot must
-        // still fire, but the originating collect-to-cursor sweep must NOT be cancelled.
+    void doubleClickRestoresLiftedStackThenSortsAndClearsCursor() {
+        // Simulate the real post-first-click state: the clicked slot is empty because vanilla already
+        // lifted its stack onto the cursor, and a matching stack sits elsewhere. The DOUBLE_CLICK sort
+        // must re-deposit the lifted stack into its origin slot, fold it into the merge, and clear cursor.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(1, stack(Material.STONE, 10));   // the other matching stack still in the inventory
+        InventoryView view = player.openInventory(chest);
+
+        ItemStack lifted = stack(Material.STONE, 5);
+        player.setItemOnCursor(lifted);
+
+        // Slot 0 is empty (its stack is the one on the cursor); getCursor returns the lifted stack.
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, 0, ClickType.DOUBLE_CLICK, InventoryAction.UNKNOWN) {
+            @Override public ItemStack getCurrentItem() { return new ItemStack(Material.AIR); }
+            @Override public ItemStack getCursor() { return lifted; }
+        };
+        callEvent(event);
+
+        assertEquals(15, countByMaterial(chest).getOrDefault(Material.STONE, 0),
+                "the lifted cursor stack (5) must be folded back in and merged with the inventory's 10");
+        long stoneSlots = 0;
+        for (ItemStack item : chest.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(1, stoneSlots, "all STONE merged into a single stack");
+        ItemStack cursorAfter = player.getItemOnCursor();
+        assertTrue(cursorAfter == null || cursorAfter.getType() == Material.AIR,
+                "cursor must be cleared once the lifted stack is restored into the inventory");
+        assertTrue(event.isCancelled(), "DOUBLE_CLICK sort must cancel the vanilla gather");
+    }
+
+    @Test
+    void occupiedSlotSortedAndCancelledForDoubleClick() {
+        // DOUBLE_CLICK's vanilla gesture gathers matching stacks to the cursor, so a sort over an
+        // occupied slot must fire AND cancel the event to suppress that gather.
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
         plugin.getSortingPrefs().setSortOverItems(player, true);
@@ -353,8 +445,83 @@ class InventorySortTest extends AbstractClickSortedTest {
             if (item != null && item.getType() == Material.STONE) stoneSlots++;
         }
         assertEquals(1, stoneSlots, "Occupied slot must be sorted when sort-over-items is enabled");
+        assertTrue(event.isCancelled(),
+                "DOUBLE_CLICK must cancel so the vanilla gather-to-cursor is suppressed");
+    }
+
+    @Test
+    void occupiedSlotSingleClickDoesNotSortEvenWithHoverOn() {
+        // SINGLE_CLICK treats sort-over-items as always off: a LEFT click on an occupied slot must let
+        // the player pick the item up (no sort), even when the hover preference is enabled — otherwise
+        // the inventory would be unusable for moving items.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SINGLE_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.LEFT, 0);
+
+        long stoneSlots = 0;
+        for (ItemStack item : chest.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(2, stoneSlots, "SINGLE_CLICK on an occupied slot must not sort, regardless of hover");
         assertFalse(event.isCancelled(),
-                "A non-cancelling method (DOUBLE_CLICK) must not suppress the player's own interaction");
+                "SINGLE_CLICK on an occupied slot must not cancel the player's pickup");
+    }
+
+    @Test
+    void controlDropSortsOccupiedSlotEvenWithStoredHoverOff() {
+        // CONTROL_DROP only ever fires on an occupied slot, so it requires sort-over-items on. The runtime
+        // gate forces it on via ClickMethod.requiredSortOverItems(), regardless of the stored preference.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.CONTROL_DROP);
+        plugin.getSortingPrefs().setSortOverItems(player, false); // stored off — runtime must override
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        chest.setItem(2, stack(Material.DIRT, 3));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.CONTROL_DROP, 0);
+
+        Map<Material, Integer> counts = countByMaterial(chest);
+        assertEquals(15, counts.getOrDefault(Material.STONE, 0), "STONE stacks should merge to 15");
+        assertEquals(3, counts.getOrDefault(Material.DIRT, 0));
+        long stoneSlots = 0;
+        for (ItemStack item : chest.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(1, stoneSlots, "CONTROL_DROP must sort an occupied slot even with stored hover off");
+        assertTrue(event.isCancelled(), "CONTROL_DROP must cancel so the vanilla drop is suppressed");
+    }
+
+    @Test
+    void emptySlotSingleClickSortsButIsNotCancelled() {
+        // On an empty slot a LEFT click with an empty cursor is a vanilla no-op, so SINGLE_CLICK sorts
+        // without needing to cancel — the cancel only kicks in for the occupied case above.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SINGLE_CLICK);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(1, stack(Material.COBBLESTONE, 7));
+        chest.setItem(2, stack(Material.COBBLESTONE, 3));
+        InventoryView view = player.openInventory(chest);
+
+        // Slot 0 is empty — getCurrentItem overridden to a non-null AIR item (mirrors production's empty slot).
+        InventoryClickEvent event = clickEventWithCurrentItem(
+                view, ClickType.LEFT, 0, new ItemStack(Material.AIR));
+        callEvent(event);
+
+        assertEquals(10, countByMaterial(chest).getOrDefault(Material.COBBLESTONE, 0),
+                "Empty-slot single click should still sort");
+        assertFalse(event.isCancelled(),
+                "SINGLE_CLICK on an empty slot has no vanilla side-effect, so it need not be cancelled");
     }
 
     // --- Player inventory sort ---

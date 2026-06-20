@@ -50,8 +50,7 @@ public class UpdateChecker {
 
     private void run() {
         String current = plugin.getPluginMeta().getVersion();
-        try {
-            HttpClient client = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
+        try (HttpClient client = HttpClient.newBuilder().connectTimeout(TIMEOUT).build()) {
             HttpRequest request = HttpRequest.newBuilder(URI.create(API_URL))
                     .timeout(TIMEOUT)
                     .header("User-Agent", "kccricket/ClickSorted/" + current + " (github.com/kccricket/ClickSorted)")

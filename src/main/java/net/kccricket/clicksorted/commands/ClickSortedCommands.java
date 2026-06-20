@@ -9,9 +9,12 @@ import io.papermc.paper.command.brigadier.Commands;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.logging.DebugLevel;
+import net.kccricket.clicksorted.migration.PreferenceRepair;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
+import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -48,24 +51,87 @@ public class ClickSortedCommands {
         return Commands.literal("set")
                 .then(buildSortMethod(plugin))
                 .then(buildClickMethod(plugin))
+                .then(buildStartCorner(plugin))
+                .then(buildFillAxis(plugin))
                 .then(buildHover(plugin))
                 .then(buildBundle(plugin))
                 .then(buildLock(plugin));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStartCorner(ClickSortedPlugin plugin) {
+        return enumPref(plugin, "start-corner", "clicksorted.commands.sort", "corner",
+                StartCorner.values(), "setStartCornerTo", "corner",
+                (player, corner) -> plugin.getSortingPrefs().setStartCorner(player, corner));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildFillAxis(ClickSortedPlugin plugin) {
+        return enumPref(plugin, "fill-axis", "clicksorted.commands.sort", "axis",
+                FillAxis.values(), "setFillAxisTo", "axis",
+                (player, axis) -> plugin.getSortingPrefs().setFillAxis(player, axis));
+    }
+
+    /**
+     * A {@code /clicksorted set <literal> <value>} subcommand that parses {@code value} (case-insensitive)
+     * into one of {@code values} and persists it via {@code setter}, echoing {@code langKey} with the
+     * chosen value under the {@code placeholder} tag. Unrecognised input is a silent no-op, matching the
+     * other per-player preference setters. Suited to plain enum preferences with no extra validation;
+     * {@code sort-method} and {@code click-method} keep bespoke builders for their availability check and
+     * instruction text.
+     */
+    private static <E extends Enum<E>> com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> enumPref(
+            ClickSortedPlugin plugin, String literal, String permission, String argName, E[] values,
+            String langKey, String placeholder, java.util.function.BiConsumer<Player, E> setter) {
+        return Commands.literal(literal)
+                .requires(src -> src.getSender().hasPermission(permission))
+                .then(Commands.argument(argName, StringArgumentType.word())
+                        .suggests((ctx, builder) -> suggestEnum(builder, values, v -> true))
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            E value = parseEnum(values, StringArgumentType.getString(ctx, argName));
+                            if (value == null) {
+                                return Command.SINGLE_SUCCESS; // unrecognised → no-op
+                            }
+                            setter.accept(player, value);
+                            MessageUtil.statusMessage(player,
+                                    plugin.getConfigManager().lang().getColoredMessage(langKey,
+                                            Placeholder.unparsed(placeholder, value.toString())));
+                            return Command.SINGLE_SUCCESS;
+                        }));
+    }
+
+    /**
+     * Suggests the lower-cased names of {@code values} that pass {@code include} and prefix-match the
+     * current (case-insensitive) input. Shared by every enum-valued argument's {@code suggests} hook.
+     */
+    private static <E extends Enum<E>> java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestEnum(
+            com.mojang.brigadier.suggestion.SuggestionsBuilder builder, E[] values, java.util.function.Predicate<E> include) {
+        String input = builder.getRemaining().toUpperCase();
+        for (E value : values) {
+            if (include.test(value) && value.name().startsWith(input)) {
+                builder.suggest(value.name().toLowerCase());
+            }
+        }
+        return builder.buildFuture();
+    }
+
+    /** The matching enum constant for {@code raw} (case-insensitive), or {@code null} if none match. */
+    private static <E extends Enum<E>> E parseEnum(E[] values, String raw) {
+        for (E value : values) {
+            if (value.name().equalsIgnoreCase(raw)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSortMethod(ClickSortedPlugin plugin) {
         return Commands.literal("sort-method")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
                 .then(Commands.argument("method", StringArgumentType.word())
-                        .suggests((ctx, builder) -> {
-                            String input = builder.getRemaining().toUpperCase();
-                            for (SortingMethod m : SortingMethod.values()) {
-                                if (m.isAvailable() && m.name().startsWith(input)) {
-                                    builder.suggest(m.name().toLowerCase());
-                                }
-                            }
-                            return builder.buildFuture();
-                        })
+                        .suggests((ctx, builder) -> suggestEnum(builder, SortingMethod.values(), SortingMethod::isAvailable))
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -95,15 +161,7 @@ public class ClickSortedCommands {
         return Commands.literal("click-method")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.click"))
                 .then(Commands.argument("method", StringArgumentType.word())
-                        .suggests((ctx, builder) -> {
-                            String input = builder.getRemaining().toUpperCase();
-                            for (ClickMethod m : ClickMethod.values()) {
-                                if (m.name().startsWith(input)) {
-                                    builder.suggest(m.name().toLowerCase());
-                                }
-                            }
-                            return builder.buildFuture();
-                        })
+                        .suggests((ctx, builder) -> suggestEnum(builder, ClickMethod.values(), m -> true))
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -117,6 +175,9 @@ public class ClickSortedCommands {
                                         plugin.getConfigManager().lang().getColoredMessage("setClickMethodTo",
                                                 Placeholder.unparsed("method", method.toString()),
                                                 Placeholder.unparsed("instruction", method.getInstruction())));
+                                // Methods that govern hover (SINGLE_CLICK, CONTROL_DROP) force the player's
+                                // hover preference to the only usable value, messaging them on any change.
+                                PreferenceRepair.enforceHover(plugin, player, method);
                             } catch (IllegalArgumentException ignored) {
                                 // invalid value → no-op
                             }
@@ -153,6 +214,14 @@ public class ClickSortedCommands {
     }
 
     private static void applyHoverSetting(ClickSortedPlugin plugin, Player player, boolean enabled) {
+        ClickMethod clickMethod = plugin.getSortingPrefs().getClickMethod(player);
+        if (clickMethod.requiredSortOverItems().isPresent()) {
+            // The active click method governs hover; refuse to change the stored value and explain why.
+            MessageUtil.statusMessage(player,
+                    plugin.getConfigManager().lang().getColoredMessage("hoverGovernedByClickMethod",
+                            Placeholder.unparsed("method", clickMethod.name())));
+            return;
+        }
         plugin.getSortingPrefs().setSortOverItems(player, enabled);
         MessageUtil.statusMessage(player,
                 plugin.getConfigManager().lang().getColoredMessage("setSortOverItemsStatus",
@@ -238,7 +307,10 @@ public class ClickSortedCommands {
                                 limit = 0; // an off-word disables the entry limit
                             } else {
                                 try {
-                                    limit = Math.max(0, Integer.parseInt(raw));
+                                    // A bundle holds at most 64 weight-units (64 single non-stackable items),
+                                    // so any entry cap above 64 can never bind; clamp so a huge value doesn't
+                                    // silently behave as "no limit" while the status still reports the number.
+                                    limit = Math.min(64, Math.max(0, Integer.parseInt(raw)));
                                 } catch (NumberFormatException e) {
                                     return Command.SINGLE_SUCCESS; // unrecognised → no-op
                                 }
@@ -289,11 +361,17 @@ public class ClickSortedCommands {
                     var lang = plugin.getConfigManager().lang();
                     ClickMethod clickMethod = prefs.getClickMethod(player);
                     SortingMethod sortMethod = prefs.getSortingMethod(player);
+                    StartCorner startCorner = prefs.getStartCorner(player);
+                    FillAxis fillAxis = prefs.getFillAxis(player);
                     boolean hover = prefs.getSortOverItems(player);
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusClickMethod",
                             Placeholder.unparsed("method", clickMethod.toString())));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusSortMethod",
                             Placeholder.unparsed("method", sortMethod.toString())));
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusStartCorner",
+                            Placeholder.unparsed("corner", startCorner.toString())));
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusFillAxis",
+                            Placeholder.unparsed("axis", fillAxis.toString())));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusHover",
                             Placeholder.unparsed("status", enabledLabel(hover))));
                     return Command.SINGLE_SUCCESS;
@@ -340,15 +418,7 @@ public class ClickSortedCommands {
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(Commands.argument("level", StringArgumentType.word())
-                        .suggests((ctx, builder) -> {
-                            String input = builder.getRemaining().toUpperCase();
-                            for (DebugLevel l : DebugLevel.values()) {
-                                if (l.name().startsWith(input)) {
-                                    builder.suggest(l.name().toLowerCase());
-                                }
-                            }
-                            return builder.buildFuture();
-                        })
+                        .suggests((ctx, builder) -> suggestEnum(builder, DebugLevel.values(), l -> true))
                         .executes(ctx -> {
                             String arg = StringArgumentType.getString(ctx, "level");
                             try {

@@ -22,9 +22,10 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class PlayerSortingPrefs {
     private final ClickSortedPlugin plugin;
@@ -35,6 +36,8 @@ public class PlayerSortingPrefs {
     private final NamespacedKey bundleInventoryKey;
     private final NamespacedKey bundleOthersKey;
     private final NamespacedKey bundleStackLimitKey;
+    private final NamespacedKey startCornerKey;
+    private final NamespacedKey fillAxisKey;
 
     public PlayerSortingPrefs(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -45,11 +48,13 @@ public class PlayerSortingPrefs {
         this.bundleInventoryKey = new NamespacedKey(plugin, "bundle_inventory");
         this.bundleOthersKey = new NamespacedKey(plugin, "bundle_others");
         this.bundleStackLimitKey = new NamespacedKey(plugin, "bundle_stack_limit");
+        this.startCornerKey = new NamespacedKey(plugin, "start_corner");
+        this.fillAxisKey = new NamespacedKey(plugin, "fill_axis");
     }
 
     public SortingMethod getSortingMethod(Player player) {
         String stored = player.getPersistentDataContainer().get(sortKey, PersistentDataType.STRING);
-        return stored != null ? SortingMethod.parse(stored) : plugin.getConfigManager().main().getDefaultSortingMethod();
+        return SortingMethod.parse(stored, plugin.getConfigManager().main().getDefaultSortingMethod());
     }
 
     public void setSortingMethod(Player player, SortingMethod sortMethod) {
@@ -58,11 +63,29 @@ public class PlayerSortingPrefs {
 
     public ClickMethod getClickMethod(Player player) {
         String stored = player.getPersistentDataContainer().get(clickKey, PersistentDataType.STRING);
-        return stored != null ? ClickMethod.parse(stored) : plugin.getConfigManager().main().getDefaultClickMethod();
+        return ClickMethod.parse(stored, plugin.getConfigManager().main().getDefaultClickMethod());
     }
 
     public void setClickMethod(Player player, ClickMethod clickMethod) {
         player.getPersistentDataContainer().set(clickKey, PersistentDataType.STRING, clickMethod.name());
+    }
+
+    public StartCorner getStartCorner(Player player) {
+        String stored = player.getPersistentDataContainer().get(startCornerKey, PersistentDataType.STRING);
+        return StartCorner.parse(stored, plugin.getConfigManager().main().getDefaultStartCorner());
+    }
+
+    public void setStartCorner(Player player, StartCorner corner) {
+        player.getPersistentDataContainer().set(startCornerKey, PersistentDataType.STRING, corner.name());
+    }
+
+    public FillAxis getFillAxis(Player player) {
+        String stored = player.getPersistentDataContainer().get(fillAxisKey, PersistentDataType.STRING);
+        return FillAxis.parse(stored, plugin.getConfigManager().main().getDefaultFillAxis());
+    }
+
+    public void setFillAxis(Player player, FillAxis axis) {
+        player.getPersistentDataContainer().set(fillAxisKey, PersistentDataType.STRING, axis.name());
     }
 
     /**
@@ -70,12 +93,11 @@ public class PlayerSortingPrefs {
      * Falls back to the server default when the player has no stored preference.
      */
     public boolean getSortOverItems(Player player) {
-        Byte stored = player.getPersistentDataContainer().get(sortOverItemsKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultSortOverItems();
+        return getBool(player, sortOverItemsKey, plugin.getConfigManager().main()::getDefaultSortOverItems);
     }
 
     public void setSortOverItems(Player player, boolean enabled) {
-        player.getPersistentDataContainer().set(sortOverItemsKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+        setBool(player, sortOverItemsKey, enabled);
     }
 
     /**
@@ -83,12 +105,11 @@ public class PlayerSortingPrefs {
      * Falls back to the server default when the player has no stored preference.
      */
     public boolean getBundlePackInventory(Player player) {
-        Byte stored = player.getPersistentDataContainer().get(bundleInventoryKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultBundlePackInventory();
+        return getBool(player, bundleInventoryKey, plugin.getConfigManager().main()::getDefaultBundlePackInventory);
     }
 
     public void setBundlePackInventory(Player player, boolean enabled) {
-        player.getPersistentDataContainer().set(bundleInventoryKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+        setBool(player, bundleInventoryKey, enabled);
     }
 
     /**
@@ -96,12 +117,22 @@ public class PlayerSortingPrefs {
      * Falls back to the server default when the player has no stored preference.
      */
     public boolean getBundlePackOthers(Player player) {
-        Byte stored = player.getPersistentDataContainer().get(bundleOthersKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultBundlePackOthers();
+        return getBool(player, bundleOthersKey, plugin.getConfigManager().main()::getDefaultBundlePackOthers);
     }
 
     public void setBundlePackOthers(Player player, boolean enabled) {
-        player.getPersistentDataContainer().set(bundleOthersKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+        setBool(player, bundleOthersKey, enabled);
+    }
+
+    /** Reads a boolean preference stored as a byte, falling back to {@code def} when unset. */
+    private static boolean getBool(Player player, NamespacedKey key, java.util.function.BooleanSupplier def) {
+        Byte stored = player.getPersistentDataContainer().get(key, PersistentDataType.BYTE);
+        return stored != null ? stored != 0 : def.getAsBoolean();
+    }
+
+    /** Writes a boolean preference as a byte. */
+    private static void setBool(Player player, NamespacedKey key, boolean enabled) {
+        player.getPersistentDataContainer().set(key, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
     }
 
     /**
@@ -122,11 +153,7 @@ public class PlayerSortingPrefs {
         if (stored == null || stored.length == 0) {
             return Set.of();
         }
-        Set<Integer> result = new HashSet<>(stored.length);
-        for (int slot : stored) {
-            result.add(slot);
-        }
-        return Collections.unmodifiableSet(result);
+        return Arrays.stream(stored).boxed().collect(Collectors.toUnmodifiableSet());
     }
 
     public boolean toggleSlotLocked(Player player, int slot) {
