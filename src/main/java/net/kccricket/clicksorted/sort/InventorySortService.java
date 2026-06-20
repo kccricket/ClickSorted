@@ -25,6 +25,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
@@ -111,6 +112,22 @@ public class InventorySortService {
             container = true;
         } else {
             return false;
+        }
+
+        // DOUBLE_CLICK gesture repair: the first click of the double-click already lifted the clicked
+        // stack onto the cursor and emptied the slot; the listener cancels the event to suppress the
+        // vanilla gather, which would otherwise strand that stack on the cursor. Put it back into its
+        // origin slot (only when that slot is empty — the expected post-first-click state) so the sort
+        // below folds it in and the cursor ends empty. Done here, past the permission/target checks, so
+        // it never fires for a click that wouldn't actually sort.
+        if (event.getClick() == ClickType.DOUBLE_CLICK) {
+            ItemStack cursor = event.getCursor();
+            ItemStack atSlot = inv.getItem(slot);
+            if (cursor != null && cursor.getType() != Material.AIR
+                    && (atSlot == null || atSlot.getType() == Material.AIR)) {
+                inv.setItem(slot, cursor.clone());
+                p.setItemOnCursor(null);
+            }
         }
 
         InventorySortEvent sortEvent = new InventorySortEvent(event.getView(), inv, min, max);

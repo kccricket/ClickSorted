@@ -389,6 +389,43 @@ class InventorySortTest extends AbstractClickSortedTest {
     }
 
     @Test
+    void doubleClickRestoresLiftedStackThenSortsAndClearsCursor() {
+        // Simulate the real post-first-click state: the clicked slot is empty because vanilla already
+        // lifted its stack onto the cursor, and a matching stack sits elsewhere. The DOUBLE_CLICK sort
+        // must re-deposit the lifted stack into its origin slot, fold it into the merge, and clear cursor.
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(1, stack(Material.STONE, 10));   // the other matching stack still in the inventory
+        InventoryView view = player.openInventory(chest);
+
+        ItemStack lifted = stack(Material.STONE, 5);
+        player.setItemOnCursor(lifted);
+
+        // Slot 0 is empty (its stack is the one on the cursor); getCursor returns the lifted stack.
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, 0, ClickType.DOUBLE_CLICK, InventoryAction.UNKNOWN) {
+            @Override public ItemStack getCurrentItem() { return new ItemStack(Material.AIR); }
+            @Override public ItemStack getCursor() { return lifted; }
+        };
+        callEvent(event);
+
+        assertEquals(15, countByMaterial(chest).getOrDefault(Material.STONE, 0),
+                "the lifted cursor stack (5) must be folded back in and merged with the inventory's 10");
+        long stoneSlots = 0;
+        for (ItemStack item : chest.getContents()) {
+            if (item != null && item.getType() == Material.STONE) stoneSlots++;
+        }
+        assertEquals(1, stoneSlots, "all STONE merged into a single stack");
+        ItemStack cursorAfter = player.getItemOnCursor();
+        assertTrue(cursorAfter == null || cursorAfter.getType() == Material.AIR,
+                "cursor must be cleared once the lifted stack is restored into the inventory");
+        assertTrue(event.isCancelled(), "DOUBLE_CLICK sort must cancel the vanilla gather");
+    }
+
+    @Test
     void occupiedSlotSortedAndCancelledForDoubleClick() {
         // DOUBLE_CLICK's vanilla gesture gathers matching stacks to the cursor, so a sort over an
         // occupied slot must fire AND cancel the event to suppress that gather.
