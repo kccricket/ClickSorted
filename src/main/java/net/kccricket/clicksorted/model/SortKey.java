@@ -17,6 +17,14 @@ public class SortKey implements Comparable<SortKey> {
     private final String metaStr;
     private final ItemMeta meta;
 
+    /**
+     * The canonical pooling key for bundle packing: items are pooled by identity regardless of the
+     * active sort method, so this fixes {@link SortingMethod#NAME} as the single pooling convention.
+     */
+    public static SortKey poolKey(ItemStack stack) {
+        return new SortKey(stack, SortingMethod.NAME);
+    }
+
     public SortKey(ItemStack stack, SortingMethod sortMethod) {
         String prefix = sortMethod.makeSortPrefix(stack);
         if (prefix == null) {

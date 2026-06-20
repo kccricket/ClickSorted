@@ -22,9 +22,10 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class PlayerSortingPrefs {
     private final ClickSortedPlugin plugin;
@@ -92,12 +93,11 @@ public class PlayerSortingPrefs {
      * Falls back to the server default when the player has no stored preference.
      */
     public boolean getSortOverItems(Player player) {
-        Byte stored = player.getPersistentDataContainer().get(sortOverItemsKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultSortOverItems();
+        return getBool(player, sortOverItemsKey, plugin.getConfigManager().main()::getDefaultSortOverItems);
     }
 
     public void setSortOverItems(Player player, boolean enabled) {
-        player.getPersistentDataContainer().set(sortOverItemsKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+        setBool(player, sortOverItemsKey, enabled);
     }
 
     /**
@@ -105,12 +105,11 @@ public class PlayerSortingPrefs {
      * Falls back to the server default when the player has no stored preference.
      */
     public boolean getBundlePackInventory(Player player) {
-        Byte stored = player.getPersistentDataContainer().get(bundleInventoryKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultBundlePackInventory();
+        return getBool(player, bundleInventoryKey, plugin.getConfigManager().main()::getDefaultBundlePackInventory);
     }
 
     public void setBundlePackInventory(Player player, boolean enabled) {
-        player.getPersistentDataContainer().set(bundleInventoryKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+        setBool(player, bundleInventoryKey, enabled);
     }
 
     /**
@@ -118,12 +117,22 @@ public class PlayerSortingPrefs {
      * Falls back to the server default when the player has no stored preference.
      */
     public boolean getBundlePackOthers(Player player) {
-        Byte stored = player.getPersistentDataContainer().get(bundleOthersKey, PersistentDataType.BYTE);
-        return stored != null ? stored != 0 : plugin.getConfigManager().main().getDefaultBundlePackOthers();
+        return getBool(player, bundleOthersKey, plugin.getConfigManager().main()::getDefaultBundlePackOthers);
     }
 
     public void setBundlePackOthers(Player player, boolean enabled) {
-        player.getPersistentDataContainer().set(bundleOthersKey, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
+        setBool(player, bundleOthersKey, enabled);
+    }
+
+    /** Reads a boolean preference stored as a byte, falling back to {@code def} when unset. */
+    private static boolean getBool(Player player, NamespacedKey key, java.util.function.BooleanSupplier def) {
+        Byte stored = player.getPersistentDataContainer().get(key, PersistentDataType.BYTE);
+        return stored != null ? stored != 0 : def.getAsBoolean();
+    }
+
+    /** Writes a boolean preference as a byte. */
+    private static void setBool(Player player, NamespacedKey key, boolean enabled) {
+        player.getPersistentDataContainer().set(key, PersistentDataType.BYTE, enabled ? (byte) 1 : (byte) 0);
     }
 
     /**
@@ -144,11 +153,7 @@ public class PlayerSortingPrefs {
         if (stored == null || stored.length == 0) {
             return Set.of();
         }
-        Set<Integer> result = new HashSet<>(stored.length);
-        for (int slot : stored) {
-            result.add(slot);
-        }
-        return Collections.unmodifiableSet(result);
+        return Arrays.stream(stored).boxed().collect(Collectors.toUnmodifiableSet());
     }
 
     public boolean toggleSlotLocked(Player player, int slot) {

@@ -84,6 +84,7 @@ public class InventorySortService {
         boolean playerMainStorage = false; // packing applies here (not the hotbar)
         boolean container = false;
         if (type == InventoryType.PLAYER) {
+            int playerSortMax = mainCfg.getPlayerSortMax();
             if (slot < 9) {
                 // hotbar
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.hotbar")) {
@@ -91,19 +92,19 @@ public class InventorySortService {
                 }
                 min = 0;
                 max = 9;
-            } else if (slot < mainCfg.getPlayerSortMax()) {
+            } else if (slot < playerSortMax) {
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.player")) {
                     return false;
                 }
                 // main player inventory
                 min = mainCfg.getPlayerSortMin();
-                max = mainCfg.getPlayerSortMax();
+                max = playerSortMax;
                 playerMainStorage = true;
             } else {
                 // armor / offhand slots — never sort
                 return false;
             }
-        } else if (plugin.getConfigManager().main().getSortableInventories().contains(type)) {
+        } else if (mainCfg.getSortableInventories().contains(type)) {
             if (!Permissions.isAllowedTo(p, "clicksorted.sort.container")) {
                 return false;
             }
@@ -188,14 +189,15 @@ public class InventorySortService {
     private List<ItemStack> writeLinear(Inventory inv, Set<Integer> sortableSlots, List<ItemStack> sortedItems,
                                         int base, int width, StartCorner startCorner, FillAxis fillAxis) {
         List<Integer> fillOrder = SlotOrder.order(sortableSlots, base, width, startCorner, fillAxis);
+        int next = 0;
         for (int i : fillOrder) {
-            if (!sortedItems.isEmpty()) {
-                inv.setItem(i, sortedItems.remove(0));
+            if (next < sortedItems.size()) {
+                inv.setItem(i, sortedItems.get(next++));
             } else {
                 inv.clear(i);
             }
         }
-        return sortedItems;
+        return next < sortedItems.size() ? new ArrayList<>(sortedItems.subList(next, sortedItems.size())) : List.of();
     }
 
     /**
@@ -250,8 +252,10 @@ public class InventorySortService {
             if (is.getType() == Material.BUNDLE) {
                 bundles.add(is.clone());
             } else if (BundlePacker.canBundle(is)) {
-                SortKey key = new SortKey(is, SortingMethod.NAME);
-                loosePool.merge(key, (long) is.getAmount(), Long::sum);
+                SortKey key = SortKey.poolKey(is);
+                // Lambda, not Long::sum: a method ref binds the boxed map values straight to
+                // primitive params, tripping JDT's "needs unchecked conversion" null warning.
+                loosePool.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
                 samples.putIfAbsent(key, is);
             } else {
                 toSort.add(is.clone());

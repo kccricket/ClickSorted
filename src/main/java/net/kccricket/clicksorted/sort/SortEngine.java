@@ -67,7 +67,9 @@ public final class SortEngine {
             }
             SortKey key = new SortKey(is, sortMethod);
             if (isFungible(is)) {
-                amounts.merge(key, is.getAmount(), Integer::sum);
+                // Lambda, not Integer::sum: a method ref binds the boxed map values straight to
+                // primitive params, tripping JDT's "needs unchecked conversion" null warning.
+                amounts.merge(key, is.getAmount(), (a, b) -> Integer.sum(a, b));
             } else {
                 discretes.add(new Entry(key, is));
             }
@@ -79,7 +81,7 @@ public final class SortEngine {
         }
         Collections.sort(discretes);
 
-        List<ItemStack> sorted = new LinkedList<>();
+        List<ItemStack> sorted = new ArrayList<>(discretes.size());
         for (Entry entry : discretes) {
             if (entry.stack != null) {
                 sorted.add(entry.stack);

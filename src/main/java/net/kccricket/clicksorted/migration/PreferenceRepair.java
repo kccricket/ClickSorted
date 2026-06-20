@@ -24,8 +24,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
+import java.util.function.Function;
 
 /**
  * Join-time repair of a player's stored preferences, run <em>after</em> {@link Migrations#migrate(Player)}
@@ -42,20 +42,27 @@ import java.util.Map;
  */
 public final class PreferenceRepair {
 
-    /** Enum-backed PDC key name → enum class, with the human-readable label used in the reset message. */
-    private record EnumPref(String key, Class<? extends Enum<?>> type, String label) {
+    /**
+     * One repairable enum preference: its PDC key name, enum class, human-readable label for the reset
+     * message, and the read accessor that resolves the post-reset value (so neither the key nor the
+     * read dispatch is duplicated).
+     */
+    private record EnumPref(String key, Class<? extends Enum<?>> type, String label,
+                            Function<ClickSortedPlugin, Function<Player, ? extends Enum<?>>> reader) {
+        Enum<?> read(ClickSortedPlugin plugin, Player player) {
+            return reader.apply(plugin).apply(player);
+        }
     }
 
-    private static final Map<String, EnumPref> ENUM_PREFS = buildEnumPrefs();
-
-    private static Map<String, EnumPref> buildEnumPrefs() {
-        Map<String, EnumPref> map = new LinkedHashMap<>();
-        map.put("click", new EnumPref("click", ClickMethod.class, "click method"));
-        map.put("sort", new EnumPref("sort", SortingMethod.class, "sort method"));
-        map.put("start_corner", new EnumPref("start_corner", StartCorner.class, "start corner"));
-        map.put("fill_axis", new EnumPref("fill_axis", FillAxis.class, "fill axis"));
-        return map;
-    }
+    private static final List<EnumPref> ENUM_PREFS = List.of(
+            new EnumPref("click", ClickMethod.class, "click method",
+                    p -> p.getSortingPrefs()::getClickMethod),
+            new EnumPref("sort", SortingMethod.class, "sort method",
+                    p -> p.getSortingPrefs()::getSortingMethod),
+            new EnumPref("start_corner", StartCorner.class, "start corner",
+                    p -> p.getSortingPrefs()::getStartCorner),
+            new EnumPref("fill_axis", FillAxis.class, "fill axis",
+                    p -> p.getSortingPrefs()::getFillAxis));
 
     private PreferenceRepair() {
     }
@@ -63,7 +70,7 @@ public final class PreferenceRepair {
     /** Resets any invalid stored enum value to its default, then enforces hover coupling. */
     public static void repair(ClickSortedPlugin plugin, Player player) {
         PersistentDataContainer pdc = player.getPersistentDataContainer();
-        for (EnumPref pref : ENUM_PREFS.values()) {
+        for (EnumPref pref : ENUM_PREFS) {
             resetIfInvalid(plugin, player, pdc, pref);
         }
         enforceHover(plugin, player, plugin.getSortingPrefs().getClickMethod(player));
@@ -87,14 +94,7 @@ public final class PreferenceRepair {
 
     /** The name of the value the read path resolves to now that {@code pref}'s key has been removed. */
     private static String currentDefault(ClickSortedPlugin plugin, Player player, EnumPref pref) {
-        var prefs = plugin.getSortingPrefs();
-        return switch (pref.key()) {
-            case "click" -> prefs.getClickMethod(player).name();
-            case "sort" -> prefs.getSortingMethod(player).name();
-            case "start_corner" -> prefs.getStartCorner(player).name();
-            case "fill_axis" -> prefs.getFillAxis(player).name();
-            default -> "";
-        };
+        return pref.read(plugin, player).name();
     }
 
     /** True if {@code raw} names a constant of {@code type} (exact match, no warning side-effect). */

@@ -9,9 +9,9 @@ import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import org.bukkit.event.inventory.InventoryType;
 
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 /**
  * Wraps {@code config.yml} via Bukkit's built-in {@code JavaPlugin} config machinery.
@@ -28,7 +28,8 @@ public class MainConfig implements ManagedConfig {
 
     private final ClickSortedPlugin plugin;
     // Reassigned on reload; read on Folia region threads, so publish via volatile.
-    private volatile List<InventoryType> sortableInventories = List.of();
+    // EnumSet for O(1) membership tests on the per-click sort path.
+    private volatile Set<InventoryType> sortableInventories = Set.of();
 
     public MainConfig(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -157,23 +158,22 @@ public class MainConfig implements ManagedConfig {
     private void applyToRuntime() {
         Log.setDebugLevel(DebugLevel.parse(plugin.getConfig().getString("debug_level"), DebugLevel.OFF));
 
-        sortableInventories = plugin.getConfig().getStringList("sortable_inventories").stream()
-                .map(s -> {
-                    try {
-                        return InventoryType.valueOf(s);
-                    } catch (IllegalArgumentException e) {
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        Set<InventoryType> parsed = EnumSet.noneOf(InventoryType.class);
+        for (String s : plugin.getConfig().getStringList("sortable_inventories")) {
+            try {
+                parsed.add(InventoryType.valueOf(s));
+            } catch (IllegalArgumentException ignored) {
+                // unrecognized type name — silently skipped (documented in config comments)
+            }
+        }
+        sortableInventories = parsed;
     }
 
     // -------------------------------------------------------------------------
     // Accessors
     // -------------------------------------------------------------------------
 
-    public List<InventoryType> getSortableInventories() {
+    public Set<InventoryType> getSortableInventories() {
         return sortableInventories;
     }
 

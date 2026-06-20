@@ -14,7 +14,6 @@ package net.kccricket.clicksorted.sort;
 
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.SortKey;
-import net.kccricket.clicksorted.model.SortingMethod;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BundleMeta;
@@ -43,13 +42,16 @@ import java.util.*;
  */
 public final class BundlePacker {
 
+    /** Total weight a single bundle can hold (item weight = {@code 64 / maxStackSize} per item). */
+    public static final int BUNDLE_WEIGHT_CAPACITY = 64;
+
     /**
-     * Upper weight bound for a remainder to be bundle-eligible. A bundle holds 64 weight, so spending
-     * more than half of it on a single stack — to reclaim one slot — is never an efficient trade;
-     * such remainders are left loose. Remainders at or below this weight are the small odds-and-ends
-     * bundles are meant for.
+     * Upper weight bound for a remainder to be bundle-eligible. Spending more than half a bundle's
+     * capacity on a single stack — to reclaim one slot — is never an efficient trade; such remainders
+     * are left loose. Remainders at or below this weight are the small odds-and-ends bundles are meant
+     * for.
      */
-    public static final int MAX_PACK_WEIGHT = 32;
+    public static final int MAX_PACK_WEIGHT = BUNDLE_WEIGHT_CAPACITY / 2;
 
     private BundlePacker() {}
 
@@ -142,7 +144,9 @@ public final class BundlePacker {
         Bin bin = Bin.of(bins.size(), bundleItem);
         if (bin == null) return;
         for (ItemStack is : bin.pooled) {
-            SortKey key = new SortKey(is, SortingMethod.NAME);
+            SortKey key = SortKey.poolKey(is);
+            // Lambda, not Long::sum: a method ref binds the boxed map values straight to
+            // primitive params, tripping JDT's "needs unchecked conversion" null warning.
             totals.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
             samples.putIfAbsent(key, is);
             originBins.computeIfAbsent(key, k -> new HashSet<>()).add(bin.id);
@@ -183,9 +187,13 @@ public final class BundlePacker {
      * Formula: {@code amount × (64 / maxStackSize)}, integer division.
      */
     public static int stackWeight(ItemStack is) {
-        int maxStack = is.getType().getMaxStackSize();
-        if (maxStack <= 0) return 64;
-        return is.getAmount() * 64 / maxStack;
+        return weight(is.getAmount(), is.getType().getMaxStackSize());
+    }
+
+    /** Bundle weight {@code amount} of a stack occupies given its {@code maxStack} size. */
+    private static int weight(int amount, int maxStack) {
+        if (maxStack <= 0) return BUNDLE_WEIGHT_CAPACITY;
+        return amount * BUNDLE_WEIGHT_CAPACITY / maxStack;
     }
 
     /** Number of distinct item types/meta among a list of stacks. */
@@ -193,7 +201,7 @@ public final class BundlePacker {
         Set<SortKey> seen = new HashSet<>();
         for (ItemStack is : items) {
             if (is != null) {
-                seen.add(new SortKey(is, SortingMethod.NAME));
+                seen.add(SortKey.poolKey(is));
             }
         }
         return seen.size();
@@ -232,7 +240,7 @@ public final class BundlePacker {
             this.maxStack = maxStack;
             this.fullStacks = total / maxStack;
             this.remAmt = (int) (total % maxStack);
-            this.remWeight = remAmt * 64 / maxStack;
+            this.remWeight = weight(remAmt, maxStack);
             this.bundleable = remAmt > 0 && remWeight <= MAX_PACK_WEIGHT;
         }
     }

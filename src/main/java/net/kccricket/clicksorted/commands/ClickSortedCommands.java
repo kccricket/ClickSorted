@@ -84,15 +84,7 @@ public class ClickSortedCommands {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(permission))
                 .then(Commands.argument(argName, StringArgumentType.word())
-                        .suggests((ctx, builder) -> {
-                            String input = builder.getRemaining().toUpperCase();
-                            for (E value : values) {
-                                if (value.name().startsWith(input)) {
-                                    builder.suggest(value.name().toLowerCase());
-                                }
-                            }
-                            return builder.buildFuture();
-                        })
+                        .suggests((ctx, builder) -> suggestEnum(builder, values, v -> true))
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -110,6 +102,21 @@ public class ClickSortedCommands {
                         }));
     }
 
+    /**
+     * Suggests the lower-cased names of {@code values} that pass {@code include} and prefix-match the
+     * current (case-insensitive) input. Shared by every enum-valued argument's {@code suggests} hook.
+     */
+    private static <E extends Enum<E>> java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestEnum(
+            com.mojang.brigadier.suggestion.SuggestionsBuilder builder, E[] values, java.util.function.Predicate<E> include) {
+        String input = builder.getRemaining().toUpperCase();
+        for (E value : values) {
+            if (include.test(value) && value.name().startsWith(input)) {
+                builder.suggest(value.name().toLowerCase());
+            }
+        }
+        return builder.buildFuture();
+    }
+
     /** The matching enum constant for {@code raw} (case-insensitive), or {@code null} if none match. */
     private static <E extends Enum<E>> E parseEnum(E[] values, String raw) {
         for (E value : values) {
@@ -124,15 +131,7 @@ public class ClickSortedCommands {
         return Commands.literal("sort-method")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
                 .then(Commands.argument("method", StringArgumentType.word())
-                        .suggests((ctx, builder) -> {
-                            String input = builder.getRemaining().toUpperCase();
-                            for (SortingMethod m : SortingMethod.values()) {
-                                if (m.isAvailable() && m.name().startsWith(input)) {
-                                    builder.suggest(m.name().toLowerCase());
-                                }
-                            }
-                            return builder.buildFuture();
-                        })
+                        .suggests((ctx, builder) -> suggestEnum(builder, SortingMethod.values(), SortingMethod::isAvailable))
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -162,15 +161,7 @@ public class ClickSortedCommands {
         return Commands.literal("click-method")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.click"))
                 .then(Commands.argument("method", StringArgumentType.word())
-                        .suggests((ctx, builder) -> {
-                            String input = builder.getRemaining().toUpperCase();
-                            for (ClickMethod m : ClickMethod.values()) {
-                                if (m.name().startsWith(input)) {
-                                    builder.suggest(m.name().toLowerCase());
-                                }
-                            }
-                            return builder.buildFuture();
-                        })
+                        .suggests((ctx, builder) -> suggestEnum(builder, ClickMethod.values(), m -> true))
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -427,15 +418,7 @@ public class ClickSortedCommands {
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(Commands.argument("level", StringArgumentType.word())
-                        .suggests((ctx, builder) -> {
-                            String input = builder.getRemaining().toUpperCase();
-                            for (DebugLevel l : DebugLevel.values()) {
-                                if (l.name().startsWith(input)) {
-                                    builder.suggest(l.name().toLowerCase());
-                                }
-                            }
-                            return builder.buildFuture();
-                        })
+                        .suggests((ctx, builder) -> suggestEnum(builder, DebugLevel.values(), l -> true))
                         .executes(ctx -> {
                             String arg = StringArgumentType.getString(ctx, "level");
                             try {
