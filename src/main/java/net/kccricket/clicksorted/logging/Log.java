@@ -16,28 +16,40 @@ public final class Log {
         logger = plugin.getLogger();
     }
 
+    /**
+     * The plugin logger once {@link #init} has run, or a standalone fallback before then. Guarantees
+     * logging never NPEs if a static helper logs before the plugin is enabled (e.g. enum parsing in a
+     * plain unit test, or very early startup).
+     */
+    private static Logger logger() {
+        if (logger == null) {
+            logger = Logger.getLogger("ClickSorted");
+        }
+        return logger;
+    }
+
     // -------------------------------------------------------------------------
     // Standard log levels
     // -------------------------------------------------------------------------
 
     public static void log(Level level, String message) {
-        logger.log(level, message);
+        logger().log(level, message);
     }
 
     public static void warning(String message) {
-        logger.warning(message);
+        logger().warning(message);
     }
 
     public static void warning(String message, Throwable t) {
-        logger.log(Level.WARNING, message, t);
+        logger().log(Level.WARNING, message, t);
     }
 
     public static void severe(String message) {
-        logger.severe(message);
+        logger().severe(message);
     }
 
     public static void severe(String message, Throwable t) {
-        logger.log(Level.SEVERE, message, t);
+        logger().log(Level.SEVERE, message, t);
     }
 
     // -------------------------------------------------------------------------
@@ -64,7 +76,7 @@ public final class Log {
 
     private static void logAt(DebugLevel level, String message) {
         if (debugLevel != DebugLevel.OFF && debugLevel.ordinal() >= level.ordinal()) {
-            logger.info("[debug] " + message);
+            logger().info("[debug] " + message);
         }
     }
 }
