@@ -31,7 +31,7 @@ public class MessageUtil {
     }
 
     public static void statusMessage(Audience sender, Component component) {
-        message(sender, component.colorIfAbsent(NamedTextColor.AQUA), Level.INFO);
+        message(sender, component.colorIfAbsent(NamedTextColor.WHITE), Level.INFO);
     }
 
     public static void statusMessage(Audience sender, String string) {
