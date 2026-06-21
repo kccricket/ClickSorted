@@ -7,6 +7,9 @@
 # Placeholder tags are listed in comments above each message that accepts one.
 # Do not remove a placeholder from a message that requires it.
 
+# Prepended to every status/error/alert message sent to players. MiniMessage. Set to "" to disable.
+prefix: "<gray>[<aqua>ClickSorted<gray>] "
+
 # Command feedback — sort mode
 # Placeholder: <method>
 setSortingMethodTo: "Sort mode set to <method>."

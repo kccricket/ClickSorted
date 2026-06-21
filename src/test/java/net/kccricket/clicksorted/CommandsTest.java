@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.*;
 
 /**
  * Integration tests for the ClickSorted command tree.  Each subcommand is exercised by calling
@@ -231,5 +232,38 @@ class CommandsTest extends AbstractClickSortedTest {
         // Should receive at least one line containing a config key.
         assertTrue(anyMessageContains(player, "=", "defaults", "sort", "click"),
                 "getcfg should output config key/value pairs");
+    }
+
+    // --- prefix ---
+
+    @Test
+    void statusMessageIsPrefixedWithPluginTag() {
+        String prefix = plugin.getConfigManager().lang().getMessage("prefix", "");
+        assumeFalse(prefix.isEmpty(), "prefix key is empty — nothing to assert");
+
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set sort-method NAME");
+
+        assertTrue(anyMessageContains(player, "ClickSorted"),
+                "Status messages should be prefixed with [ClickSorted]");
+    }
+
+    @Test
+    void rawMessageIsNotPrefixed() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted getcfg");
+
+        // getcfg uses rawMessage — none of those lines should carry the plugin prefix
+        String msg;
+        while ((msg = player.nextMessage()) != null) {
+            assertFalse(msg.contains("ClickSorted"),
+                    "getcfg (raw) lines must not be prefixed: " + msg);
+        }
     }
 }

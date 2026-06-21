@@ -23,6 +23,7 @@ import net.kccricket.clicksorted.security.ActionThrottle;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
 import net.kccricket.clicksorted.sort.InventorySortService;
 import net.kccricket.clicksorted.text.CooldownMessenger;
+import net.kccricket.clicksorted.text.MessageUtil;
 import net.kccricket.clicksorted.update.UpdateChecker;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bstats.bukkit.Metrics;
@@ -51,6 +52,7 @@ public class ClickSortedPlugin extends JavaPlugin {
 
         configManager = new ConfigManager(this);
         configManager.loadAll();
+        MessageUtil.init(configManager);
 
         if (getConfig().getBoolean("enable_metrics", true)) {
             metrics = new Metrics(this, 31833);
@@ -83,6 +85,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         if (configManager != null) {
             configManager.saveAll();
         }
+        MessageUtil.init(null);
         instance = null;
     }
 
