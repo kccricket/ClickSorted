@@ -15,9 +15,19 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 
+import java.io.File;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Base class for ClickSorted integration tests. Loads the real plugin via MockBukkit so that
@@ -35,6 +45,17 @@ abstract class AbstractClickSortedTest {
         // Use the test-config.yml fixture: disables bStats.
         InputStream configStream = getClass().getClassLoader().getResourceAsStream("test-config.yml");
         plugin = MockBukkit.loadWithConfig(ClickSortedPlugin.class, configStream);
+        // Install the sentinel lang fixture so assertions key off stable tokens rather than
+        // production prose. ResourceUpdater re-merges production as defaults for any key the
+        // fixture omits, so only the asserted keys need to be present in the fixture.
+        InputStream langStream = getClass().getClassLoader().getResourceAsStream("test-lang.yml");
+        if (langStream != null) {
+            try (langStream) {
+                Files.copy(langStream, new File(plugin.getDataFolder(), "lang.yml").toPath(),
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
+            plugin.getConfigManager().lang().load();
+        }
     }
 
     @AfterEach
@@ -130,5 +151,37 @@ abstract class AbstractClickSortedTest {
             }
         }
         return false;
+    }
+
+    /** Drains all queued messages for {@code player} into a list for multi-assertion use. */
+    protected List<String> drainMessageList(PlayerMock player) {
+        List<String> messages = new ArrayList<>();
+        String msg;
+        while ((msg = player.nextMessage()) != null) {
+            messages.add(msg);
+        }
+        return messages;
+    }
+
+    private static final Pattern RAW_PLACEHOLDER = Pattern.compile("<[a-z_]+>");
+
+    /**
+     * Asserts that {@code messages} contains at least one entry that contains <em>all</em>
+     * of {@code tokens}, and that no message in the batch has an unsubstituted lowercase
+     * MiniMessage placeholder (e.g. {@code <value>}, {@code <method>}).
+     */
+    protected void assertMessageSent(List<String> messages, String... tokens) {
+        for (String msg : messages) {
+            assertFalse(RAW_PLACEHOLDER.matcher(msg).find(),
+                    "Unsubstituted placeholder in message: " + msg);
+        }
+        outer:
+        for (String msg : messages) {
+            for (String token : tokens) {
+                if (!msg.contains(token)) continue outer;
+            }
+            return;
+        }
+        fail("No message contained all of " + Arrays.toString(tokens) + "; messages: " + messages);
     }
 }

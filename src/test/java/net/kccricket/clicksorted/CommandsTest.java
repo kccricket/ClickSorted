@@ -43,8 +43,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
         server.dispatchCommand(player, "clicksorted set sort-method NAME");
 
-        assertTrue(anyMessageContains(player, "NAME"),
-                "Expected sort-mode status message");
+        assertMessageSent(drainMessageList(player), "MSG.setSortingMethodTo", "NAME");
     }
 
     @Test
@@ -56,8 +55,65 @@ class CommandsTest extends AbstractClickSortedTest {
 
         server.dispatchCommand(player, "clicksorted set sort-method TOTALLY_INVALID");
 
-        // Sort method should be unchanged.
+        // Sort method should be unchanged and player receives an error message.
         assertEquals(before, plugin.getSortingPrefs().getSortingMethod(player));
+        assertMessageSent(drainMessageList(player), "MSG.invalidValue", "TOTALLY_INVALID");
+    }
+
+    @Test
+    void clickCommandWithInvalidMethodShowsError() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        ClickMethod before = plugin.getSortingPrefs().getClickMethod(player);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set click-method BOGUS_METHOD");
+
+        assertEquals(before, plugin.getSortingPrefs().getClickMethod(player),
+                "Click method should be unchanged on invalid input");
+        assertMessageSent(drainMessageList(player), "MSG.invalidValue", "BOGUS_METHOD");
+    }
+
+    @Test
+    void startCornerWithInvalidValueShowsError() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        var before = plugin.getSortingPrefs().getStartCorner(player);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set start-corner BOGUS_CORNER");
+
+        assertEquals(before, plugin.getSortingPrefs().getStartCorner(player),
+                "Start corner should be unchanged on invalid input");
+        assertMessageSent(drainMessageList(player), "MSG.invalidValue", "BOGUS_CORNER");
+    }
+
+    @Test
+    void fillAxisWithInvalidValueShowsError() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        var before = plugin.getSortingPrefs().getFillAxis(player);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set fill-axis BOGUS_AXIS");
+
+        assertEquals(before, plugin.getSortingPrefs().getFillAxis(player),
+                "Fill axis should be unchanged on invalid input");
+        assertMessageSent(drainMessageList(player), "MSG.invalidValue", "BOGUS_AXIS");
+    }
+
+    @Test
+    void hoverWithInvalidValueShowsError() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        boolean before = plugin.getSortingPrefs().getSortOverItems(player);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set hover GARBAGE");
+
+        assertEquals(before, plugin.getSortingPrefs().getSortOverItems(player),
+                "Hover flag should be unchanged on invalid input");
+        assertMessageSent(drainMessageList(player), "MSG.invalidValue", "GARBAGE");
     }
 
     @Test
@@ -86,8 +142,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
         server.dispatchCommand(player, "clicksorted set click-method DOUBLE_CLICK");
 
-        assertTrue(anyMessageContains(player, "DOUBLE_CLICK"),
-                "Expected click-mode status message");
+        assertMessageSent(drainMessageList(player), "MSG.setClickMethodTo", "DOUBLE_CLICK");
     }
 
     @Test
@@ -101,8 +156,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
         assertFalse(plugin.getSortingPrefs().getSortOverItems(player),
                 "SINGLE_CLICK must force hover off");
-        assertTrue(anyMessageContains(player, "DISABLED", "automatically"),
-                "Expected a hover-forced message");
+        assertMessageSent(drainMessageList(player), "MSG.hoverForcedByClickMethod", "DISABLED");
     }
 
     @Test
@@ -116,8 +170,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
         assertTrue(plugin.getSortingPrefs().getSortOverItems(player),
                 "CONTROL_DROP must force hover on");
-        assertTrue(anyMessageContains(player, "ENABLED", "automatically"),
-                "Expected a hover-forced message");
+        assertMessageSent(drainMessageList(player), "MSG.hoverForcedByClickMethod", "ENABLED");
     }
 
     @Test
@@ -132,8 +185,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
         assertTrue(plugin.getSortingPrefs().getSortOverItems(player),
                 "hover must be unchanged when the click method governs it");
-        assertTrue(anyMessageContains(player, "controlled by your click mode"),
-                "Expected a hover-governed message");
+        assertMessageSent(drainMessageList(player), "MSG.hoverGovernedByClickMethod");
     }
 
     // --- set hover ---
@@ -173,8 +225,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
         server.dispatchCommand(player, "clicksorted set hover");
 
-        assertTrue(anyMessageContains(player, "ENABLED", "DISABLED", "Sort over items"),
-                "Expected sort-over-items status message");
+        assertMessageSent(drainMessageList(player), "MSG.setSortOverItemsStatus");
     }
 
     // --- reload (op-only) ---
@@ -187,8 +238,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
         assertDoesNotThrow(() -> server.dispatchCommand(player, "clicksorted reload"));
 
-        assertTrue(anyMessageContains(player, "reloaded", "reload", "configurations"),
-                "Op player should receive reload-confirmation message");
+        assertMessageSent(drainMessageList(player), "MSG.configReloaded");
     }
 
     @Test
@@ -200,7 +250,7 @@ class CommandsTest extends AbstractClickSortedTest {
         server.dispatchCommand(player, "clicksorted reload");
 
         // Should receive an error/denied message, not a reload-success message.
-        assertFalse(anyMessageContains(player, "reloaded", "configurations"),
+        assertFalse(anyMessageContains(player, "MSG.configReloaded"),
                 "Non-op player should not be able to reload");
     }
 
@@ -215,8 +265,7 @@ class CommandsTest extends AbstractClickSortedTest {
         // Set debug level to TRACE.
         server.dispatchCommand(player, "clicksorted debug TRACE");
 
-        assertTrue(anyMessageContains(player, "TRACE", "Debug", "debug"),
-                "Expected debug-level status message");
+        assertMessageSent(drainMessageList(player), "MSG.setDebugLevelTo", "TRACE");
     }
 
     // --- getcfg (op-only) ---
@@ -247,8 +296,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
         server.dispatchCommand(player, "clicksorted set sort-method NAME");
 
-        assertTrue(anyMessageContains(player, "ClickSorted"),
-                "Status messages should be prefixed with [ClickSorted]");
+        assertMessageSent(drainMessageList(player), "MSG.prefix");
     }
 
     @Test
@@ -262,7 +310,7 @@ class CommandsTest extends AbstractClickSortedTest {
         // getcfg uses rawMessage — none of those lines should carry the plugin prefix
         String msg;
         while ((msg = player.nextMessage()) != null) {
-            assertFalse(msg.contains("ClickSorted"),
+            assertFalse(msg.contains("MSG.prefix"),
                     "getcfg (raw) lines must not be prefixed: " + msg);
         }
     }
