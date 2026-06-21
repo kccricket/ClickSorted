@@ -70,11 +70,27 @@ public class ClickSortedCommands {
                 (player, axis) -> plugin.getSortingPrefs().setFillAxis(player, axis));
     }
 
+    /** Comma-joined lower-cased names of {@code values} passing {@code include}, for error text. */
+    private static <E extends Enum<E>> String validList(E[] values, java.util.function.Predicate<E> include) {
+        return java.util.Arrays.stream(values).filter(include)
+                .map(e -> e.name().toLowerCase()).collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    /** Send the shared "invalid value" error naming {@code raw} and the {@code valid} options. */
+    private static void sendInvalidValue(ClickSortedPlugin plugin, Player player, String raw, String valid) {
+        MessageUtil.errorMessage(player,
+                plugin.getConfigManager().lang().getColoredMessage("invalidValue",
+                        Placeholder.unparsed("value", raw),
+                        Placeholder.unparsed("valid", valid)));
+    }
+
+    private static final String BOOLEAN_VALUES = "on, off";
+
     /**
      * A {@code /clicksorted set <literal> <value>} subcommand that parses {@code value} (case-insensitive)
      * into one of {@code values} and persists it via {@code setter}, echoing {@code langKey} with the
-     * chosen value under the {@code placeholder} tag. Unrecognised input is a silent no-op, matching the
-     * other per-player preference setters. Suited to plain enum preferences with no extra validation;
+     * chosen value under the {@code placeholder} tag. Unrecognised input sends an error message naming
+     * the bad value and valid options. Suited to plain enum preferences with no extra validation;
      * {@code sort-method} and {@code click-method} keep bespoke builders for their availability check and
      * instruction text.
      */
@@ -90,9 +106,11 @@ public class ClickSortedCommands {
                             if (player == null || throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
-                            E value = parseEnum(values, StringArgumentType.getString(ctx, argName));
+                            String raw = StringArgumentType.getString(ctx, argName);
+                            E value = parseEnum(values, raw);
                             if (value == null) {
-                                return Command.SINGLE_SUCCESS; // unrecognised → no-op
+                                sendInvalidValue(plugin, player, raw, validList(values, v -> true));
+                                return Command.SINGLE_SUCCESS;
                             }
                             setter.accept(player, value);
                             MessageUtil.statusMessage(player,
@@ -151,7 +169,8 @@ public class ClickSortedCommands {
                                         plugin.getConfigManager().lang().getColoredMessage("setSortingMethodTo",
                                                 Placeholder.unparsed("method", method.toString())));
                             } catch (IllegalArgumentException ignored) {
-                                // invalid value → no-op
+                                sendInvalidValue(plugin, player, arg,
+                                        validList(SortingMethod.values(), SortingMethod::isAvailable));
                             }
                             return Command.SINGLE_SUCCESS;
                         }));
@@ -179,7 +198,8 @@ public class ClickSortedCommands {
                                 // hover preference to the only usable value, messaging them on any change.
                                 PreferenceRepair.enforceHover(plugin, player, method);
                             } catch (IllegalArgumentException ignored) {
-                                // invalid value → no-op
+                                sendInvalidValue(plugin, player, arg,
+                                        validList(ClickMethod.values(), m -> true));
                             }
                             return Command.SINGLE_SUCCESS;
                         }));
@@ -204,9 +224,11 @@ public class ClickSortedCommands {
                             if (player == null || throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
-                            Boolean value = parseState(StringArgumentType.getString(ctx, "value"));
+                            String raw = StringArgumentType.getString(ctx, "value");
+                            Boolean value = parseState(raw);
                             if (value == null) {
-                                return Command.SINGLE_SUCCESS; // unrecognised → no-op
+                                sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
+                                return Command.SINGLE_SUCCESS;
                             }
                             applyHoverSetting(plugin, player, value);
                             return Command.SINGLE_SUCCESS;
@@ -280,9 +302,11 @@ public class ClickSortedCommands {
                             if (player == null || throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
-                            Boolean state = parseState(StringArgumentType.getString(ctx, "state"));
+                            String raw = StringArgumentType.getString(ctx, "state");
+                            Boolean state = parseState(raw);
                             if (state == null) {
-                                return Command.SINGLE_SUCCESS; // unrecognised → no-op
+                                sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
+                                return Command.SINGLE_SUCCESS;
                             }
                             setter.accept(player, state);
                             MessageUtil.statusMessage(player,
@@ -312,7 +336,8 @@ public class ClickSortedCommands {
                                     // silently behave as "no limit" while the status still reports the number.
                                     limit = Math.min(64, Math.max(0, Integer.parseInt(raw)));
                                 } catch (NumberFormatException e) {
-                                    return Command.SINGLE_SUCCESS; // unrecognised → no-op
+                                    sendInvalidValue(plugin, player, raw, "a number from 0 to 64, or off");
+                                    return Command.SINGLE_SUCCESS;
                                 }
                             }
                             plugin.getSortingPrefs().setBundleStackLimit(player, limit);

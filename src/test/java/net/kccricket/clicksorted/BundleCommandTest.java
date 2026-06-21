@@ -6,6 +6,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -50,8 +52,7 @@ class BundleCommandTest extends AbstractClickSortedTest {
         PlayerMock player = addOpPlayer("Alice");
         drainMessages(player);
         server.dispatchCommand(player, "clicksorted set bundle inventory on");
-        assertTrue(anyMessageContains(player, "ENABLED", "inventory", "Bundle"),
-                "Expected an inventory-packing status message");
+        assertMessageSent(drainMessageList(player), "MSG.setBundlePackInventoryStatus", "ENABLED");
     }
 
     // -------------------------------------------------------------------------
@@ -94,8 +95,7 @@ class BundleCommandTest extends AbstractClickSortedTest {
         PlayerMock player = addOpPlayer("Alice");
         drainMessages(player);
         server.dispatchCommand(player, "clicksorted set bundle stacklimit 12");
-        assertTrue(anyMessageContains(player, "12", "stack limit", "Bundle"),
-                "Expected a stack-limit status message");
+        assertMessageSent(drainMessageList(player), "MSG.setBundleStackLimitStatus", "12");
     }
 
     // -------------------------------------------------------------------------
@@ -137,6 +137,36 @@ class BundleCommandTest extends AbstractClickSortedTest {
     }
 
     // -------------------------------------------------------------------------
+    // Invalid argument feedback
+    // -------------------------------------------------------------------------
+
+    @Test
+    void bundleInventoryWithInvalidValueShowsError() {
+        PlayerMock player = addOpPlayer("Alice");
+        boolean before = plugin.getSortingPrefs().getBundlePackInventory(player);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set bundle inventory GARBAGE");
+
+        assertEquals(before, plugin.getSortingPrefs().getBundlePackInventory(player),
+                "Pref should be unchanged on invalid input");
+        assertMessageSent(drainMessageList(player), "MSG.invalidValue", "GARBAGE");
+    }
+
+    @Test
+    void bundleStackLimitWithInvalidValueShowsError() {
+        PlayerMock player = addOpPlayer("Alice");
+        int before = plugin.getSortingPrefs().getBundleStackLimit(player);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted set bundle stacklimit NOTANUMBER");
+
+        assertEquals(before, plugin.getSortingPrefs().getBundleStackLimit(player),
+                "Stack limit should be unchanged on invalid input");
+        assertMessageSent(drainMessageList(player), "MSG.invalidValue", "NOTANUMBER");
+    }
+
+    // -------------------------------------------------------------------------
     // Guards
     // -------------------------------------------------------------------------
 
@@ -151,7 +181,9 @@ class BundleCommandTest extends AbstractClickSortedTest {
         PlayerMock player = addOpPlayer("Alice");
         drainMessages(player);
         server.dispatchCommand(player, "clicksorted set bundle");
-        assertTrue(anyMessageContains(player, "Bundle", "inventory", "stack limit"),
-                "Bare /clicksorted bundle should print the current settings");
+        List<String> msgs = drainMessageList(player);
+        assertMessageSent(msgs, "MSG.setBundlePackInventoryStatus");
+        assertMessageSent(msgs, "MSG.setBundlePackOthersStatus");
+        assertMessageSent(msgs, "MSG.setBundleStackLimitStatus");
     }
 }

@@ -34,8 +34,7 @@ class PreferenceRepairTest extends AbstractClickSortedTest {
                 "Invalid stored click value must be removed so the read falls back to the default");
         assertEquals(plugin.getConfigManager().main().getDefaultClickMethod(),
                 plugin.getSortingPrefs().getClickMethod(player));
-        assertTrue(anyMessageContains(player, "invalid", "reset"),
-                "Player must be told their invalid preference was reset");
+        assertMessageSent(drainMessageList(player), "MSG.prefResetInvalid", "BOGUS_VALUE");
     }
 
     @Test
@@ -49,8 +48,7 @@ class PreferenceRepairTest extends AbstractClickSortedTest {
 
         assertTrue(plugin.getSortingPrefs().getSortOverItems(player),
                 "CONTROL_DROP must have hover forced on at join");
-        assertTrue(anyMessageContains(player, "automatically"),
-                "Player must be told hover was forced on");
+        assertMessageSent(drainMessageList(player), "MSG.hoverForcedByClickMethod", "ENABLED");
     }
 
     @Test
@@ -61,7 +59,7 @@ class PreferenceRepairTest extends AbstractClickSortedTest {
 
         join(player);
 
-        assertFalse(anyMessageContains(player, "invalid", "reset", "automatically"),
+        assertFalse(anyMessageContains(player, "MSG.prefResetInvalid", "MSG.hoverForcedByClickMethod"),
                 "A clean, consistent config must produce no repair messages");
     }
 }
