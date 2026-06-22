@@ -264,9 +264,9 @@ public final class TreemapPacker {
             }
             long waste = (long) w * h - size;
             int square = Math.abs(w - h);
-            if (waste < bestWaste
-                    || (waste == bestWaste && square < bestSquare)
-                    || (waste == bestWaste && square == bestSquare && h > bestHeight)) {
+            if (square < bestSquare
+                    || (square == bestSquare && waste < bestWaste)
+                    || (square == bestSquare && waste == bestWaste && h > bestHeight)) {
                 best = new int[]{w, h};
                 bestWaste = waste;
                 bestSquare = square;
