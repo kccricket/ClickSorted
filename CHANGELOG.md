@@ -12,6 +12,10 @@ ClickSorted 1.2.0 adds a treemap sort method, configurable sort direction, an au
 - **Item-loss fix** — enchantments and other `ItemMeta` fields are now included in the sort-key merge-equality check, so identically typed but differently enchanted items are never merged.
 - **Hover coupled to click method** — `single_click` now forces sort-over-items off (it only ever triggers on an empty slot); `control_drop` forces it on. Switching click method adjusts the hover preference automatically, and trying to override it manually shows a clear message.
 
+## Breaking Changes
+
+- **Minimum server version is now Paper/Folia 1.21.5**
+
 ## New Features
 
 ### Treemap sort method
@@ -56,7 +60,7 @@ A "preference repair" procedure runs on player join and resets any per-player PD
 
 ## Compatibility
 
-✔️ Paper/Folia 1.20.6 – 26.1.x
+✔️ Paper/Folia 1.21.5 – 26.1.x
 ✔️ Java 21
 
 ## Upgrading
