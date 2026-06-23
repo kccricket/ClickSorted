@@ -364,7 +364,12 @@ public class ClickSortedCommands {
         int limit = prefs.getBundleStackLimit(player);
         MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleStackLimitStatus",
                 Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
-        Set<Material> blacklist = prefs.getBundleBlacklist(player);
+        sendBlacklistStatus(plugin, player);
+    }
+
+    private static void sendBlacklistStatus(ClickSortedPlugin plugin, Player player) {
+        var lang = plugin.getConfigManager().lang();
+        Set<Material> blacklist = plugin.getSortingPrefs().getBundleBlacklist(player);
         if (blacklist.isEmpty()) {
             MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistEmpty"));
         } else {
@@ -381,29 +386,12 @@ public class ClickSortedCommands {
                     if (player == null || throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
-                    Set<Material> blacklist = plugin.getSortingPrefs().getBundleBlacklist(player);
-                    var lang = plugin.getConfigManager().lang();
-                    if (blacklist.isEmpty()) {
-                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistEmpty"));
-                    } else {
-                        String list = blacklist.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
-                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistList",
-                                Placeholder.unparsed("list", list)));
-                    }
+                    sendBlacklistStatus(plugin, player);
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(Commands.literal("add")
                         .then(Commands.argument("material", StringArgumentType.word())
-                                .suggests((ctx, b) -> {
-                                    String input = ctx.getInput();
-                                    String prefix = input.contains(" ") ? input.substring(input.lastIndexOf(' ') + 1).toUpperCase() : "";
-                                    for (Material mat : Material.values()) {
-                                        if (!mat.isLegacy() && mat.name().startsWith(prefix)) {
-                                            b.suggest(mat.name().toLowerCase());
-                                        }
-                                    }
-                                    return b.buildFuture();
-                                })
+                                .suggests((ctx, b) -> suggestEnum(b, Material.values(), mat -> !mat.isLegacy()))
                                 .executes(ctx -> {
                                     Player player = requirePlayer(plugin, ctx);
                                     if (player == null || throttled(plugin, ctx.getSource())) {
@@ -463,15 +451,7 @@ public class ClickSortedCommands {
                             if (player == null || throttled(plugin, ctx.getSource())) {
                                 return Command.SINGLE_SUCCESS;
                             }
-                            Set<Material> blacklist = plugin.getSortingPrefs().getBundleBlacklist(player);
-                            var lang = plugin.getConfigManager().lang();
-                            if (blacklist.isEmpty()) {
-                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistEmpty"));
-                            } else {
-                                String list = blacklist.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
-                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistList",
-                                        Placeholder.unparsed("list", list)));
-                            }
+                            sendBlacklistStatus(plugin, player);
                             return Command.SINGLE_SUCCESS;
                         }))
                 .then(Commands.literal("clear")

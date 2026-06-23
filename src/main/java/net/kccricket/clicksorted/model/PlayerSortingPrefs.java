@@ -169,7 +169,7 @@ public class PlayerSortingPrefs {
                 result.add(mat);
             }
         }
-        return result.isEmpty() ? Set.of() : java.util.Collections.unmodifiableSet(result);
+        return result.isEmpty() ? Set.of() : Set.copyOf(result);
     }
 
     /**

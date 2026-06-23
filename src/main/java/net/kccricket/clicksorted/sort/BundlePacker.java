@@ -56,24 +56,6 @@ public final class BundlePacker {
     private BundlePacker() {}
 
     /**
-     * Pack the bundleable remainders of a pooled item multiset into the given bundles, returning the
-     * loose stacks that should stay out in the inventory. Mutates the bundle {@link ItemStack}s in
-     * {@code bundles} in place; layout of the returned loose stacks is left to the caller (the sort).
-     *
-     * <p>Each bundle's eligible contents are pooled into {@code loosePool}/{@code samples} as well, so
-     * the caller only needs to pre-pool the loose (non-bundle) eligible items. For each pooled type the
-     * total is split into full stacks plus a single remainder; a remainder whose weight is at or below
-     * {@link #MAX_PACK_WEIGHT} is placed into the fullest bundle with room (origin bundles preferred),
-     * otherwise it stays loose. Ineligible bundle contents are retained and never moved.
-     *
-     * @param loosePool  pooled amounts per item type for the loose eligible items; bundle contents are
-     *                   merged in by this method (mutated)
-     * @param samples    a representative ItemStack per type (mutated: bundle-only types are added)
-     * @param bundles    the bundle ItemStacks to use as bins; mutated in place ({@code null}/empty ok)
-     * @param entryCap   maximum distinct entries per bundle; ≤ 0 means weight-only limit
-     * @return the leftover loose stacks (full stacks plus any un-bundled remainder) for every type
-     */
-    /**
      * Convenience overload with no blacklist; preserves existing callers (tests included).
      *
      * @see #packIntoBundles(Map, Map, List, int, Set)
