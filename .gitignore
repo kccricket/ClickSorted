@@ -25,3 +25,6 @@
 /.vscode
 /.claude
 /.bug-hunter
+
+# run-server-plugin dev server (downloaded Paper jar, worlds, configs)
+/run
