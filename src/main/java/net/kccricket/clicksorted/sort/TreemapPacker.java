@@ -16,7 +16,11 @@ import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
+import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -31,16 +35,23 @@ import java.util.Set;
  * Pure, stateless placement for the {@code TREEMAP} sort method — each item type becomes its own
  * roughly-square, contiguous rectangle, sized to the number of stacks it occupies.
  * <p>
- * Types are ranked largest-first and packed shelf-style: the biggest type opens a shelf (a
- * horizontal band) whose height is chosen to keep the block near-square; smaller types fill in to
+ * Item types are grouped before placement: durable items (tools/weapons/armour) are grouped by
+ * material only, fully meta-agnostic — a damaged, enchanted, or anvil-renamed diamond sword shares
+ * one rectangle with plain diamond swords. Non-durable items that carry enchantments, lore,
+ * custom-model-data, or a non-empty PDC are treated as custom/plugin items and each distinct
+ * custom variant gets its own rectangle (multiple copies of the same custom item still share one
+ * rectangle). All other non-durable items (including bundles and written books) group by material.
+ * <p>
+ * Groups are ranked largest-first and packed shelf-style: the biggest group opens a shelf (a
+ * horizontal band) whose height is chosen to keep the block near-square; smaller groups fill in to
  * its right at the same height while they stay reasonably square and fit, otherwise a new shelf
- * opens below. A type that does not tile its rectangle exactly leaves its own trailing cells empty
- * (its ragged tail) — a neighbouring type never tucks into it, so no type wraps or splits.
+ * opens below. A group that does not tile its rectangle exactly leaves its own trailing cells empty
+ * (its ragged tail) — a neighbouring group never tucks into it, so no group wraps or splits.
  * <p>
  * Because clean rectangles need spare cells to pad their tails, this works while the container has
- * room. Once a remaining type can no longer fit as a rectangle in the space left (a nearly-full
+ * room. Once a remaining group can no longer fit as a rectangle in the space left (a nearly-full
  * container), the packer falls back to filling the remaining free cells tightly in reading order —
- * so the largest, most visible types keep clean rectangles and only the tail degrades, reducing to
+ * so the largest, most visible groups keep clean rectangles and only the tail degrades, reducing to
  * a gap-free fill when the container is full. {@code TOP_LEFT} anchors the largest block top-left;
  * other {@link StartCorner}s reflect the grid so the largest block sits at the chosen corner.
  */
@@ -54,7 +65,46 @@ public final class TreemapPacker {
      */
     private static final double MIN_SHELF_ASPECT = 0.5;
 
+    /**
+     * Within-block stack ordering. Enchanted books sort by their primary stored enchantment key
+     * (alphabetically) then level; everything else sorts by SortKey (name → durability → meta).
+     */
+    private static final Comparator<ItemStack> WITHIN_BLOCK_ORDER = (a, b) -> {
+        if (a.getType() == Material.ENCHANTED_BOOK && b.getType() == Material.ENCHANTED_BOOK) {
+            String aKey = primaryStoredEnchantKey(a);
+            String bKey = primaryStoredEnchantKey(b);
+            int c = aKey.compareTo(bKey);
+            if (c != 0) return c;
+            c = Integer.compare(storedEnchantLevel(a, aKey), storedEnchantLevel(b, bKey));
+            if (c != 0) return c;
+        }
+        return new SortKey(a, SortingMethod.TREEMAP).compareTo(new SortKey(b, SortingMethod.TREEMAP));
+    };
+
     private TreemapPacker() {
+    }
+
+    /** Returns the alphabetically-first stored enchantment key (without namespace) for an enchanted book. */
+    private static String primaryStoredEnchantKey(ItemStack stack) {
+        ItemMeta meta = stack.getItemMeta();
+        if (!(meta instanceof EnchantmentStorageMeta esm)) return "";
+        return esm.getStoredEnchants().keySet().stream()
+                .map(e -> e.getKey().getKey())
+                .sorted()
+                .findFirst()
+                .orElse("");
+    }
+
+    /** Returns the level of the stored enchantment whose key matches {@code primaryKey}. */
+    private static int storedEnchantLevel(ItemStack stack, String primaryKey) {
+        ItemMeta meta = stack.getItemMeta();
+        if (!(meta instanceof EnchantmentStorageMeta esm)) return 0;
+        for (Map.Entry<Enchantment, Integer> e : esm.getStoredEnchants().entrySet()) {
+            if (e.getKey().getKey().getKey().equals(primaryKey)) {
+                return e.getValue();
+            }
+        }
+        return 0;
     }
 
     /**
@@ -96,6 +146,7 @@ public final class TreemapPacker {
         boolean flipCol = !start.leftCol();
         Deque<ItemStack> leftover = new ArrayDeque<>();
         for (Block b : blocks) {
+            b.stacks.sort(WITHIN_BLOCK_ORDER);
             List<Integer> slots = new ArrayList<>(b.cells.size());
             for (int[] cell : b.cells) {
                 // Undo the transpose (if any) so cellRow/cellCol address the real rows×width grid.
@@ -213,9 +264,9 @@ public final class TreemapPacker {
             }
             long waste = (long) w * h - size;
             int square = Math.abs(w - h);
-            if (waste < bestWaste
-                    || (waste == bestWaste && square < bestSquare)
-                    || (waste == bestWaste && square == bestSquare && h > bestHeight)) {
+            if (square < bestSquare
+                    || (square == bestSquare && waste < bestWaste)
+                    || (square == bestSquare && waste == bestWaste && h > bestHeight)) {
                 best = new int[]{w, h};
                 bestWaste = waste;
                 bestSquare = square;
@@ -247,20 +298,43 @@ public final class TreemapPacker {
         return (a + b - 1) / b;
     }
 
-    /** Partitions the name-sorted list into runs of consecutive same-type stacks. */
+    /**
+     * Groups stacks into per-type blocks across the whole list (not just consecutive runs).
+     * Durable items group by material (meta-agnostic). Non-durable items that carry enchantments,
+     * lore, custom-model-data, or a non-empty PDC are custom plugin items; each distinct custom
+     * variant gets its own block. All other non-durable items group by material.
+     */
     private static List<Block> groupByType(List<ItemStack> stacks) {
-        List<Block> groups = new ArrayList<>();
-        Block current = null;
+        LinkedHashMap<Object, Block> groups = new LinkedHashMap<>();
         for (ItemStack stack : stacks) {
-            SortKey key = new SortKey(stack, SortingMethod.TREEMAP);
-            if (current == null || !current.key.equals(key)) {
-                current = new Block(key);
-                groups.add(current);
+            Object key = groupKey(stack);
+            Block block = groups.get(key);
+            if (block == null) {
+                block = new Block(new SortKey(stack, SortingMethod.TREEMAP));
+                groups.put(key, block);
             }
-            current.stacks.add(stack);
-            current.size++;
+            block.stacks.add(stack);
+            block.size++;
         }
-        return groups;
+        return new ArrayList<>(groups.values());
+    }
+
+    private static Object groupKey(ItemStack stack) {
+        if (stack.getType().getMaxDurability() > 0) {
+            return stack.getType(); // durable: all meta variants share one block
+        }
+        if (isCustomNonDurable(stack)) {
+            return new SortKey(stack, SortingMethod.TREEMAP); // custom plugin item: own block by identity
+        }
+        return stack.getType(); // plain non-durable: by material
+    }
+
+    private static boolean isCustomNonDurable(ItemStack stack) {
+        ItemMeta meta = stack.getItemMeta();
+        return meta != null && (meta.hasEnchants()
+                || meta.hasLore()
+                || meta.hasCustomModelDataComponent()
+                || !meta.getPersistentDataContainer().isEmpty());
     }
 
     /** One rectangle in the treemap: an item type with its stacks. {@link #cells} is filled by {@link #shelfPack}. */

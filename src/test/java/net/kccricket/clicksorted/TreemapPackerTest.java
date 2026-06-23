@@ -5,8 +5,16 @@ import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.sort.SortEngine;
 import net.kccricket.clicksorted.sort.TreemapPacker;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BundleMeta;
+import org.bukkit.inventory.meta.Damageable;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -16,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -325,5 +334,238 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         assertEquals(5, placement.size(), "only the real stacks are placed");
         assertTrue(placement.keySet().stream().allMatch(s -> s >= 0 && s < CELLS),
                 "no placement escapes the grid");
+    }
+
+    // --- material-grouping tests ---
+
+    /** Slots whose item passes the predicate. */
+    private Set<Integer> slotsMatching(Map<Integer, ItemStack> placement, Predicate<ItemStack> filter) {
+        Set<Integer> slots = new TreeSet<>();
+        placement.forEach((slot, item) -> { if (filter.test(item)) slots.add(slot); });
+        return slots;
+    }
+
+    /** Creates a max-size stack with lore so multiple copies remain distinct cells after SortEngine merge. */
+    private ItemStack withLore(Material mat, String lore) {
+        ItemStack stack = new ItemStack(mat, 64);
+        ItemMeta meta = stack.getItemMeta();
+        meta.lore(List.of(Component.text(lore)));
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    private ItemStack withDamage(Material mat, int damage) {
+        ItemStack stack = new ItemStack(mat);
+        Damageable meta = (Damageable) stack.getItemMeta();
+        meta.setDamage(damage);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    private ItemStack withPDC(Material mat, String key) {
+        ItemStack stack = new ItemStack(mat, 64);
+        ItemMeta meta = stack.getItemMeta();
+        meta.getPersistentDataContainer().set(new NamespacedKey("test", key), PersistentDataType.BYTE, (byte) 1);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    private ItemStack enchantedBook(Enchantment ench, int level) {
+        ItemStack stack = new ItemStack(Material.ENCHANTED_BOOK);
+        EnchantmentStorageMeta meta = (EnchantmentStorageMeta) stack.getItemMeta();
+        meta.addStoredEnchant(ench, level, true);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    @Test
+    void bundlesMergeIntoOneBlock() {
+        // Empty bundles and a filled bundle must share one contiguous rectangle (not split by meta).
+        ItemStack filled = new ItemStack(Material.BUNDLE);
+        BundleMeta bundleMeta = (BundleMeta) filled.getItemMeta();
+        bundleMeta.addItem(new ItemStack(Material.STONE, 16));
+        filled.setItemMeta(bundleMeta);
+
+        List<ItemStack> raw = new ArrayList<>();
+        for (int i = 0; i < 6; i++) raw.add(new ItemStack(Material.BUNDLE));
+        raw.add(filled);
+        // Add other material so the grouping is exercised against a distinct block.
+        raw.addAll(fullStacks(Material.DIRT, 8));
+
+        List<ItemStack> sortedStacks = sorted(raw);
+        Map<Integer, ItemStack> placement =
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+
+        assertEquals(sortedStacks.size(), placement.size(), "every stack placed");
+        Set<Integer> bundleSlots = slotsOf(placement, Material.BUNDLE);
+        assertFalse(bundleSlots.isEmpty(), "bundles are placed");
+        assertTrue(isContiguous(bundleSlots), "all bundle stacks occupy one contiguous block");
+    }
+
+    @Test
+    void durableVariantsMergeIntoOneBlock() {
+        // Diamond pickaxes differing by damage, enchantment, and anvil rename are all durable and
+        // must share one contiguous rectangle regardless of meta differences.
+        ItemStack plain    = new ItemStack(Material.DIAMOND_PICKAXE);
+        ItemStack damaged  = withDamage(Material.DIAMOND_PICKAXE, 200);
+        ItemStack enchanted = new ItemStack(Material.DIAMOND_PICKAXE);
+        ItemMeta enchMeta = enchanted.getItemMeta();
+        enchMeta.addEnchant(Enchantment.EFFICIENCY, 3, true);
+        enchanted.setItemMeta(enchMeta);
+        ItemStack renamed = new ItemStack(Material.DIAMOND_PICKAXE);
+        ItemMeta renamedMeta = renamed.getItemMeta();
+        renamedMeta.displayName(Component.text("My Pickaxe"));
+        renamed.setItemMeta(renamedMeta);
+
+        List<ItemStack> raw = new ArrayList<>();
+        for (int i = 0; i < 5; i++) raw.add(plain.clone());
+        for (int i = 0; i < 5; i++) raw.add(damaged.clone());
+        for (int i = 0; i < 5; i++) raw.add(enchanted.clone());
+        for (int i = 0; i < 5; i++) raw.add(renamed.clone());
+        raw.addAll(fullStacks(Material.DIRT, 8));
+
+        List<ItemStack> sortedStacks = sorted(raw);
+        Map<Integer, ItemStack> placement =
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+
+        assertEquals(sortedStacks.size(), placement.size(), "every stack placed");
+        Set<Integer> pickSlots = slotsOf(placement, Material.DIAMOND_PICKAXE);
+        assertEquals(20, pickSlots.size(), "all 20 pickaxe stacks placed");
+        assertTrue(isContiguous(pickSlots), "all diamond pickaxe variants share one contiguous block");
+    }
+
+    @Test
+    void customSwordJoinsMaterialBlockBecauseSwordsAreDurable() {
+        // A DIAMOND_SWORD with lore (which would make it "custom" if non-durable) must still join the
+        // plain diamond sword block because swords are durable — the durable check wins.
+        ItemStack plain  = new ItemStack(Material.DIAMOND_SWORD);
+        ItemStack custom = withLore(Material.DIAMOND_SWORD, "Legendary");
+
+        List<ItemStack> raw = new ArrayList<>();
+        for (int i = 0; i < 6; i++) raw.add(plain.clone());
+        for (int i = 0; i < 6; i++) raw.add(custom.clone());
+        raw.addAll(fullStacks(Material.DIRT, 8));
+
+        List<ItemStack> sortedStacks = sorted(raw);
+        Map<Integer, ItemStack> placement =
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+
+        Set<Integer> swordSlots = slotsOf(placement, Material.DIAMOND_SWORD);
+        assertEquals(12, swordSlots.size(), "all 12 sword stacks placed");
+        assertTrue(isContiguous(swordSlots), "plain and custom swords share one block (durable rule)");
+    }
+
+    @Test
+    void nonDurableCustomItemsGetSeparateBlocksGroupedByIdentity() {
+        // Two distinct custom feathers (different lore) each form their own block; plain feathers
+        // form a third block. Multiple copies of the same custom variant share one block.
+        ItemStack customA = withLore(Material.FEATHER, "Lore A");  // amount=64 (from withLore)
+        ItemStack customB = withLore(Material.FEATHER, "Lore B");
+        ItemStack plain   = new ItemStack(Material.FEATHER, 64);   // amount=64 so merge keeps 5 stacks
+
+        List<ItemStack> raw = new ArrayList<>();
+        for (int i = 0; i < 5; i++) raw.add(customA.clone());
+        for (int i = 0; i < 5; i++) raw.add(customB.clone());
+        for (int i = 0; i < 5; i++) raw.add(plain.clone());
+        raw.addAll(fullStacks(Material.DIRT, 8));
+
+        List<ItemStack> sortedStacks = sorted(raw);
+        Map<Integer, ItemStack> placement =
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+
+        assertEquals(sortedStacks.size(), placement.size(), "every stack placed");
+
+        // Each variant must occupy its own contiguous region.
+        Set<Integer> slotsA = slotsMatching(placement, item -> item.isSimilar(customA));
+        Set<Integer> slotsB = slotsMatching(placement, item -> item.isSimilar(customB));
+        Set<Integer> slotsPlain = slotsMatching(placement, item ->
+                item.getType() == Material.FEATHER && !item.isSimilar(customA) && !item.isSimilar(customB));
+
+        assertEquals(5, slotsA.size(), "5 stacks of custom-A placed");
+        assertEquals(5, slotsB.size(), "5 stacks of custom-B placed");
+        assertEquals(5, slotsPlain.size(), "5 plain feather stacks placed");
+        assertTrue(isContiguous(slotsA),     "custom-A feathers form one contiguous block");
+        assertTrue(isContiguous(slotsB),     "custom-B feathers form one contiguous block");
+        assertTrue(isContiguous(slotsPlain), "plain feathers form one contiguous block");
+
+        // The three blocks must be distinct (no slot shared).
+        Set<Integer> all = new TreeSet<>(slotsA);
+        all.retainAll(slotsB);
+        assertTrue(all.isEmpty(), "custom-A and custom-B blocks do not overlap");
+    }
+
+    @Test
+    void anvilRenameAloneDoesNotMakeItemCustom() {
+        // A STICK with only a display name (no lore/enchant/model-data/PDC) is not a custom item
+        // and must group with plain sticks in one block. Use amount=64 so each "copy" produces a
+        // distinct cell after SortEngine merges same-SortKey stacks.
+        ItemStack plain   = new ItemStack(Material.STICK, 64);
+        ItemStack renamed = new ItemStack(Material.STICK, 64);
+        ItemMeta meta = renamed.getItemMeta();
+        meta.displayName(Component.text("My Stick"));
+        renamed.setItemMeta(meta);
+
+        List<ItemStack> raw = new ArrayList<>();
+        for (int i = 0; i < 6; i++) raw.add(plain.clone());
+        for (int i = 0; i < 6; i++) raw.add(renamed.clone());
+        raw.addAll(fullStacks(Material.DIRT, 8));
+
+        List<ItemStack> sortedStacks = sorted(raw);
+        Map<Integer, ItemStack> placement =
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+
+        Set<Integer> stickSlots = slotsOf(placement, Material.STICK);
+        assertEquals(12, stickSlots.size(), "all 12 stick stacks placed");
+        assertTrue(isContiguous(stickSlots), "plain and renamed sticks share one contiguous block");
+    }
+
+    @Test
+    void nonDurableItemWithPdcIsCustomAndGetsOwnBlock() {
+        // A non-durable item carrying a PDC entry (the WuufusWaygates feather-key pattern) must be
+        // treated as a custom item and land in a block separate from plain items of the same material.
+        ItemStack pdcFeather = withPDC(Material.FEATHER, "door_key");
+        ItemStack plain      = new ItemStack(Material.FEATHER, 64);
+
+        List<ItemStack> raw = new ArrayList<>();
+        for (int i = 0; i < 5; i++) raw.add(pdcFeather.clone());
+        for (int i = 0; i < 5; i++) raw.add(plain.clone());
+        raw.addAll(fullStacks(Material.DIRT, 8));
+
+        List<ItemStack> sortedStacks = sorted(raw);
+        Map<Integer, ItemStack> placement =
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+
+        assertEquals(sortedStacks.size(), placement.size(), "every stack placed");
+        Set<Integer> pdcSlots   = slotsMatching(placement, item -> item.isSimilar(pdcFeather));
+        Set<Integer> plainSlots = slotsMatching(placement, item ->
+                item.getType() == Material.FEATHER && !item.isSimilar(pdcFeather));
+
+        assertFalse(pdcSlots.isEmpty(),   "PDC feathers are placed");
+        assertFalse(plainSlots.isEmpty(), "plain feathers are placed");
+        assertTrue(isContiguous(pdcSlots),   "PDC feathers form one contiguous block");
+        assertTrue(isContiguous(plainSlots), "plain feathers form one contiguous block");
+        Set<Integer> overlap = new TreeSet<>(pdcSlots);
+        overlap.retainAll(plainSlots);
+        assertTrue(overlap.isEmpty(), "PDC and plain feather blocks do not overlap");
+    }
+
+    @Test
+    void enchantedBooksLumpIntoOneBlock() {
+        // ENCHANTED_BOOKs with different stored enchantments are not custom (hasEnchants() is false
+        // for stored enchantments) and must all group into one contiguous block.
+        List<ItemStack> raw = new ArrayList<>();
+        for (int i = 0; i < 4; i++) raw.add(enchantedBook(Enchantment.SHARPNESS, 1));
+        for (int i = 0; i < 4; i++) raw.add(enchantedBook(Enchantment.EFFICIENCY, 3));
+        for (int i = 0; i < 4; i++) raw.add(enchantedBook(Enchantment.PROTECTION, 4));
+        raw.addAll(fullStacks(Material.DIRT, 8));
+
+        List<ItemStack> sortedStacks = sorted(raw);
+        Map<Integer, ItemStack> placement =
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+
+        assertEquals(sortedStacks.size(), placement.size(), "every stack placed");
+        Set<Integer> bookSlots = slotsOf(placement, Material.ENCHANTED_BOOK);
+        assertEquals(12, bookSlots.size(), "all 12 enchanted book stacks placed");
+        assertTrue(isContiguous(bookSlots), "all enchanted books occupy one contiguous block");
     }
 }
