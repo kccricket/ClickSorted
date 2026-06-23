@@ -4,6 +4,7 @@ plugins {
     java
     jacoco
     id("com.gradleup.shadow") version "9.4.2"
+    id("org.bxteam.runserver") version "1.2.2"
 }
 
 group = project.property("group") as String
@@ -121,4 +122,14 @@ tasks.shadowJar {
 // Make the standard 'build' task produce the shadow JAR
 tasks.build {
     dependsOn(tasks.shadowJar)
+}
+
+// Run a local Paper dev server with the plugin already loaded.
+// Usage: ./gradlew runServer
+tasks.runServer {
+    serverType(org.bxteam.runserver.ServerType.PAPER)
+    serverVersion("26.1.2")
+    acceptMojangEula()
+    // Use the Shadow JAR (bStats relocated) instead of the plain jar task output.
+    inputTask(tasks.named("shadowJar"))
 }
