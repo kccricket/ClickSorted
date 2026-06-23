@@ -3,6 +3,7 @@ package net.kccricket.clicksorted;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kccricket.clicksorted.sort.BundleBlacklist;
 import net.kccricket.clicksorted.sort.BundlePacker;
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
@@ -59,7 +60,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
      * blacklist, returning the leftover loose stacks. Mirrors InventorySortService.packAndSort.
      */
     private static List<ItemStack> pack(List<ItemStack> loose, List<ItemStack> bundles,
-                                        int stackLimit, Set<Material> blacklist) {
+                                        int stackLimit, BundleBlacklist blacklist) {
         Map<SortKey, Long> pool = new LinkedHashMap<>();
         Map<SortKey, ItemStack> samples = new LinkedHashMap<>();
         for (ItemStack is : loose) {
@@ -70,6 +71,15 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
             samples.putIfAbsent(key, is);
         }
         return BundlePacker.packIntoBundles(pool, samples, bundles, stackLimit, blacklist);
+    }
+
+    /** Build an ItemStack with a custom display name (Adventure component). */
+    private static ItemStack customNamed(Material material, String name) {
+        ItemStack item = new ItemStack(material, 1);
+        var meta = item.getItemMeta();
+        meta.displayName(net.kyori.adventure.text.Component.text(name));
+        item.setItemMeta(meta);
+        return item;
     }
 
     /** True if the bundle contains at least one stack of the given material. */
@@ -204,7 +214,8 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         // The pack() helper filters via canBundle(is, blacklist) before pooling, so blacklisted
         // items never enter packIntoBundles at all — they don't appear in the leftover list either.
         // What we verify here is that the bundle never receives blacklisted dirt.
-        pack(List.of(new ItemStack(Material.DIRT, 16)), bundles, 0, Set.of(Material.DIRT));
+        pack(List.of(new ItemStack(Material.DIRT, 16)), bundles, 0,
+                new BundleBlacklist(Set.of(Material.DIRT), Set.of()));
 
         assertFalse(bundleHas(b, Material.DIRT),
                 "Blacklisted dirt must not be packed into the bundle");
@@ -217,7 +228,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         assertTrue(BundlePacker.canBundle(dirt),
                 "Dirt should be bundleable without a blacklist");
         // With blacklist containing DIRT: must return false.
-        assertFalse(BundlePacker.canBundle(dirt, Set.of(Material.DIRT)),
+        assertFalse(BundlePacker.canBundle(dirt, new BundleBlacklist(Set.of(Material.DIRT), Set.of())),
                 "canBundle with blacklist must return false for blacklisted material");
     }
 
@@ -230,7 +241,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 List.of(new ItemStack(Material.COBBLESTONE, 16)),
                 bundles,
                 0,
-                Set.of(Material.DIRT)); // COBBLESTONE is NOT blacklisted
+                new BundleBlacklist(Set.of(Material.DIRT), Set.of())); // COBBLESTONE is NOT blacklisted
 
         assertFalse(leftover.stream().anyMatch(is -> is != null && is.getType() == Material.COBBLESTONE),
                 "Non-blacklisted cobblestone should be packed away");
@@ -249,7 +260,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         List<ItemStack> bundles = new ArrayList<>(List.of(b));
 
         // Pack with no loose items; only the existing bundle's contents matter.
-        pack(List.of(), bundles, 0, Set.of(Material.DIRT));
+        pack(List.of(), bundles, 0, new BundleBlacklist(Set.of(Material.DIRT), Set.of()));
 
         assertTrue(bundleHas(b, Material.DIRT),
                 "Blacklisted dirt already in the bundle must stay there (not unpacked)");
@@ -262,7 +273,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         ItemStack b = bundle(new ItemStack(Material.COBBLESTONE, 64));
         List<ItemStack> bundles = new ArrayList<>(List.of(b));
 
-        List<ItemStack> leftover = pack(List.of(), bundles, 0, Set.of(Material.DIRT));
+        List<ItemStack> leftover = pack(List.of(), bundles, 0, new BundleBlacklist(Set.of(Material.DIRT), Set.of()));
 
         boolean fullStackLoose = leftover.stream().anyMatch(
                 is -> is != null && is.getType() == Material.COBBLESTONE && is.getAmount() == 64);
@@ -277,7 +288,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 new ItemStack(Material.COBBLESTONE, 64));
         List<ItemStack> bundles = new ArrayList<>(List.of(b));
 
-        List<ItemStack> leftover = pack(List.of(), bundles, 0, Set.of(Material.DIRT));
+        List<ItemStack> leftover = pack(List.of(), bundles, 0, new BundleBlacklist(Set.of(Material.DIRT), Set.of()));
 
         // Dirt stays in bundle; cobblestone (full stack) is pooled out and returned loose.
         assertTrue(bundleHas(b, Material.DIRT),
@@ -324,6 +335,108 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         assertTrue(bundleHas(bundle, Material.COBBLESTONE), "Non-blacklisted cobblestone should pack");
     }
 
+    // -------------------------------------------------------------------------
+    // PlayerSortingPrefs — display-name PDC storage
+    // -------------------------------------------------------------------------
+
+    @Test
+    void nameBlacklistEmptyByDefault() {
+        PlayerMock player = server.addPlayer("Alice");
+        assertTrue(plugin.getSortingPrefs().getBundleBlacklistNames(player).isEmpty(),
+                "New player should have an empty name blacklist");
+    }
+
+    @Test
+    void addNameThenGetRoundTrips() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+
+        boolean added = prefs.addToBundleBlacklistName(player, "Magic Sword");
+        assertTrue(added, "First name add should return true");
+        assertTrue(prefs.getBundleBlacklistNames(player).contains("Magic Sword"));
+    }
+
+    @Test
+    void addDuplicateNameReturnsFalse() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+
+        prefs.addToBundleBlacklistName(player, "Magic Sword");
+        boolean addedAgain = prefs.addToBundleBlacklistName(player, "Magic Sword");
+        assertFalse(addedAgain, "Re-adding an existing name entry should return false");
+        assertEquals(1, prefs.getBundleBlacklistNames(player).size());
+    }
+
+    @Test
+    void removeNameReturnsTrueWhenPresent() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+
+        prefs.addToBundleBlacklistName(player, "Magic Sword");
+        boolean removed = prefs.removeFromBundleBlacklistName(player, "Magic Sword");
+        assertTrue(removed);
+        assertFalse(prefs.getBundleBlacklistNames(player).contains("Magic Sword"));
+    }
+
+    @Test
+    void clearAlsoClearsNameBlacklist() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+
+        prefs.addToBundleBlacklist(player, Material.DIRT);
+        prefs.addToBundleBlacklistName(player, "Magic Sword");
+        prefs.clearBundleBlacklist(player);
+        assertTrue(prefs.getBundleBlacklist(player).isEmpty(), "Material blacklist should be empty after clear");
+        assertTrue(prefs.getBundleBlacklistNames(player).isEmpty(), "Name blacklist should be empty after clear");
+    }
+
+    // -------------------------------------------------------------------------
+    // BundleBlacklist.blocks — name matching
+    // -------------------------------------------------------------------------
+
+    @Test
+    void blocksReturnsTrueForCustomNamedItem() {
+        ItemStack sword = customNamed(Material.DIAMOND_SWORD, "Magic Sword");
+        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        assertTrue(blacklist.blocks(sword),
+                "blocks() must return true for an item whose display name is in the name set");
+    }
+
+    @Test
+    void blocksReturnsFalseForSameMaterialDifferentName() {
+        ItemStack plain = new ItemStack(Material.DIAMOND_SWORD, 1); // no custom name
+        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        assertFalse(blacklist.blocks(plain),
+                "blocks() must return false for a same-material item without that display name");
+    }
+
+    @Test
+    void blocksReturnsFalseForWrongName() {
+        ItemStack sword = customNamed(Material.DIAMOND_SWORD, "Other Sword");
+        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        assertFalse(blacklist.blocks(sword),
+                "blocks() must return false when the item's name does not match");
+    }
+
+    @Test
+    void canBundleReturnsFalseForBlacklistedName() {
+        ItemStack sword = customNamed(Material.DIAMOND_SWORD, "Magic Sword");
+        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        // DIAMOND_SWORD is non-stackable (maxStackSize=1) → canBundle(is) is already false for it.
+        // Use a stackable named item instead.
+        ItemStack namedDirt = customNamed(Material.DIRT, "Special Dirt");
+        BundleBlacklist bl = new BundleBlacklist(Set.of(), Set.of("Special Dirt"));
+        assertFalse(BundlePacker.canBundle(namedDirt, bl),
+                "canBundle must return false for a named item whose name is blacklisted");
+        // A plain dirt (no custom name) must still be bundleable with the same blacklist.
+        assertTrue(BundlePacker.canBundle(new ItemStack(Material.DIRT, 1), bl),
+                "canBundle must return true for a same-material item without the blacklisted name");
+    }
+
+    // -------------------------------------------------------------------------
+    // Integration — sort service respects the player's name blacklist
+    // -------------------------------------------------------------------------
+
     @Test
     void blacklistedItemInBundleRemainsAfterSort() {
         PlayerMock player = addOpPlayer("Alice");
@@ -342,5 +455,70 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         assertNotNull(bundleAfter, "Bundle should remain");
         assertTrue(bundleHas(bundleAfter, Material.DIRT),
                 "Blacklisted dirt inside the bundle must stay there after sorting");
+    }
+
+    @Test
+    void namedItemBlacklistedByName_staysLoose_plainPacksNormally() {
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().addToBundleBlacklistName(player, "Special Dirt");
+
+        // One "Special Dirt" (named) and one plain dirt — same material.
+        ItemStack namedDirt = customNamed(Material.DIRT, "Special Dirt");
+        namedDirt.setAmount(16);
+        ItemStack plainDirt = new ItemStack(Material.DIRT, 16);
+        ItemStack cobble = new ItemStack(Material.COBBLESTONE, 8);
+
+        player.getInventory().setItem(9, bundle());
+        player.getInventory().setItem(10, namedDirt);
+        player.getInventory().setItem(11, plainDirt);
+        player.getInventory().setItem(12, cobble);
+
+        sortMainStorage(player);
+
+        ItemStack b = findBundle(player.getInventory(), 9, 36);
+        assertNotNull(b, "Bundle should be present after sort");
+
+        // Named dirt must not be in the bundle.
+        boolean namedInBundle = false;
+        for (ItemStack is : ((org.bukkit.inventory.meta.BundleMeta) b.getItemMeta()).getItems()) {
+            if (is != null && is.getType() == Material.DIRT && is.hasItemMeta()
+                    && is.getItemMeta().hasDisplayName()) {
+                namedInBundle = true;
+            }
+        }
+        assertFalse(namedInBundle, "Named 'Special Dirt' must not be packed into the bundle");
+
+        // Cobblestone (not blacklisted) should be in the bundle.
+        assertTrue(bundleHas(b, Material.COBBLESTONE), "Non-blacklisted cobblestone should pack into bundle");
+    }
+
+    @Test
+    void namedItemInsideBundle_blacklistedByName_retainedAfterSort() {
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().addToBundleBlacklistName(player, "Special Dirt");
+
+        // Pre-load a bundle with a named dirt item.
+        ItemStack namedDirt = customNamed(Material.DIRT, "Special Dirt");
+        namedDirt.setAmount(10);
+        ItemStack b = bundle(namedDirt);
+        player.getInventory().setItem(9, b);
+        player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 5));
+
+        sortMainStorage(player);
+
+        ItemStack bundleAfter = findBundle(player.getInventory(), 9, 36);
+        assertNotNull(bundleAfter, "Bundle should remain after sort");
+
+        // Named dirt must still be inside the bundle (not unpacked).
+        boolean namedRetained = false;
+        for (ItemStack is : ((org.bukkit.inventory.meta.BundleMeta) bundleAfter.getItemMeta()).getItems()) {
+            if (is != null && is.getType() == Material.DIRT && is.hasItemMeta()
+                    && is.getItemMeta().hasDisplayName()) {
+                namedRetained = true;
+            }
+        }
+        assertTrue(namedRetained, "Named 'Special Dirt' inside the bundle must stay there after sorting");
     }
 }

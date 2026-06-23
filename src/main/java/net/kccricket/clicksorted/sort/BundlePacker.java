@@ -58,12 +58,12 @@ public final class BundlePacker {
     /**
      * Convenience overload with no blacklist; preserves existing callers (tests included).
      *
-     * @see #packIntoBundles(Map, Map, List, int, Set)
+     * @see #packIntoBundles(Map, Map, List, int, BundleBlacklist)
      */
     public static List<ItemStack> packIntoBundles(Map<SortKey, Long> loosePool,
                                                   Map<SortKey, ItemStack> samples,
                                                   List<ItemStack> bundles, int entryCap) {
-        return packIntoBundles(loosePool, samples, bundles, entryCap, Set.of());
+        return packIntoBundles(loosePool, samples, bundles, entryCap, BundleBlacklist.EMPTY);
     }
 
     /**
@@ -71,22 +71,22 @@ public final class BundlePacker {
      * loose stacks that should stay out in the inventory. Mutates the bundle {@link ItemStack}s in
      * {@code bundles} in place; layout of the returned loose stacks is left to the caller (the sort).
      *
-     * <p>Materials in {@code blacklist} are treated as ineligible for bundling: loose blacklisted
-     * items are not pooled by the caller and blacklisted items already inside bundles are retained
-     * (not unpacked) by this method.
+     * <p>Entries in {@code blacklist} are treated as ineligible for bundling: loose blacklisted items
+     * are not pooled by the caller and blacklisted items already inside bundles are retained (not
+     * unpacked) by this method.
      *
      * @param loosePool  pooled amounts per item type for the loose eligible items; bundle contents are
      *                   merged in by this method (mutated)
      * @param samples    a representative ItemStack per type (mutated: bundle-only types are added)
      * @param bundles    the bundle ItemStacks to use as bins; mutated in place ({@code null}/empty ok)
      * @param entryCap   maximum distinct entries per bundle; ≤ 0 means weight-only limit
-     * @param blacklist  materials that must not be packed into or unpacked from bundles
+     * @param blacklist  materials and display names that must not be packed into or unpacked from bundles
      * @return the leftover loose stacks (full stacks plus any un-bundled remainder) for every type
      */
     public static List<ItemStack> packIntoBundles(Map<SortKey, Long> loosePool,
                                                   Map<SortKey, ItemStack> samples,
                                                   List<ItemStack> bundles, int entryCap,
-                                                  Set<Material> blacklist) {
+                                                  BundleBlacklist blacklist) {
         Map<SortKey, Set<Integer>> originBins = new HashMap<>();
 
         // Bins = each provided bundle; pool its eligible contents into the loose pool.
@@ -152,7 +152,7 @@ public final class BundlePacker {
     /** Construct a {@link Bin} for {@code bundleItem}, pooling its eligible contents into the pool. */
     private static void addBin(List<Bin> bins, ItemStack bundleItem, Map<SortKey, Long> totals,
                                Map<SortKey, ItemStack> samples, Map<SortKey, Set<Integer>> originBins,
-                               Set<Material> blacklist) {
+                               BundleBlacklist blacklist) {
         Bin bin = Bin.of(bins.size(), bundleItem, blacklist);
         if (bin == null) return;
         for (ItemStack is : bin.pooled) {
@@ -237,12 +237,12 @@ public final class BundlePacker {
     }
 
     /**
-     * Returns true if {@code is} may be placed into a bundle and is not in the player's blacklist.
+     * Returns true if {@code is} may be placed into a bundle and is not blocked by the blacklist.
      *
-     * @param blacklist materials excluded from bundle packing/unpacking; may be empty but not null
+     * @param blacklist materials and display names excluded from bundle packing/unpacking; not null
      */
-    public static boolean canBundle(ItemStack is, Set<Material> blacklist) {
-        return canBundle(is) && !blacklist.contains(is.getType());
+    public static boolean canBundle(ItemStack is, BundleBlacklist blacklist) {
+        return canBundle(is) && !blacklist.blocks(is);
     }
 
     /**
@@ -281,7 +281,7 @@ public final class BundlePacker {
         int distinct;
         boolean dirty;
 
-        private Bin(int id, ItemStack bundleItem, BundleMeta meta, Set<Material> blacklist) {
+        private Bin(int id, ItemStack bundleItem, BundleMeta meta, BundleBlacklist blacklist) {
             this.id = id;
             this.bundleItem = bundleItem;
             this.meta = meta;
@@ -302,7 +302,7 @@ public final class BundlePacker {
         }
 
         /** Wrap a bundle ItemStack, or {@code null} if it has no usable {@link BundleMeta}. */
-        static Bin of(int id, ItemStack bundleItem, Set<Material> blacklist) {
+        static Bin of(int id, ItemStack bundleItem, BundleBlacklist blacklist) {
             if (!(bundleItem.getItemMeta() instanceof BundleMeta meta)) return null;
             return new Bin(id, bundleItem, meta, blacklist);
         }

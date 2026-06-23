@@ -60,9 +60,19 @@ setBundleBlacklistAlreadyPresent: "<aqua><material><white> is already in your bu
 setBundleBlacklistRemoved: "<aqua><material><white> removed from your bundle blacklist."
 setBundleBlacklistNotPresent: "<aqua><material><white> is not in your bundle blacklist."
 # Placeholder: <list> (comma-separated material names)
-setBundleBlacklistList: "Bundle blacklist: <aqua><list><white>."
+setBundleBlacklistMaterialsList: "Blacklisted materials: <aqua><list><white>."
 setBundleBlacklistEmpty: "Your bundle blacklist is <aqua>empty<white>."
 setBundleBlacklistCleared: "Your bundle blacklist has been <aqua>cleared<white>."
+# Command feedback — bundle blacklist name sub-branch (/clicksorted set bundle blacklist name ...)
+# Placeholder: <name> (plain-text display name)
+setBundleBlacklistNameAdded: "Display name <aqua><name><white> added to your bundle blacklist."
+setBundleBlacklistNameAlreadyPresent: "Display name <aqua><name><white> is already in your bundle blacklist."
+setBundleBlacklistNameRemoved: "Display name <aqua><name><white> removed from your bundle blacklist."
+setBundleBlacklistNameNotPresent: "Display name <aqua><name><white> is not in your bundle blacklist."
+# Shown when the player runs 'name hand' but holds nothing or an item with no custom display name.
+setBundleBlacklistNameNoHeld: "Hold an item with a <aqua>custom display name<white> to blacklist it by name."
+# Placeholder: <list> (comma-separated display names)
+setBundleBlacklistNamesList: "Blacklisted display names: <aqua><list><white>."
 
 # Command feedback — status (/clicksorted status)
 # Placeholder: <method>

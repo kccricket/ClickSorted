@@ -18,8 +18,11 @@ import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -369,12 +372,21 @@ public class ClickSortedCommands {
 
     private static void sendBlacklistStatus(ClickSortedPlugin plugin, Player player) {
         var lang = plugin.getConfigManager().lang();
-        Set<Material> blacklist = plugin.getSortingPrefs().getBundleBlacklist(player);
-        if (blacklist.isEmpty()) {
+        var prefs = plugin.getSortingPrefs();
+        Set<Material> materials = prefs.getBundleBlacklist(player);
+        Set<String> names = prefs.getBundleBlacklistNames(player);
+        if (materials.isEmpty() && names.isEmpty()) {
             MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistEmpty"));
-        } else {
-            String list = blacklist.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistList",
+            return;
+        }
+        if (!materials.isEmpty()) {
+            String list = materials.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
+            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistMaterialsList",
+                    Placeholder.unparsed("list", list)));
+        }
+        if (!names.isEmpty()) {
+            String list = names.stream().sorted().collect(Collectors.joining(", "));
+            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNamesList",
                     Placeholder.unparsed("list", list)));
         }
     }
@@ -464,7 +476,102 @@ public class ClickSortedCommands {
                             MessageUtil.statusMessage(player,
                                     plugin.getConfigManager().lang().getColoredMessage("setBundleBlacklistCleared"));
                             return Command.SINGLE_SUCCESS;
-                        }));
+                        }))
+                .then(buildBundleBlacklistName(plugin));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundleBlacklistName(ClickSortedPlugin plugin) {
+        return Commands.literal("name")
+                .then(Commands.literal("hand")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            var lang = plugin.getConfigManager().lang();
+                            ItemStack held = player.getInventory().getItemInMainHand();
+                            String name = heldDisplayName(held);
+                            if (name == null) {
+                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameNoHeld"));
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            boolean added = plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
+                            if (added) {
+                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAdded",
+                                        Placeholder.unparsed("name", name)));
+                            } else {
+                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAlreadyPresent",
+                                        Placeholder.unparsed("name", name)));
+                            }
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                .then(Commands.literal("add")
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(ctx -> {
+                                    Player player = requirePlayer(plugin, ctx);
+                                    if (player == null || throttled(plugin, ctx.getSource())) {
+                                        return Command.SINGLE_SUCCESS;
+                                    }
+                                    String name = StringArgumentType.getString(ctx, "name").trim();
+                                    if (name.isEmpty()) {
+                                        sendInvalidValue(plugin, player, name, "a display name");
+                                        return Command.SINGLE_SUCCESS;
+                                    }
+                                    var lang = plugin.getConfigManager().lang();
+                                    boolean added = plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
+                                    if (added) {
+                                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAdded",
+                                                Placeholder.unparsed("name", name)));
+                                    } else {
+                                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAlreadyPresent",
+                                                Placeholder.unparsed("name", name)));
+                                    }
+                                    return Command.SINGLE_SUCCESS;
+                                })))
+                .then(Commands.literal("remove")
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .suggests((ctx, b) -> {
+                                    if (ctx.getSource().getExecutor() instanceof Player player) {
+                                        String input = b.getRemaining().toLowerCase();
+                                        plugin.getSortingPrefs().getBundleBlacklistNames(player)
+                                                .stream()
+                                                .filter(n -> n.toLowerCase().startsWith(input))
+                                                .forEach(b::suggest);
+                                    }
+                                    return b.buildFuture();
+                                })
+                                .executes(ctx -> {
+                                    Player player = requirePlayer(plugin, ctx);
+                                    if (player == null || throttled(plugin, ctx.getSource())) {
+                                        return Command.SINGLE_SUCCESS;
+                                    }
+                                    String name = StringArgumentType.getString(ctx, "name").trim();
+                                    var lang = plugin.getConfigManager().lang();
+                                    boolean removed = plugin.getSortingPrefs().removeFromBundleBlacklistName(player, name);
+                                    if (removed) {
+                                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameRemoved",
+                                                Placeholder.unparsed("name", name)));
+                                    } else {
+                                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameNotPresent",
+                                                Placeholder.unparsed("name", name)));
+                                    }
+                                    return Command.SINGLE_SUCCESS;
+                                })));
+    }
+
+    /**
+     * Returns the plain-text custom display name of {@code held}, or {@code null} if the stack is
+     * empty/air or has no custom display name.
+     */
+    private static String heldDisplayName(ItemStack held) {
+        if (held == null || held.getType() == Material.AIR || !held.hasItemMeta()) {
+            return null;
+        }
+        ItemMeta meta = held.getItemMeta();
+        if (!meta.hasDisplayName()) {
+            return null;
+        }
+        return PlainTextComponentSerializer.plainText().serialize(meta.displayName());
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildLock(ClickSortedPlugin plugin) {

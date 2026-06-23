@@ -147,9 +147,11 @@ public class InventorySortService {
         var prefs = plugin.getSortingPrefs();
         boolean packEnabled = (playerMainStorage && prefs.getBundlePackInventory(p))
                 || (container && prefs.getBundlePackOthers(p));
+        BundleBlacklist blacklist = packEnabled
+                ? new BundleBlacklist(prefs.getBundleBlacklist(p), prefs.getBundleBlacklistNames(p))
+                : BundleBlacklist.EMPTY;
         List<ItemStack> sortedItems = packEnabled
-                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p),
-                        prefs.getBundleBlacklist(p))
+                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p), blacklist)
                 : SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
@@ -239,7 +241,7 @@ public class InventorySortService {
      */
     private List<ItemStack> packAndSort(Inventory inv, Set<Integer> sortableSlots,
                                         SortingMethod sortMethod, int stackLimit,
-                                        Set<Material> blacklist) {
+                                        BundleBlacklist blacklist) {
         Map<SortKey, Long> loosePool = new LinkedHashMap<>();
         Map<SortKey, ItemStack> samples = new LinkedHashMap<>();
         List<ItemStack> bundles = new ArrayList<>();       // bins (mutated by the packer)
