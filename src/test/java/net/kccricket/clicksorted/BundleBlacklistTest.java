@@ -420,17 +420,14 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
 
     @Test
     void canBundleReturnsFalseForBlacklistedName() {
-        ItemStack sword = customNamed(Material.DIAMOND_SWORD, "Magic Sword");
-        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
-        // DIAMOND_SWORD is non-stackable (maxStackSize=1) → canBundle(is) is already false for it.
-        // Use a stackable named item instead.
+        // Use a stackable item; DIAMOND_SWORD is non-stackable so canBundle(is) is already false.
         ItemStack namedDirt = customNamed(Material.DIRT, "Special Dirt");
         BundleBlacklist bl = new BundleBlacklist(Set.of(), Set.of("Special Dirt"));
         assertFalse(BundlePacker.canBundle(namedDirt, bl),
-                "canBundle must return false for a named item whose name is blacklisted");
-        // A plain dirt (no custom name) must still be bundleable with the same blacklist.
+                "canBundle must return false for an item whose resolved name is blacklisted");
+        // A plain dirt's resolved name ("Dirt" / "DIRT") does not match "Special Dirt".
         assertTrue(BundlePacker.canBundle(new ItemStack(Material.DIRT, 1), bl),
-                "canBundle must return true for a same-material item without the blacklisted name");
+                "canBundle must return true for a same-material item whose name does not match");
     }
 
     // -------------------------------------------------------------------------

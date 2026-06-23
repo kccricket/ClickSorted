@@ -16,13 +16,12 @@ import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
+import net.kccricket.clicksorted.text.ItemNames;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -560,18 +559,14 @@ public class ClickSortedCommands {
     }
 
     /**
-     * Returns the plain-text custom display name of {@code held}, or {@code null} if the stack is
-     * empty/air or has no custom display name.
+     * Returns the displayed name of {@code held} (custom display name if set, otherwise the
+     * items.yml / translation lookup), or {@code null} if the stack is empty/air.
      */
     private static String heldDisplayName(ItemStack held) {
-        if (held == null || held.getType() == Material.AIR || !held.hasItemMeta()) {
+        if (held == null || held.getType() == Material.AIR) {
             return null;
         }
-        ItemMeta meta = held.getItemMeta();
-        if (!meta.hasDisplayName()) {
-            return null;
-        }
-        return PlainTextComponentSerializer.plainText().serialize(meta.displayName());
+        return ItemNames.lookup(held);
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildLock(ClickSortedPlugin plugin) {

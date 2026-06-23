@@ -69,8 +69,8 @@ setBundleBlacklistNameAdded: "Display name <aqua><name><white> added to your bun
 setBundleBlacklistNameAlreadyPresent: "Display name <aqua><name><white> is already in your bundle blacklist."
 setBundleBlacklistNameRemoved: "Display name <aqua><name><white> removed from your bundle blacklist."
 setBundleBlacklistNameNotPresent: "Display name <aqua><name><white> is not in your bundle blacklist."
-# Shown when the player runs 'name hand' but holds nothing or an item with no custom display name.
-setBundleBlacklistNameNoHeld: "Hold an item with a <aqua>custom display name<white> to blacklist it by name."
+# Shown when the player runs 'name hand' but holds nothing.
+setBundleBlacklistNameNoHeld: "Hold an item to blacklist it by name."
 # Placeholder: <list> (comma-separated display names)
 setBundleBlacklistNamesList: "Blacklisted display names: <aqua><list><white>."
 
