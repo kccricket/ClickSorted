@@ -18,12 +18,11 @@ package net.kccricket.clicksorted.model;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.text.ItemNames;
 import org.bukkit.inventory.ItemStack;
 
 public enum SortingMethod {
-    NAME, GROUP;
+    NAME, GROUP, TREEMAP;
 
     public boolean isAvailable() {
         return switch (this) {
@@ -32,30 +31,29 @@ public enum SortingMethod {
         };
     }
 
+    /**
+     * @return true if this method groups items by type and packs each type into a proportional
+     *         block (handled by {@link net.kccricket.clicksorted.sort.TreemapPacker}) rather than
+     *         laying the sorted sequence out linearly via {@link net.kccricket.clicksorted.sort.SlotOrder}.
+     */
+    public boolean isTreemap() {
+        return this == TREEMAP;
+    }
+
     public String makeSortPrefix(ItemStack stack) {
         return switch (this) {
-            case NAME -> ItemNames.lookup(stack);
+            // TREEMAP orders/merges by name; placement (not ordering) is what differs.
+            case NAME, TREEMAP -> ItemNames.lookup(stack);
             case GROUP -> {
                 String grp = ClickSortedPlugin.getInstance().getConfigManager().groups().getGroup(stack);
                 yield String.format("%s-%s", grp, stack.getType());
             }
-            default -> "";
         };
     }
 
     public static final SortingMethod DEFAULT = NAME;
 
-    public static SortingMethod parse(String sortingMethod) {
-        ClickSortedPlugin inst = ClickSortedPlugin.getInstance();
-        return parse(sortingMethod, inst != null ? inst.getConfigManager().main().getDefaultSortingMethod() : DEFAULT);
-    }
-
     public static SortingMethod parse(String sortingMethod, SortingMethod defaultMethod) {
-        try {
-            return SortingMethod.valueOf(sortingMethod);
-        } catch (IllegalArgumentException e) {
-            Log.warning("invalid sort method " + sortingMethod + " - default to " + defaultMethod);
-            return defaultMethod;
-        }
+        return EnumParse.parse(SortingMethod.class, sortingMethod, defaultMethod);
     }
 }

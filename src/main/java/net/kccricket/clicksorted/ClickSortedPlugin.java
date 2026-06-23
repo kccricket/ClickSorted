@@ -23,6 +23,8 @@ import net.kccricket.clicksorted.security.ActionThrottle;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
 import net.kccricket.clicksorted.sort.InventorySortService;
 import net.kccricket.clicksorted.text.CooldownMessenger;
+import net.kccricket.clicksorted.text.MessageUtil;
+import net.kccricket.clicksorted.update.UpdateChecker;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.plugin.PluginManager;
@@ -36,6 +38,7 @@ public class ClickSortedPlugin extends JavaPlugin {
     private InventorySortService sortService;
     private ActionThrottle actionThrottle;
     private Migrations migrations;
+    private UpdateChecker updateChecker;
 
     private static ClickSortedPlugin instance = null;
 
@@ -49,6 +52,7 @@ public class ClickSortedPlugin extends JavaPlugin {
 
         configManager = new ConfigManager(this);
         configManager.loadAll();
+        MessageUtil.init(configManager);
 
         if (getConfig().getBoolean("enable_metrics", true)) {
             metrics = new Metrics(this, 31833);
@@ -56,6 +60,11 @@ public class ClickSortedPlugin extends JavaPlugin {
 
         sortingPrefs = new PlayerSortingPrefs(this);
         actionThrottle = new ActionThrottle(this);
+
+        updateChecker = new UpdateChecker(this);
+        if (configManager.main().getCheckForUpdates()) {
+            updateChecker.check();
+        }
 
         sortService = new InventorySortService(this);
 
@@ -76,6 +85,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         if (configManager != null) {
             configManager.saveAll();
         }
+        MessageUtil.init(null);
         instance = null;
     }
 
@@ -106,5 +116,9 @@ public class ClickSortedPlugin extends JavaPlugin {
 
     public Migrations getMigrations() {
         return migrations;
+    }
+
+    public UpdateChecker getUpdateChecker() {
+        return updateChecker;
     }
 }

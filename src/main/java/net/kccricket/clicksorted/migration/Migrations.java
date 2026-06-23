@@ -45,13 +45,29 @@ public final class Migrations {
             .rename("SINGLE").to("SINGLE_CLICK")
             .build();
 
+    /**
+     * {@code defaults.start_corner} in config and the per-player {@code start_corner} PDC key.
+     * No historical aliases yet; extend with {@code .rename(old).to(new)} if a constant is renamed.
+     */
+    public static final ValueMigration START_CORNER = ValueMigration.builder().build();
+
+    /**
+     * {@code defaults.fill_axis} in config and the per-player {@code fill_axis} PDC key.
+     * No historical aliases yet; extend with {@code .rename(old).to(new)} if a constant is renamed.
+     */
+    public static final ValueMigration FILL_AXIS = ValueMigration.builder().build();
+
     /** Config paths (value-remap): path → lineage. */
     private static final Map<String, ValueMigration> CONFIG = Map.of(
-            "defaults.click_mode", CLICK_METHOD);
+            "defaults.click_mode", CLICK_METHOD,
+            "defaults.start_corner", START_CORNER,
+            "defaults.fill_axis", FILL_AXIS);
 
     /** Per-player PDC keys (value-remap): key name → lineage. */
     private static final Map<String, ValueMigration> PDC = Map.of(
-            "click", CLICK_METHOD);
+            "click", CLICK_METHOD,
+            "start_corner", START_CORNER,
+            "fill_axis", FILL_AXIS);
 
     /** Config paths for settings that have been removed entirely and should be dropped. */
     private static final List<String> DEPRECATED_CONFIG_PATHS = List.of(

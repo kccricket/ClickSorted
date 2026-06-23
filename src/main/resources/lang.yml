@@ -7,45 +7,72 @@
 # Placeholder tags are listed in comments above each message that accepts one.
 # Do not remove a placeholder from a message that requires it.
 
+# Prepended to every status/error/alert message sent to players. MiniMessage. Set to "" to disable.
+prefix: "<gray>[<aqua>ClickSorted<gray>] "
+
 # Command feedback — sort mode
 # Placeholder: <method>
-setSortingMethodTo: "Sort mode set to <method>."
+setSortingMethodTo: "Your <aqua>sort mode<white> is now set to: <aqua><method><white>."
 # Placeholder: <method>
 sortingMethodNotAvailable: "Sort mode <method> is not available — configure groups.yml first."
 
 # Command feedback — click mode
 # Placeholders: <method>, <instruction>
-setClickMethodTo: "Click mode set to <method>. <instruction>"
+setClickMethodTo: "Your <aqua>click mode<white> is now set to: <aqua><method><white>. <instruction>"
+
+# Command feedback — sort layout (/clicksorted set start-corner|fill-axis)
+# Placeholder: <corner>
+setStartCornerTo: "Your <aqua>sort start corner<white> is now set to: <aqua><corner><white>."
+# Placeholder: <axis>
+setFillAxisTo: "Your <aqua>sort fill direction<white> is now set to: <aqua><axis><white>."
 
 # Command feedback — sort-over-items toggle (/clicksorted hover)
 # Placeholder: <status> (ENABLED or DISABLED)
-setSortOverItemsStatus: "Sort over items: <status>."
+setSortOverItemsStatus: "Sorting while hovering over an item is now <aqua><status><white> for you."
+# Shown when a click method governs hover and forces it to a value.
+# Placeholders: <status> (ENABLED or DISABLED), <method>
+hoverForcedByClickMethod: "Sorting while hovering over an item is now <aqua><status><white> for you because your click mode is <aqua><method><white>."
+# Shown when the player tries to change hover but their click method controls it.
+# Placeholder: <method>
+hoverGovernedByClickMethod: "Sorting while hovering over an item is restricted by your click mode (<aqua><method><white>) and can't be changed."
+
+# Shown (to the player) at join when a stored preference held an invalid value and was reset.
+# Placeholders: <pref>, <value>, <default>
+prefResetInvalid: "Your saved <aqua><pref><white> value, <aqua><value><white>, was invalid and has been reset to <aqua><default><white>."
+
+# Shown when a /clicksorted set … argument can't be parsed.
+# Placeholders: <value> (what the player typed), <valid> (comma-joined valid options)
+invalidValue: "<red>Invalid value '<value>'. Valid values: <valid>."
 
 # Command feedback — bundle packing toggles (/clicksorted bundle inventory|others on|off)
 # Placeholder: <status> (ENABLED or DISABLED)
-setBundlePackInventoryStatus: "Bundle packing in your inventory: <status>."
-setBundlePackOthersStatus: "Bundle packing in other containers: <status>."
+setBundlePackInventoryStatus: "Bundle packing in your inventory is now <aqua><status><white>."
+setBundlePackOthersStatus: "Bundle packing in other containers is now <aqua><status><white>."
 
 # Command feedback — bundle stack limit (/clicksorted bundle stacklimit <n|off>)
 # Placeholder: <limit> (max distinct entries per bundle, or "off" for weight-only)
-setBundleStackLimitStatus: "Bundle stack limit: <limit>."
+setBundleStackLimitStatus: "Your <aqua>bundle stack limit<white> is now <aqua><limit><white>."
 
 # Command feedback — status (/clicksorted status)
 # Placeholder: <method>
 statusClickMethod: "Click method: <method>"
 # Placeholder: <method>
 statusSortMethod: "Sort method: <method>"
+# Placeholder: <corner>
+statusStartCorner: "Start corner: <corner>"
+# Placeholder: <axis>
+statusFillAxis: "Fill direction: <axis>"
 # Placeholder: <status> (ENABLED or DISABLED)
 statusHover: "Sort over items: <status>"
 
 # Command feedback — debug level
 # Placeholder: <level>
-setDebugLevelTo: "Debug level is now <level>"
+setDebugLevelTo: "Debug level is now temporarily set to <aqua><level><white>."
 # Placeholder: <level>
 invalidDebugLevel: "Invalid debug level '<level>'. Valid values: OFF, DEBUG, TRACE."
 
 # Command feedback — reload
-configReloaded: "ClickSorted configuration reloaded."
+configReloaded: "Configuration reloaded."
 
 # Inventory overflow messages
 invOverFlow: "Inventory overflow — items were not sorted."
@@ -67,7 +94,7 @@ notFromConsole: "This command can only be used by a player."
 actionTooFast: "<red>Slow down — you're acting too quickly."
 
 # Lock GUI
-lockGuiTitle: "<!italic>Slot Locks"
+lockGuiTitle: "<!italic>Inventory Sorting Locks"
 lockPaneUnlocked: "<!italic><green>Unlocked"
 lockPaneLocked: "<!italic><red>Locked"
 # Placeholder: <number>
@@ -80,4 +107,4 @@ lockPaneUnsortable: "<!italic><dark_gray>Not sortable"
 lockPaneUnsortableLore: "<!italic><gray>This slot is always excluded from sorting."
 lockDividerName: "<!italic><dark_gray>--------"
 lockHelpHeadName: "<!italic>What is this?"
-lockHelpHeadLore: "<!italic><gray>Locked inventory slots will not be sorted."
+lockHelpHeadLore: "<!italic><gray>Locked inventory slots will not be sorted and<newline>bundles in a locked slot will not be packed."

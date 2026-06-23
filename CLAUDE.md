@@ -22,18 +22,22 @@ ClickSorted is a Paper/Bukkit plugin that lets players sort inventories via conf
 ```
 net.kccricket.clicksorted
 ├── ClickSortedPlugin          entry point
-├── model/                   ClickMethod, SortingMethod, SortKey, PlayerSortingPrefs
+├── model/                   ClickMethod, SortingMethod, SortKey, PlayerSortingPrefs,
+│                            StartCorner, FillAxis, EnumParse
 ├── commands/                ClickSortedCommands (Brigadier command tree)
 ├── config/                  ConfigManager, ManagedConfig, MainConfig, LangConfig,
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
 ├── events/                  InventorySortEvent
-├── gui/                     LockGuiHolder, LockGuiListener
+├── gui/                     ClickSortedHolder, LockGuiHolder, LockGuiListener
 ├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
-│                            BundlePacker, BundleBenchmark
-├── migration/               ValueMigration, Migrations, PlayerMigrationListener
+│                            BundlePacker, BundleBenchmark, GridGeometry, SlotOrder,
+│                            TreemapPacker, PrefsCycleHandler
+├── migration/               ValueMigration, Migrations, PlayerMigrationListener,
+│                            PreferenceRepair
 ├── text/                    MessageUtil, CooldownMessenger, ItemNames
 ├── logging/                 Log, DebugLevel
-└── security/                Permissions, ActionThrottle
+├── security/                Permissions, ActionThrottle
+└── update/                  UpdateChecker
 ```
 
 ### Settings migration
@@ -68,6 +72,8 @@ the lineage definitions stay pure data.
 4. When bundle packing is enabled for the target (`defaults.bundle_inventory` / `defaults.bundle_others`, toggled per-player), `InventorySortService` first runs `BundlePacker` to repack partial stacks into bundles before the sort.
 5. A custom `InventorySortEvent` fires after sorting so third-party plugins can intervene.
 6. For player inventories, any slots the player has locked (via `/clicksorted set lock`) are excluded from the sortable set before `SortEngine` runs — locked slots are neither read nor overwritten.
+7. On startup (and after `/clicksorted reload`), `UpdateChecker` runs an async best-effort Modrinth API call and logs a console notice if a newer release exists (`check_for_updates: true`).
+8. On `PlayerJoinEvent`, `PreferenceRepair` validates the player's PDC preferences and resets any that hold unrecognised values, notifying the player in chat.
 
 ### Key Classes
 
@@ -78,13 +84,23 @@ the lineage definitions stay pure data.
 | `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier panes and maps chest↔inventory slots |
 | `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; toggles lock state and cancels all real-inventory interaction |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
-| `SortingMethod` | model | Enum (NAME, GROUP) controlling `SortKey.makeSortPrefix()` |
+| `SortingMethod` | model | Enum (NAME, GROUP, TREEMAP) controlling `SortKey.makeSortPrefix()`; `isTreemap()` routes placement through `TreemapPacker` instead of `SlotOrder` |
 | `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE) |
+| `StartCorner` | model | Enum (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT) — which corner the sort grid begins from |
+| `FillAxis` | model | Enum (HORIZONTAL, VERTICAL) — whether rows or columns fill first from the start corner |
+| `EnumParse` | model | Case-insensitive enum parse helper used by StartCorner, FillAxis, and others |
 | `InventoryClickListener` | sort | Dispatches click events: trigger match, sort-over-items gate, throttle, then hand off to the sort service |
 | `InventorySortService` | sort | Target resolution, permissions, event lifecycle, optional bundle packing, write-back |
 | `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) — fungible merge + discrete passthrough |
+| `GridGeometry` | sort | Maps an inventory's slot indices to a 2-D grid; computes row/column counts and the mount-slot offset |
+| `SlotOrder` | sort | Produces a write-back slot sequence from a `GridGeometry` given a `StartCorner` and `FillAxis` |
+| `TreemapPacker` | sort | Implements the `TREEMAP` sort method: assigns each item type a contiguous near-square block sized to its stack count; respects `StartCorner` and `FillAxis`; falls back to gap-free fill when rectangles no longer fit |
+| `PrefsCycleHandler` | sort | Handles a click-method-driven preference cycle (used internally by InventoryClickListener) |
 | `BundlePacker` | sort | Pure pool-and-repack of bundle-eligible items into bundles (no plugin state) |
 | `BundleBenchmark` | sort | In-situ micro-benchmark of the sort and bundle-repack paths (`/clicksorted benchmark`) |
+| `ClickSortedHolder` | gui | Base `InventoryHolder` marker for all ClickSorted-owned GUIs (used to block self-sort) |
+| `PreferenceRepair` | migration | Validates and resets invalid per-player PDC preferences on login, notifying the player |
+| `UpdateChecker` | update | Best-effort async Modrinth API check; logs a console notice when a newer release exists |
 | `ConfigManager` | config | Unified lifecycle for all four config files |
 | `ResourceUpdater` | config | Add-only merge of bundled resource into plugin data folder |
 | `Log`, `DebugLevel` | logging | Plugin logger wrapper with gated debug levels |
@@ -95,7 +111,7 @@ the lineage definitions stay pure data.
 
 ### Configuration Files (src/main/resources)
 
-- `config.yml` — debug level, sortable inventory types, `player_sort_min`/`player_sort_max` slot range, `action_cooldown_ms` throttle, and per-player `defaults` (click/sort mode, sort-over-items, bundle packing)
+- `config.yml` — debug level, sortable inventory types, `player_sort_min`/`player_sort_max` slot range, `action_cooldown_ms` throttle, `check_for_updates` flag, and per-player `defaults` (click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing)
 - `groups.yml` — item groupings for GROUP sort method
 - `items.yml` — persistent store of material → display-name mappings
 - `lang.yml` — all user-facing messages (MiniMessage format)
@@ -110,8 +126,8 @@ There is a known non-obvious setup required for MockBukkit v4 on Java 16+; see `
 
 Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand is a static builder method. The tree is:
 
-- **`set`** — per-player preferences: `set sort-method <NAME|GROUP>`, `set click-method <…>`, `set hover [on|off]` (toggles when no arg), `set lock` (opens the lock GUI), and `set bundle` (no-arg prints status; `set bundle inventory|others <on|off>`; `set bundle stacklimit <n|off>`).
-- **`status`** — print the player's current click method, sort method, and sort-over-items state.
+- **`set`** — per-player preferences: `set sort-method <NAME|GROUP|TREEMAP>`, `set click-method <…>`, `set start-corner <TOP_LEFT|TOP_RIGHT|BOTTOM_LEFT|BOTTOM_RIGHT>`, `set fill-axis <HORIZONTAL|VERTICAL>`, `set hover [on|off]` (toggles when no arg; some click methods govern this automatically), `set lock` (opens the lock GUI), and `set bundle` (no-arg prints status; `set bundle inventory|others <on|off>`; `set bundle stacklimit <n|off>`).
+- **`status`** — print the player's current click method, sort method, start corner, fill axis, and sort-over-items state.
 - **`reload`**, **`getcfg`**, **`debug [level]`**, **`benchmark [iterations]`** — admin/diagnostic commands.
 
 `set hover` toggles the per-player "sort over items" flag (server default `defaults.sort_over_items`), which controls whether a sort fires only on an empty slot or also while hovering an occupied one.

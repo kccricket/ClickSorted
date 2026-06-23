@@ -17,6 +17,14 @@ public class SortKey implements Comparable<SortKey> {
     private final String metaStr;
     private final ItemMeta meta;
 
+    /**
+     * The canonical pooling key for bundle packing: items are pooled by identity regardless of the
+     * active sort method, so this fixes {@link SortingMethod#NAME} as the single pooling convention.
+     */
+    public static SortKey poolKey(ItemStack stack) {
+        return new SortKey(stack, SortingMethod.NAME);
+    }
+
     public SortKey(ItemStack stack, SortingMethod sortMethod) {
         String prefix = sortMethod.makeSortPrefix(stack);
         if (prefix == null) {
@@ -27,12 +35,12 @@ public class SortKey implements Comparable<SortKey> {
             this.sortPrefix = prefix;
         }
         this.material = stack.getType();
-        if (stack.getItemMeta() instanceof Damageable damageable) {
-            this.durability = damageable.getDamage();
-        } else {
-            this.durability = 0;
-        }
-        this.meta = stack.getItemMeta();
+        // getItemMeta() returns a fresh deep copy on each call, so read it once and reuse it for both
+        // the durability probe and the stored meta (Damageable is an ItemMeta) to avoid a redundant
+        // clone per SortKey on the sort hot path.
+        ItemMeta itemMeta = stack.getItemMeta();
+        this.durability = itemMeta instanceof Damageable damageable ? damageable.getDamage() : 0;
+        this.meta = itemMeta;
         this.metaStr = makeMetaString();
     }
 
@@ -70,6 +78,12 @@ public class SortKey implements Comparable<SortKey> {
         return stack;
     }
 
+    // Note: this orders by metaStr while equals() also weighs the full ItemMeta, so compareTo can return
+    // 0 for two keys that equals() considers distinct (same metaStr, different meta). That deviation from
+    // the Comparable/equals contract is intentional and harmless: compareTo only ORDERS the already-
+    // distinct keys (merging is done via equals/hashCode in a HashMap), so the worst case is two
+    // identical-looking stacks sorting in an arbitrary adjacent order — never a lost item. Do NOT
+    // "reconcile" this by making equals key on metaStr only; see the warning in equals().
     @Override
     public int compareTo(SortKey other) {
         if (other == null) {
@@ -105,12 +119,21 @@ public class SortKey implements Comparable<SortKey> {
         }
 
         SortKey sortKey = (SortKey) o;
+        // DO NOT drop `meta` from equals/hashCode in favor of metaStr alone. Fungible (stackable) items
+        // are merged in a HashMap keyed by SortKey, so two keys that compare equal here get their stacks
+        // collapsed into one. metaStr is a LOSSY, unsorted toString of meta.serialize() — distinct
+        // ItemMeta can collide to the same metaStr — so keying merge-equality on it alone would merge a
+        // custom/plugin itemstack into a plain one and silently destroy the special metadata. Requiring
+        // the full ItemMeta.equals as well is the safe choice: it never merges genuinely different meta.
+        // (This costs a deep meta compare on the sort path, which is an acceptable price for correctness.)
         return durability == sortKey.durability && material == sortKey.material && Objects.equals(meta, sortKey.meta)
                 && metaStr.equals(sortKey.metaStr) && sortPrefix.equals(sortKey.sortPrefix);
     }
 
     @Override
     public int hashCode() {
+        // Must mirror equals: include meta so two SortKeys that differ only by ItemMeta land in different
+        // buckets and are never merged. See the warning in equals before changing this.
         int result = sortPrefix.hashCode();
         result = 31 * result + material.hashCode();
         result = 31 * result + durability;

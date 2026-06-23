@@ -26,6 +26,9 @@ dependencies {
     // bStats is bundled and relocated by Shadow
     implementation("org.bstats:bstats-bukkit:3.0.1")
 
+    // Gson is provided by the server at runtime (Paper bundles it); compile against it but don't bundle it
+    compileOnly("com.google.code.gson:gson:2.11.0")
+
     // paper-api must be available at both test compile time and test runtime (integration tests
     // bootstrap the full plugin via MockBukkit). compileOnly is NOT inherited by test scopes in Gradle.
     testImplementation("io.papermc.paper:paper-api:26.1.2.build.+")

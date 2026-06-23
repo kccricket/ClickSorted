@@ -1,5 +1,6 @@
 package net.kccricket.clicksorted.text;
 
+import net.kccricket.clicksorted.config.ConfigManager;
 import net.kccricket.clicksorted.logging.Log;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
@@ -10,6 +11,12 @@ import org.bukkit.command.ConsoleCommandSender;
 import java.util.logging.Level;
 
 public class MessageUtil {
+
+    private static ConfigManager configManager;
+
+    public static void init(ConfigManager cm) {
+        configManager = cm;
+    }
 
     private static String toPlain(Component component) {
         return PlainTextComponentSerializer.plainText().serialize(component);
@@ -24,7 +31,7 @@ public class MessageUtil {
     }
 
     public static void statusMessage(Audience sender, Component component) {
-        message(sender, component.colorIfAbsent(NamedTextColor.AQUA), Level.INFO);
+        message(sender, component.colorIfAbsent(NamedTextColor.WHITE), Level.INFO);
     }
 
     public static void statusMessage(Audience sender, String string) {
@@ -47,7 +54,11 @@ public class MessageUtil {
         if (sender instanceof ConsoleCommandSender) {
             Log.log(level != null ? level : Level.INFO, toPlain(component));
         } else {
-            sender.sendMessage(component);
+            Component out = component;
+            if (level != null && configManager != null) {
+                out = configManager.lang().getColoredMessage("prefix").append(component);
+            }
+            sender.sendMessage(out);
         }
     }
 }

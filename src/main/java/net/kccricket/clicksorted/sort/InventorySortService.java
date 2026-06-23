@@ -15,15 +15,17 @@ package net.kccricket.clicksorted.sort;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.events.InventorySortEvent;
 import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
@@ -31,6 +33,8 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,11 +66,10 @@ public class InventorySortService {
      * @return true if the sort completed and the caller should cancel the originating event
      */
     public boolean sortInventory(final InventoryClickEvent event, final SortingMethod sortMethod) {
-        if (!event.getCursor().isEmpty()) {
-            // Prevent sorting when the player is holding an item with the cursor, to avoid accidental sorts and potential dupes.
-            return false;
-        }
-
+        // No cursor-state guard here: the only cursor-empty requirement belongs to SINGLE_CLICK (so a
+        // held item can still be placed), and ClickMethod.matchesSortTrigger already enforces that before
+        // we are ever called. Other methods may sort with a held cursor item — the event is cancelled and
+        // the cursor stack is left untouched.
         Player p = (Player) event.getWhoClicked();
         int slot = event.getSlot();
         Inventory inv = event.getClickedInventory();
@@ -81,6 +84,7 @@ public class InventorySortService {
         boolean playerMainStorage = false; // packing applies here (not the hotbar)
         boolean container = false;
         if (type == InventoryType.PLAYER) {
+            int playerSortMax = mainCfg.getPlayerSortMax();
             if (slot < 9) {
                 // hotbar
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.hotbar")) {
@@ -88,27 +92,43 @@ public class InventorySortService {
                 }
                 min = 0;
                 max = 9;
-            } else if (slot < mainCfg.getPlayerSortMax()) {
+            } else if (slot < playerSortMax) {
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.player")) {
                     return false;
                 }
                 // main player inventory
                 min = mainCfg.getPlayerSortMin();
-                max = mainCfg.getPlayerSortMax();
+                max = playerSortMax;
                 playerMainStorage = true;
             } else {
                 // armor / offhand slots — never sort
                 return false;
             }
-        } else if (plugin.getConfigManager().main().getSortableInventories().contains(type)) {
+        } else if (mainCfg.getSortableInventories().contains(type)) {
             if (!Permissions.isAllowedTo(p, "clicksorted.sort.container")) {
                 return false;
             }
-            min = inv.getHolder() instanceof AbstractHorse ? 2 : 0;
+            min = GridGeometry.storageOffset(inv.getHolder());
             max = inv.getSize();
             container = true;
         } else {
             return false;
+        }
+
+        // DOUBLE_CLICK gesture repair: the first click of the double-click already lifted the clicked
+        // stack onto the cursor and emptied the slot; the listener cancels the event to suppress the
+        // vanilla gather, which would otherwise strand that stack on the cursor. Put it back into its
+        // origin slot (only when that slot is empty — the expected post-first-click state) so the sort
+        // below folds it in and the cursor ends empty. Done here, past the permission/target checks, so
+        // it never fires for a click that wouldn't actually sort.
+        if (event.getClick() == ClickType.DOUBLE_CLICK) {
+            ItemStack cursor = event.getCursor();
+            ItemStack atSlot = inv.getItem(slot);
+            if (cursor != null && cursor.getType() != Material.AIR
+                    && (atSlot == null || atSlot.getType() == Material.AIR)) {
+                inv.setItem(slot, cursor.clone());
+                p.setItemOnCursor(null);
+            }
         }
 
         InventorySortEvent sortEvent = new InventorySortEvent(event.getView(), inv, min, max);
@@ -136,20 +156,16 @@ public class InventorySortService {
             return false;
         }
 
-        for (int i : sortableSlots) {
-            if (!sortedItems.isEmpty()) {
-                ItemStack newItem = sortedItems.remove(0);
-                inv.setItem(i, newItem);
-            } else {
-                inv.clear(i);
-            }
-        }
+        GridGeometry grid = GridGeometry.of(type, inv.getHolder(), min, max);
+        List<ItemStack> overflow = sortMethod.isTreemap()
+                ? writeTreemap(inv, sortableSlots, sortedItems, grid.base(), grid.width(), grid.rows(), prefs.getStartCorner(p), prefs.getFillAxis(p))
+                : writeLinear(inv, sortableSlots, sortedItems, grid.base(), grid.width(), prefs.getStartCorner(p), prefs.getFillAxis(p));
 
-        if (!sortedItems.isEmpty()) {
+        if (!overflow.isEmpty()) {
             // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
             // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
             MessageUtil.alertMessage(p, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
-            for (ItemStack item : sortedItems) {
+            for (ItemStack item : overflow) {
                 Log.debug("dropping " + item + " by player " + p.getName());
                 p.getWorld().dropItemNaturally(p.getLocation(), item);
             }
@@ -162,6 +178,55 @@ public class InventorySortService {
         }
 
         return true;
+    }
+
+    /**
+     * Writes the sorted sequence linearly: order the slots by start-corner/fill-axis, then write the
+     * i-th sorted stack to the i-th slot, clearing any slot past the end of the sequence.
+     *
+     * @return the stacks that did not fit (to be dropped); empty in the normal case
+     */
+    private List<ItemStack> writeLinear(Inventory inv, Set<Integer> sortableSlots, List<ItemStack> sortedItems,
+                                        int base, int width, StartCorner startCorner, FillAxis fillAxis) {
+        List<Integer> fillOrder = SlotOrder.order(sortableSlots, base, width, startCorner, fillAxis);
+        int next = 0;
+        for (int i : fillOrder) {
+            if (next < sortedItems.size()) {
+                inv.setItem(i, sortedItems.get(next++));
+            } else {
+                inv.clear(i);
+            }
+        }
+        return next < sortedItems.size() ? new ArrayList<>(sortedItems.subList(next, sortedItems.size())) : List.of();
+    }
+
+    /**
+     * Writes the {@code TREEMAP} placement: {@link TreemapPacker} lays each item type out as a
+     * proportional block packed to fill the container; we write the resulting slot→stack map and
+     * clear every other sortable slot.
+     *
+     * @return the stacks that did not fit (to be dropped); empty in the normal case
+     */
+    private List<ItemStack> writeTreemap(Inventory inv, Set<Integer> sortableSlots, List<ItemStack> sortedItems,
+                                         int base, int width, int rows, StartCorner startCorner, FillAxis fillAxis) {
+        Map<Integer, ItemStack> placement = TreemapPacker.pack(sortedItems, sortableSlots, base, width, rows, startCorner, fillAxis);
+        Set<ItemStack> placed = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (int i : sortableSlots) {
+            ItemStack item = placement.get(i);
+            if (item != null) {
+                inv.setItem(i, item);
+                placed.add(item);
+            } else {
+                inv.clear(i);
+            }
+        }
+        List<ItemStack> overflow = new ArrayList<>();
+        for (ItemStack item : sortedItems) {
+            if (!placed.contains(item)) {
+                overflow.add(item);
+            }
+        }
+        return overflow;
     }
 
     /**
@@ -187,7 +252,9 @@ public class InventorySortService {
             if (is.getType() == Material.BUNDLE) {
                 bundles.add(is.clone());
             } else if (BundlePacker.canBundle(is)) {
-                SortKey key = new SortKey(is, SortingMethod.NAME);
+                SortKey key = SortKey.poolKey(is);
+                // Lambda, not Long::sum: a method ref binds the boxed map values straight to
+                // primitive params, tripping JDT's "needs unchecked conversion" null warning.
                 loosePool.merge(key, (long) is.getAmount(), (a, b) -> Long.sum(a, b));
                 samples.putIfAbsent(key, is);
             } else {

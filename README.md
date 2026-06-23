@@ -24,6 +24,7 @@ ClickSorted turns any inventory into a tidy one with a single click. Open a ches
     - [Sorting an inventory](#sorting-an-inventory)
     - [Sorting over occupied slots](#sorting-over-occupied-slots)
     - [Your player inventory: two regions](#your-player-inventory-two-regions)
+    - [Sort direction](#sort-direction)
     - [Locking slots](#locking-slots)
     - [Bundle packing](#bundle-packing)
     - [Player commands](#player-commands)
@@ -33,6 +34,7 @@ ClickSorted turns any inventory into a tidy one with a single click. Open a ches
     - [`config.yml`](#configyml)
     - [Sort orders \& `groups.yml`](#sort-orders--groupsyml)
       - [Name sort](#name-sort)
+      - [Treemap sort](#treemap-sort)
       - [Group sort](#group-sort)
       - [`groups.yml` structure](#groupsyml-structure)
       - [Default groups (bundled)](#default-groups-bundled)
@@ -41,9 +43,12 @@ ClickSorted turns any inventory into a tidy one with a single click. Open a ches
     - [`lang.yml`](#langyml)
       - [Sort order feedback](#sort-order-feedback)
       - [Click trigger feedback](#click-trigger-feedback)
+      - [Sort direction feedback](#sort-direction-feedback)
       - [Sort-over-items toggle feedback](#sort-over-items-toggle-feedback)
       - [Bundle packing feedback](#bundle-packing-feedback)
+      - [Preference repair](#preference-repair)
       - [Status command feedback](#status-command-feedback)
+      - [Invalid argument](#invalid-argument)
       - [Action throttle](#action-throttle)
       - [Debug commands](#debug-commands)
       - [Reload](#reload)
@@ -66,12 +71,14 @@ with contributions from **chengzi**. The original plugin made inventory sorting 
 ## Features
 
 - Sort player inventories, chests, ender chests, shulker boxes, barrels, hoppers, droppers, dispensers, and any other configured inventory.
-- Two sort orders: **name** (alphabetical by display name) and **group** (creative-tab-style buckets defined in `groups.yml`).
+- Three sort orders: **name** (alphabetical by display name), **group** (creative-tab-style buckets defined in `groups.yml`), and **treemap** (each item type fills its own contiguous near-square block, sized to its stack count).
+- **Configurable sort direction**: each player can choose which corner items are placed from and whether rows or columns fill first.
 - **Lock individual inventory slots** so they are never moved by sorting.
 - **Optional bundle packing**: consolidate partial stacks into bundles as part of a sort, with a configurable per-bundle entry limit.
-- Per-player preferences (trigger, sort order, sort-over-items, bundle packing, locked slots) persist across sessions.
+- Per-player preferences (trigger, sort order, sort direction, sort-over-items, bundle packing, locked slots) persist across sessions.
 - Identical items are automatically merged into full stacks before sorting.
 - A per-player action throttle caps how fast scripted clients can drive plugin work.
+- Automatic update check at startup via Modrinth (disable with `check_for_updates: false`).
 - Fully configurable: messages (MiniMessage), item groups, sortable inventory types, slot ranges, and more.
 
 ## Download & Installation
@@ -82,7 +89,7 @@ with contributions from **chengzi**. The original plugin made inventory sorting 
 2. Drop the JAR into your server's `plugins/` folder.
 3. Restart or reload your server.
 
-**Requirements:** Paper 1.20.6 or newer. No other plugins required.
+**Requirements:** Paper or Folia 1.20.6 or newer. No other plugins required.
 The bundled `groups.yml` was generated from Minecraft 26.1.2 creative tabs.
 
 ## Player Guide
@@ -103,17 +110,28 @@ The available trigger modes are:
 | **shift_right_click** | Shift-right-click a slot. |
 | **none** | Click-sorting disabled. |
 
-Change your trigger with `/clicksorted set click-method <mode>` and your sort order with `/clicksorted set sort-method <name\|group>`.
+Change your trigger with `/clicksorted set click-method <mode>` and your sort order with `/clicksorted set sort-method <name\|group\|treemap>`.
 
 ### Sorting over occupied slots
 
 By default a sort only fires when your cursor is over an **empty slot**, so your normal clicks on items are never hijacked. If you'd rather have your trigger fire even while hovering an occupied slot, run `/clicksorted set hover` to toggle "sort over items" on (and again to turn it off, or pass an explicit `on`/`off`). When enabled, the originating click is suppressed so the item underneath isn't picked up or moved. Admins set the default with [`defaults.sort_over_items`](#configyml).
+
+> **Note:** Some click methods govern sort-over-items automatically. `single_click` always sorts empty slots only (hover is forced off), and `control_drop` always fires regardless of the hovered slot (hover is forced on). When your click method controls hover you will see a notice if you try to change it manually.
 
 ### Your player inventory: two regions
 
 When you sort your own inventory, the **main inventory** (slots 9–35, excluding hotbar and armor) and the **hotbar** (slots 0–8) are treated as two independent regions — each sorts within itself. Trigger a sort while your cursor is in the main area to sort the main area; hover a hotbar slot and trigger to sort the hotbar.
 
 *(Admins can adjust which slot range counts as "main" — see [`player_sort_min` / `player_sort_max`](#configyml) below.)*
+
+### Sort direction
+
+By default, sorted items are placed starting from the **top-left corner**, filling row by row left to right. You can change this per-player:
+
+- `/clicksorted set start-corner <TOP_LEFT|TOP_RIGHT|BOTTOM_LEFT|BOTTOM_RIGHT>` — choose which corner items are placed from.
+- `/clicksorted set fill-axis <HORIZONTAL|VERTICAL>` — choose whether rows (`HORIZONTAL`, the default) or columns (`VERTICAL`) fill first.
+
+Admins set the server defaults with [`defaults.start_corner` and `defaults.fill_axis`](#configyml).
 
 ### Locking slots
 
@@ -142,15 +160,17 @@ These commands are available to every player by default.
 
 | Command | Description |
 |---|---|
-| `/clicksorted set sort-method <name\|group>` | Set your sort order. `group` is only available when `groups.yml` is configured. |
+| `/clicksorted set sort-method <name\|group\|treemap>` | Set your sort order. `group` is only available when `groups.yml` is configured. |
 | `/clicksorted set click-method <swap\|single_click\|double_click\|control_drop\|shift_left_click\|shift_right_click\|none>` | Set your sort trigger. |
-| `/clicksorted set hover [on\|off]` | Toggle (or explicitly set) whether sorting fires while hovering an occupied slot (off = empty slots only). |
+| `/clicksorted set start-corner <TOP_LEFT\|TOP_RIGHT\|BOTTOM_LEFT\|BOTTOM_RIGHT>` | Set which corner of the inventory sorted items are placed from. |
+| `/clicksorted set fill-axis <HORIZONTAL\|VERTICAL>` | Set whether sorted items fill rows first (`HORIZONTAL`) or columns first (`VERTICAL`). |
+| `/clicksorted set hover [on\|off]` | Toggle (or explicitly set) whether sorting fires while hovering an occupied slot (off = empty slots only). Some click methods govern this automatically. |
 | `/clicksorted set lock` | Open the slot-lock GUI to lock or unlock individual inventory slots. |
 | `/clicksorted set bundle` | Show your current bundle-packing settings. |
 | `/clicksorted set bundle inventory <on\|off>` | Toggle bundle packing when sorting your **own** inventory. |
 | `/clicksorted set bundle others <on\|off>` | Toggle bundle packing when sorting **containers** (chests, barrels, …). |
 | `/clicksorted set bundle stacklimit <n\|off>` | Max distinct item entries packed per bundle (`off` = weight-only limit). |
-| `/clicksorted status` | Show your current click method, sort method, and sort-over-items state. |
+| `/clicksorted status` | Show your current click method, sort method, start corner, fill direction, and sort-over-items state. |
 
 ## Admin Reference
 
@@ -196,6 +216,10 @@ All options with their defaults, explained. Changes take effect after `/clicksor
 # Enables bStats anonymous usage metrics. Set to false to opt out.
 enable_metrics: true
 
+# Check Modrinth for a newer published release on startup and after /clicksorted reload.
+# A notice is logged to the console if an update is available. Set to false to disable.
+check_for_updates: true
+
 # Runtime log verbosity. Valid values: OFF, DEBUG, TRACE
 # Can also be changed live with /clicksorted debug without editing this file.
 debug_level: OFF
@@ -220,8 +244,14 @@ defaults:
   # Sort trigger. Values: SWAP, SINGLE_CLICK, DOUBLE_CLICK, CONTROL_DROP,
   #                       SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE
   click_mode: SWAP
-  # Sort order. Values: NAME, GROUP
+  # Sort order. Values: NAME, GROUP, TREEMAP
   sort_mode: NAME
+  # Corner of the inventory grid where sorted items are placed.
+  # Values: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT
+  start_corner: TOP_LEFT
+  # Whether rows or columns fill first from the start corner.
+  # Values: HORIZONTAL (row-by-row), VERTICAL (column-by-column)
+  fill_axis: HORIZONTAL
   # When true, the trigger also fires while hovering an occupied slot;
   # when false, sorting only fires on an empty slot. Toggle with /clicksorted set hover.
   sort_over_items: false
@@ -266,6 +296,10 @@ sortable_inventories:
 #### Name sort
 
 Items are sorted **alphabetically by display name** (the English vanilla client name, or the custom name on renamed items). Display names are cached in `items.yml` as the server encounters items; no setup needed.
+
+#### Treemap sort
+
+Items are grouped by type and each type is assigned its own **contiguous near-square block** in the inventory grid, sized in proportion to that type's stack count. The largest type claims the biggest block and anchors to the `start_corner`; the `fill_axis` setting controls whether shelves of blocks grow horizontally or vertically. When the inventory is nearly full and clean rectangles no longer fit, smaller types degrade to a gap-free linear fill so the inventory stays tightly packed. `TREEMAP` is always available — no `groups.yml` setup required.
 
 #### Group sort
 
@@ -333,32 +367,53 @@ All player-facing messages are stored in `lang.yml` and rendered with **[MiniMes
 
 > **Placeholders:** Tags like `<method>`, `<status>`, `<instruction>`, and `<level>` are filled in at runtime. They are listed in the table below — do not remove a placeholder from a message that requires it.
 
+#### Message prefix
+
+| Key | Default value | Description |
+|---|---|---|
+| `prefix` | `<gray>[<aqua>ClickSorted<gray>] ` | Prepended to every status, error, and alert message sent to players. Set to `""` to send messages without a prefix. Lock-GUI item names are not affected. |
+
 #### Sort order feedback
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `setSortingMethodTo` | `Sort mode set to <method>.` | `<method>` — the new sort mode name |
+| `setSortingMethodTo` | `Your sort mode is now set to: <method>.` | `<method>` — the new sort mode name |
 | `sortingMethodNotAvailable` | `Sort mode <method> is not available — configure groups.yml first.` | `<method>` |
 
 #### Click trigger feedback
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `setClickMethodTo` | `Click mode set to <method>. <instruction>` | `<method>`, `<instruction>` |
+| `setClickMethodTo` | `Your click mode is now set to: <method>. <instruction>` | `<method>`, `<instruction>` |
+
+#### Sort direction feedback
+
+| Key | Default text | Placeholders |
+|---|---|---|
+| `setStartCornerTo` | `Your sort start corner is now set to: <corner>.` | `<corner>` — the new corner value |
+| `setFillAxisTo` | `Your sort fill direction is now set to: <axis>.` | `<axis>` — the new fill axis value |
 
 #### Sort-over-items toggle feedback
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `setSortOverItemsStatus` | `Sort over items: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
+| `setSortOverItemsStatus` | `Sorting while hovering over an item is now <status> for you.` | `<status>` — `ENABLED` or `DISABLED` |
+| `hoverForcedByClickMethod` | `Sorting while hovering over an item is now <status> for you because your click mode is <method>.` | `<status>`, `<method>` |
+| `hoverGovernedByClickMethod` | `Sorting while hovering over an item is restricted by your click mode (<method>) and can't be changed.` | `<method>` |
 
 #### Bundle packing feedback
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `setBundlePackInventoryStatus` | `Bundle packing in your inventory: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
-| `setBundlePackOthersStatus` | `Bundle packing in other containers: <status>.` | `<status>` — `ENABLED` or `DISABLED` |
-| `setBundleStackLimitStatus` | `Bundle stack limit: <limit>.` | `<limit>` — entry count, or `off` for weight-only |
+| `setBundlePackInventoryStatus` | `Bundle packing in your inventory is now <status>.` | `<status>` — `ENABLED` or `DISABLED` |
+| `setBundlePackOthersStatus` | `Bundle packing in other containers is now <status>.` | `<status>` — `ENABLED` or `DISABLED` |
+| `setBundleStackLimitStatus` | `Your bundle stack limit is now <limit>.` | `<limit>` — entry count, or `off` for weight-only |
+
+#### Preference repair
+
+| Key | Default text | Placeholders |
+|---|---|---|
+| `prefResetInvalid` | `Your saved <pref> value, <value>, was invalid and has been reset to <default>.` | `<pref>`, `<value>`, `<default>` |
 
 #### Status command feedback
 
@@ -366,7 +421,15 @@ All player-facing messages are stored in `lang.yml` and rendered with **[MiniMes
 |---|---|---|
 | `statusClickMethod` | `Click method: <method>` | `<method>` |
 | `statusSortMethod` | `Sort method: <method>` | `<method>` |
+| `statusStartCorner` | `Start corner: <corner>` | `<corner>` |
+| `statusFillAxis` | `Fill direction: <axis>` | `<axis>` |
 | `statusHover` | `Sort over items: <status>` | `<status>` — `ENABLED` or `DISABLED` |
+
+#### Invalid argument
+
+| Key | Default text | Placeholders |
+|---|---|---|
+| `invalidValue` | `<red>Invalid value '<value>'. Valid values: <valid>.` | `<value>` — the text the player typed; `<valid>` — comma-joined valid options |
 
 #### Action throttle
 
@@ -378,14 +441,14 @@ All player-facing messages are stored in `lang.yml` and rendered with **[MiniMes
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `setDebugLevelTo` | `Debug level is now <level>` | `<level>` |
+| `setDebugLevelTo` | `Debug level is now temporarily set to <level>.` | `<level>` |
 | `invalidDebugLevel` | `Invalid debug level '<level>'. Valid values: OFF, DEBUG, TRACE.` | `<level>` |
 
 #### Reload
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `configReloaded` | `ClickSorted configuration reloaded.` | — |
+| `configReloaded` | `Configuration reloaded.` | — |
 
 #### Inventory overflow
 
@@ -418,7 +481,7 @@ These strings are substituted as `<instruction>` in `setClickMethodTo`.
 
 | Key | Default text | Placeholders |
 |---|---|---|
-| `lockGuiTitle` | `Slot Locks` | — |
+| `lockGuiTitle` | `Inventory Sorting Locks` | — |
 | `lockPaneUnlocked` | `Unlocked` | — |
 | `lockPaneLocked` | `Locked` | — |
 | `lockPaneSlotInventory` | `Inventory slot <number>` | `<number>` — slot number (1–27) |
@@ -429,7 +492,7 @@ These strings are substituted as `<instruction>` in `setClickMethodTo`.
 | `lockPaneUnsortableLore` | `This slot is always excluded from sorting.` | — |
 | `lockDividerName` | `--------` | — |
 | `lockHelpHeadName` | `What is this?` | — |
-| `lockHelpHeadLore` | `Locked inventory slots will not be sorted.` | — |
+| `lockHelpHeadLore` | `Locked inventory slots will not be sorted and bundles in a locked slot will not be packed.` | — |
 
 ---
 

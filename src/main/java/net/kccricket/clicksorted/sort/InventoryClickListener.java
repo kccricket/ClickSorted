@@ -67,17 +67,35 @@ public class InventoryClickListener implements Listener {
         ClickMethod clickMethod = prefs.getClickMethod(player);
 
         if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
-            // Universal "sort over items" gate: unless enabled, sorting only fires on an empty slot.
+            // "Sort over items" gate: unless enabled, sorting only fires on an empty slot. Some click
+            // methods override the player's preference via ClickMethod.requiredSortOverItems():
+            // SINGLE_CLICK forces it off (with it on, every empty-cursor LEFT click on an occupied slot
+            // would sort instead of letting the player pick the item up, making the inventory unusable),
+            // and CONTROL_DROP forces it on (a ctrl-drop only ever fires on an occupied slot, so it could
+            // never sort otherwise).
             ItemStack current = event.getCurrentItem();
             boolean slotOccupied = current != null && current.getType() != Material.AIR;
-            if (slotOccupied && !prefs.getSortOverItems(player)) {
+            boolean sortOverItems = clickMethod.requiredSortOverItems().orElseGet(() -> prefs.getSortOverItems(player));
+            if (slotOccupied && !sortOverItems) {
                 return;
             }
+            // Cancel the originating click for methods whose vanilla gesture has a side-effect we must
+            // suppress (SWAP swaps the offhand item, CONTROL_DROP drops the stack, shift-click moves it,
+            // DOUBLE_CLICK gathers matching stacks to the cursor). SINGLE_CLICK only ever sorts an empty
+            // slot, where the LEFT click is a vanilla no-op, so it never needs cancelling.
+            boolean cancelVanilla = clickMethod.shouldCancelEvent();
             if (plugin.getActionThrottle().throttled(player)) {
+                // The trigger matched but we're rate-limited, so no sort runs. We must still cancel the
+                // originating click when it has a vanilla side-effect; otherwise a throttled sort-click
+                // silently performs that vanilla action instead.
+                if (cancelVanilla) {
+                    event.setCancelled(true);
+                }
                 return;
             }
-            if (sortService.sortInventory(event, prefs.getSortingMethod(player))
-                    && clickMethod.shouldCancelEvent()) {
+            if (sortService.sortInventory(event, prefs.getSortingMethod(player)) && cancelVanilla) {
+                // Cancelling the event is sufficient to suppress the vanilla side-effect on all tested
+                // server versions (Paper 1.20.6 and 1.26.1.2); no explicit offhand resync is required.
                 event.setCancelled(true);
             }
         }
