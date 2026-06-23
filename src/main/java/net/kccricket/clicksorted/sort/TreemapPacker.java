@@ -333,7 +333,7 @@ public final class TreemapPacker {
         ItemMeta meta = stack.getItemMeta();
         return meta != null && (meta.hasEnchants()
                 || meta.hasLore()
-                || meta.hasCustomModelData()
+                || meta.hasCustomModelDataComponent()
                 || !meta.getPersistentDataContainer().isEmpty());
     }
 
