@@ -4,7 +4,7 @@ authors: [ kccricket, desht, chengzi ]
 version: ${project.version}
 description: Super-convenient inventory sorting
 website: https://github.com/kccricket/ClickSorted
-api-version: 1.20.6
+api-version: 1.21.5
 folia-supported: true
 
 permissions:

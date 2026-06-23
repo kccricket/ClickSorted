@@ -3,7 +3,7 @@
 <!-- TODO: replace placeholder badge URLs once distribution pages are live
 ![Version](https://img.shields.io/badge/version-TODO-blue)
 ![License](https://img.shields.io/badge/license-GPL%20v3-green)
-![Paper](https://img.shields.io/badge/Paper-1.20.6%2B-orange)
+![Paper](https://img.shields.io/badge/Paper-1.21.5%2B-orange)
 ![Build](https://img.shields.io/badge/build-TODO-lightgrey)
 -->
 
@@ -89,7 +89,7 @@ with contributions from **chengzi**. The original plugin made inventory sorting 
 2. Drop the JAR into your server's `plugins/` folder.
 3. Restart or reload your server.
 
-**Requirements:** Paper or Folia 1.20.6 or newer. No other plugins required.
+**Requirements:** Paper or Folia 1.21.5 or newer. No other plugins required.
 The bundled `groups.yml` was generated from Minecraft 26.1.2 creative tabs.
 
 ## Player Guide
