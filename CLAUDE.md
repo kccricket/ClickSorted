@@ -80,7 +80,7 @@ the lineage definitions stay pure data.
 | Class | Package | Role |
 |---|---|---|
 | `ClickSortedPlugin` | root | `JavaPlugin` entry point, wires all components |
-| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, locked slots) stored via PDC |
+| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, bundle blacklist, locked slots) stored via PDC |
 | `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier panes and maps chest↔inventory slots |
 | `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; toggles lock state and cancels all real-inventory interaction |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
@@ -126,7 +126,7 @@ There is a known non-obvious setup required for MockBukkit v4 on Java 16+; see `
 
 Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand is a static builder method. The tree is:
 
-- **`set`** — per-player preferences: `set sort-method <NAME|GROUP|TREEMAP>`, `set click-method <…>`, `set start-corner <TOP_LEFT|TOP_RIGHT|BOTTOM_LEFT|BOTTOM_RIGHT>`, `set fill-axis <HORIZONTAL|VERTICAL>`, `set hover [on|off]` (toggles when no arg; some click methods govern this automatically), `set lock` (opens the lock GUI), and `set bundle` (no-arg prints status; `set bundle inventory|others <on|off>`; `set bundle stacklimit <n|off>`).
+- **`set`** — per-player preferences: `set sort-method <NAME|GROUP|TREEMAP>`, `set click-method <…>`, `set start-corner <TOP_LEFT|TOP_RIGHT|BOTTOM_LEFT|BOTTOM_RIGHT>`, `set fill-axis <HORIZONTAL|VERTICAL>`, `set hover [on|off]` (toggles when no arg; some click methods govern this automatically), `set lock` (opens the lock GUI), and `set bundle` (no-arg prints status; `set bundle inventory|others <on|off>`; `set bundle stacklimit <n|off>`; `set bundle blacklist add|remove <material>`, `set bundle blacklist list`, `set bundle blacklist clear` — materials in the blacklist are never packed into or unpacked from bundles; normal stack-merging still applies).
 - **`status`** — print the player's current click method, sort method, start corner, fill axis, and sort-over-items state.
 - **`reload`**, **`getcfg`**, **`debug [level]`**, **`benchmark [iterations]`** — admin/diagnostic commands.
 

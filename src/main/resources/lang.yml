@@ -53,6 +53,17 @@ setBundlePackOthersStatus: "Bundle packing in other containers is now <aqua><sta
 # Placeholder: <limit> (max distinct entries per bundle, or "off" for weight-only)
 setBundleStackLimitStatus: "Your <aqua>bundle stack limit<white> is now <aqua><limit><white>."
 
+# Command feedback — bundle blacklist (/clicksorted set bundle blacklist add|remove|list|clear)
+# Placeholder: <material> (material name)
+setBundleBlacklistAdded: "<aqua><material><white> added to your bundle blacklist."
+setBundleBlacklistAlreadyPresent: "<aqua><material><white> is already in your bundle blacklist."
+setBundleBlacklistRemoved: "<aqua><material><white> removed from your bundle blacklist."
+setBundleBlacklistNotPresent: "<aqua><material><white> is not in your bundle blacklist."
+# Placeholder: <list> (comma-separated material names)
+setBundleBlacklistList: "Bundle blacklist: <aqua><list><white>."
+setBundleBlacklistEmpty: "Your bundle blacklist is <aqua>empty<white>."
+setBundleBlacklistCleared: "Your bundle blacklist has been <aqua>cleared<white>."
+
 # Command feedback — status (/clicksorted status)
 # Placeholder: <method>
 statusClickMethod: "Click method: <method>"

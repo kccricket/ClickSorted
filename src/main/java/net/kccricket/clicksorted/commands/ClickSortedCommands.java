@@ -18,7 +18,11 @@ import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ClickSortedCommands {
 
@@ -287,7 +291,8 @@ public class ClickSortedCommands {
                         (player, status) -> plugin.getSortingPrefs().setBundlePackInventory(player, status)))
                 .then(bundleToggle(plugin, "others", "setBundlePackOthersStatus",
                         (player, status) -> plugin.getSortingPrefs().setBundlePackOthers(player, status)))
-                .then(buildBundleStackLimit(plugin));
+                .then(buildBundleStackLimit(plugin))
+                .then(buildBundleBlacklist(plugin));
     }
 
     /** A {@code /clicksorted set bundle <literal> <on|off>} boolean toggle persisting via {@code setter}. */
@@ -348,7 +353,7 @@ public class ClickSortedCommands {
                         }));
     }
 
-    /** Print the player's three current bundle-packing settings. */
+    /** Print the player's current bundle-packing settings, including the blacklist. */
     private static void sendBundleStatus(ClickSortedPlugin plugin, Player player) {
         var prefs = plugin.getSortingPrefs();
         var lang = plugin.getConfigManager().lang();
@@ -359,6 +364,127 @@ public class ClickSortedCommands {
         int limit = prefs.getBundleStackLimit(player);
         MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleStackLimitStatus",
                 Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
+        Set<Material> blacklist = prefs.getBundleBlacklist(player);
+        if (blacklist.isEmpty()) {
+            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistEmpty"));
+        } else {
+            String list = blacklist.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
+            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistList",
+                    Placeholder.unparsed("list", list)));
+        }
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundleBlacklist(ClickSortedPlugin plugin) {
+        return Commands.literal("blacklist")
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    Set<Material> blacklist = plugin.getSortingPrefs().getBundleBlacklist(player);
+                    var lang = plugin.getConfigManager().lang();
+                    if (blacklist.isEmpty()) {
+                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistEmpty"));
+                    } else {
+                        String list = blacklist.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
+                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistList",
+                                Placeholder.unparsed("list", list)));
+                    }
+                    return Command.SINGLE_SUCCESS;
+                })
+                .then(Commands.literal("add")
+                        .then(Commands.argument("material", StringArgumentType.word())
+                                .suggests((ctx, b) -> {
+                                    String input = ctx.getInput();
+                                    String prefix = input.contains(" ") ? input.substring(input.lastIndexOf(' ') + 1).toUpperCase() : "";
+                                    for (Material mat : Material.values()) {
+                                        if (!mat.isLegacy() && mat.name().startsWith(prefix)) {
+                                            b.suggest(mat.name().toLowerCase());
+                                        }
+                                    }
+                                    return b.buildFuture();
+                                })
+                                .executes(ctx -> {
+                                    Player player = requirePlayer(plugin, ctx);
+                                    if (player == null || throttled(plugin, ctx.getSource())) {
+                                        return Command.SINGLE_SUCCESS;
+                                    }
+                                    String raw = StringArgumentType.getString(ctx, "material");
+                                    Material mat = Material.matchMaterial(raw);
+                                    if (mat == null || mat.isLegacy()) {
+                                        sendInvalidValue(plugin, player, raw, "a material name");
+                                        return Command.SINGLE_SUCCESS;
+                                    }
+                                    var lang = plugin.getConfigManager().lang();
+                                    boolean added = plugin.getSortingPrefs().addToBundleBlacklist(player, mat);
+                                    if (added) {
+                                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistAdded",
+                                                Placeholder.unparsed("material", mat.name())));
+                                    } else {
+                                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistAlreadyPresent",
+                                                Placeholder.unparsed("material", mat.name())));
+                                    }
+                                    return Command.SINGLE_SUCCESS;
+                                })))
+                .then(Commands.literal("remove")
+                        .then(Commands.argument("material", StringArgumentType.word())
+                                .suggests((ctx, b) -> {
+                                    if (ctx.getSource().getExecutor() instanceof Player player) {
+                                        plugin.getSortingPrefs().getBundleBlacklist(player)
+                                                .forEach(mat -> b.suggest(mat.name().toLowerCase()));
+                                    }
+                                    return b.buildFuture();
+                                })
+                                .executes(ctx -> {
+                                    Player player = requirePlayer(plugin, ctx);
+                                    if (player == null || throttled(plugin, ctx.getSource())) {
+                                        return Command.SINGLE_SUCCESS;
+                                    }
+                                    String raw = StringArgumentType.getString(ctx, "material");
+                                    Material mat = Material.matchMaterial(raw);
+                                    if (mat == null || mat.isLegacy()) {
+                                        sendInvalidValue(plugin, player, raw, "a material name");
+                                        return Command.SINGLE_SUCCESS;
+                                    }
+                                    var lang = plugin.getConfigManager().lang();
+                                    boolean removed = plugin.getSortingPrefs().removeFromBundleBlacklist(player, mat);
+                                    if (removed) {
+                                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistRemoved",
+                                                Placeholder.unparsed("material", mat.name())));
+                                    } else {
+                                        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNotPresent",
+                                                Placeholder.unparsed("material", mat.name())));
+                                    }
+                                    return Command.SINGLE_SUCCESS;
+                                })))
+                .then(Commands.literal("list")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            Set<Material> blacklist = plugin.getSortingPrefs().getBundleBlacklist(player);
+                            var lang = plugin.getConfigManager().lang();
+                            if (blacklist.isEmpty()) {
+                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistEmpty"));
+                            } else {
+                                String list = blacklist.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
+                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistList",
+                                        Placeholder.unparsed("list", list)));
+                            }
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                .then(Commands.literal("clear")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            plugin.getSortingPrefs().clearBundleBlacklist(player);
+                            MessageUtil.statusMessage(player,
+                                    plugin.getConfigManager().lang().getColoredMessage("setBundleBlacklistCleared"));
+                            return Command.SINGLE_SUCCESS;
+                        }));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildLock(ClickSortedPlugin plugin) {

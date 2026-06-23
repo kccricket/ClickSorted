@@ -148,7 +148,8 @@ public class InventorySortService {
         boolean packEnabled = (playerMainStorage && prefs.getBundlePackInventory(p))
                 || (container && prefs.getBundlePackOthers(p));
         List<ItemStack> sortedItems = packEnabled
-                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p))
+                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p),
+                        prefs.getBundleBlacklist(p))
                 : SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
@@ -237,7 +238,8 @@ public class InventorySortService {
      * @return the sorted, stack-merged list ready to be written back into {@code sortableSlots}
      */
     private List<ItemStack> packAndSort(Inventory inv, Set<Integer> sortableSlots,
-                                        SortingMethod sortMethod, int stackLimit) {
+                                        SortingMethod sortMethod, int stackLimit,
+                                        Set<Material> blacklist) {
         Map<SortKey, Long> loosePool = new LinkedHashMap<>();
         Map<SortKey, ItemStack> samples = new LinkedHashMap<>();
         List<ItemStack> bundles = new ArrayList<>();       // bins (mutated by the packer)
@@ -251,7 +253,7 @@ public class InventorySortService {
             }
             if (is.getType() == Material.BUNDLE) {
                 bundles.add(is.clone());
-            } else if (BundlePacker.canBundle(is)) {
+            } else if (BundlePacker.canBundle(is, blacklist)) {
                 SortKey key = SortKey.poolKey(is);
                 // Lambda, not Long::sum: a method ref binds the boxed map values straight to
                 // primitive params, tripping JDT's "needs unchecked conversion" null warning.
@@ -262,7 +264,7 @@ public class InventorySortService {
             }
         }
 
-        List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, bundles, stackLimit);
+        List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, bundles, stackLimit, blacklist);
         toSort.addAll(leftover);
         toSort.addAll(bundles);
 
