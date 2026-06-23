@@ -4,12 +4,14 @@ import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.sort.SortEngine;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.block.ShulkerBox;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.BundleMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -127,6 +129,65 @@ class SortEngineTest extends AbstractClickSortedTest {
     }
 
     @Test
+    void sortAndMerge_fungibleSameMaterialDifferentLore_doNotMerge() {
+        ItemStack a = loredItem(Material.FEATHER, 1, "Line one");
+        ItemStack b = loredItem(Material.FEATHER, 1, "Line two");
+        ItemStack plain = new ItemStack(Material.FEATHER, 1);
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(a, b, plain), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(3, feathers.size(), "feathers with different lore must stay distinct");
+        assertEquals(3, feathers.stream().mapToInt(ItemStack::getAmount).sum(), "no feathers lost");
+    }
+
+    @Test
+    void sortAndMerge_fungibleSameMaterialDifferentCustomModelData_doNotMerge() {
+        ItemStack a = customModelDataItem(Material.FEATHER, 1, 100);
+        ItemStack b = customModelDataItem(Material.FEATHER, 1, 200);
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(a, b), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(2, feathers.size(), "feathers with different custom model data must stay distinct");
+        assertEquals(2, feathers.stream().mapToInt(ItemStack::getAmount).sum(), "no feathers lost");
+    }
+
+    @Test
+    void sortAndMerge_fungibleSameMaterialDifferentExternalPdc_doNotMerge() {
+        // Simulates items tagged by an external plugin. NamespacedKey.fromString("otherplugin:…")
+        // produces a key with namespace "otherplugin", identical in every way to what a real plugin
+        // would produce via new NamespacedKey(otherPlugin, …) where otherPlugin.getName() = "otherplugin".
+        NamespacedKey key = NamespacedKey.fromString("otherplugin:custom_flag");
+        ItemStack tagged = pdcItem(Material.FEATHER, 1, key, "special");
+        ItemStack plain = new ItemStack(Material.FEATHER, 1);
+        ItemStack differentValue = pdcItem(Material.FEATHER, 1, key, "other");
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(tagged, plain, differentValue), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(3, feathers.size(), "feathers differing by external PDC must stay distinct");
+        assertEquals(3, feathers.stream().mapToInt(ItemStack::getAmount).sum(), "no feathers lost");
+    }
+
+    @Test
+    void sortAndMerge_fungibleSameMaterialSameExternalPdc_merge() {
+        // Identical external-plugin PDC: stacks should still be quantity-merged and the PDC preserved.
+        NamespacedKey key = NamespacedKey.fromString("otherplugin:custom_flag");
+        ItemStack a = pdcItem(Material.FEATHER, 3, key, "special");
+        ItemStack b = pdcItem(Material.FEATHER, 7, key, "special");
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(a, b), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(1, feathers.size(), "identical PDC feathers merge into one stack");
+        assertEquals(10, feathers.get(0).getAmount(), "quantities summed correctly");
+        assertEquals("special",
+                feathers.get(0).getItemMeta().getPersistentDataContainer().get(key, PersistentDataType.STRING),
+                "merged stack retains external PDC value");
+    }
+
+    @Test
     void sortAndMerge_fungibleSameMaterialDifferentEnchants_doNotMerge() {
         // Enchantments are part of the meta, so two otherwise-identical fungible stacks that carry
         // different enchantments must remain distinct rather than collapse and lose one's enchantment.
@@ -150,6 +211,30 @@ class SortEngineTest extends AbstractClickSortedTest {
         ItemStack is = new ItemStack(Material.FEATHER, 1);
         ItemMeta meta = is.getItemMeta();
         meta.addEnchant(enchant, level, true);
+        is.setItemMeta(meta);
+        return is;
+    }
+
+    private static ItemStack loredItem(Material mat, int amount, String loreLine) {
+        ItemStack is = new ItemStack(mat, amount);
+        ItemMeta meta = is.getItemMeta();
+        meta.lore(List.of(Component.text(loreLine)));
+        is.setItemMeta(meta);
+        return is;
+    }
+
+    private static ItemStack customModelDataItem(Material mat, int amount, int modelData) {
+        ItemStack is = new ItemStack(mat, amount);
+        ItemMeta meta = is.getItemMeta();
+        meta.setCustomModelData(modelData);
+        is.setItemMeta(meta);
+        return is;
+    }
+
+    private static ItemStack pdcItem(Material mat, int amount, NamespacedKey key, String value) {
+        ItemStack is = new ItemStack(mat, amount);
+        ItemMeta meta = is.getItemMeta();
+        meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, value);
         is.setItemMeta(meta);
         return is;
     }
