@@ -518,4 +518,129 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         }
         assertTrue(namedRetained, "Named 'Special Dirt' inside the bundle must stay there after sorting");
     }
+
+    // -------------------------------------------------------------------------
+    // BundlePacker — blacklisted bundle is skipped as a bin (not packed into, not unpacked)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void blacklistedBundle_notPackedInto() {
+        // The bundle's own material (BUNDLE) is blacklisted — it must not be used as a bin.
+        ItemStack b = bundle();
+        List<ItemStack> bundles = new ArrayList<>(List.of(b));
+
+        List<ItemStack> leftover = pack(
+                List.of(new ItemStack(Material.COBBLESTONE, 8)),
+                bundles,
+                0,
+                new BundleBlacklist(Set.of(Material.BUNDLE), Set.of()));
+
+        assertFalse(bundleHas(b, Material.COBBLESTONE),
+                "A bundle blacklisted by material must not receive packed items");
+        boolean cobbLoose = leftover.stream().anyMatch(
+                is -> is != null && is.getType() == Material.COBBLESTONE);
+        assertTrue(cobbLoose, "Cobblestone must stay loose when its target bundle is blacklisted");
+    }
+
+    @Test
+    void blacklistedBundle_contentsNotUnpacked() {
+        // The bundle's own material (BUNDLE) is blacklisted — its contents must not be pooled out.
+        ItemStack b = bundle(new ItemStack(Material.COBBLESTONE, 64));
+        List<ItemStack> bundles = new ArrayList<>(List.of(b));
+
+        List<ItemStack> leftover = pack(
+                List.of(),
+                bundles,
+                0,
+                new BundleBlacklist(Set.of(Material.BUNDLE), Set.of()));
+
+        assertTrue(bundleHas(b, Material.COBBLESTONE),
+                "Contents of a blacklisted bundle must not be unpacked");
+        boolean cobbLoose = leftover.stream().anyMatch(
+                is -> is != null && is.getType() == Material.COBBLESTONE);
+        assertFalse(cobbLoose, "No cobblestone should appear loose if the bundle was not unpacked");
+    }
+
+    @Test
+    void namedBundle_blacklistedByName_skippedAsBin() {
+        // A named bundle ("Keepsake") is blacklisted by name — it must not be packed into or unpacked.
+        ItemStack b = customNamed(Material.BUNDLE, "Keepsake");
+        // Pre-load it with cobblestone.
+        BundleMeta meta = (BundleMeta) b.getItemMeta();
+        meta.setItems(List.of(new ItemStack(Material.COBBLESTONE, 32)));
+        b.setItemMeta(meta);
+        List<ItemStack> bundles = new ArrayList<>(List.of(b));
+
+        List<ItemStack> leftover = pack(
+                List.of(new ItemStack(Material.DIRT, 8)),
+                bundles,
+                0,
+                new BundleBlacklist(Set.of(), Set.of("Keepsake")));
+
+        // Cobblestone must still be inside (not unpacked).
+        assertTrue(bundleHas(b, Material.COBBLESTONE),
+                "Contents of a name-blacklisted bundle must not be unpacked");
+        // Dirt must not be packed in.
+        assertFalse(bundleHas(b, Material.DIRT),
+                "Dirt must not be packed into a name-blacklisted bundle");
+        // Dirt comes back loose.
+        boolean dirtLoose = leftover.stream().anyMatch(
+                is -> is != null && is.getType() == Material.DIRT);
+        assertTrue(dirtLoose, "Dirt should remain loose when the only bin is name-blacklisted");
+    }
+
+    @Test
+    void nonBlacklistedBundle_stillPacksNormally_whenBlacklistTargetsDifferentMaterial() {
+        // A plain BUNDLE is NOT the blacklisted material; it must still pack normally.
+        ItemStack b = bundle();
+        List<ItemStack> bundles = new ArrayList<>(List.of(b));
+
+        List<ItemStack> leftover = pack(
+                List.of(new ItemStack(Material.COBBLESTONE, 8)),
+                bundles,
+                0,
+                new BundleBlacklist(Set.of(Material.DIRT), Set.of())); // BUNDLE is not blacklisted
+
+        assertTrue(bundleHas(b, Material.COBBLESTONE),
+                "A non-blacklisted bundle must still accept packed items");
+        boolean cobbLoose = leftover.stream().anyMatch(
+                is -> is != null && is.getType() == Material.COBBLESTONE);
+        assertFalse(cobbLoose, "Cobblestone must not appear loose when packed into the bundle");
+    }
+
+    // -------------------------------------------------------------------------
+    // Integration — blacklisted bundle is sorted normally but skipped as a bin
+    // -------------------------------------------------------------------------
+
+    @Test
+    void integration_blacklistedBundle_sortedNormallyButNotUsedAsBin() {
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().addToBundleBlacklist(player, Material.BUNDLE);
+
+        // A pre-loaded bundle + loose cobblestone; bundle is blacklisted by material.
+        ItemStack b = bundle(new ItemStack(Material.COBBLESTONE, 16));
+        player.getInventory().setItem(9, b);
+        player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 8));
+
+        sortMainStorage(player);
+
+        // Bundle must still be present in main storage (sorted, not destroyed).
+        ItemStack bundleAfter = findBundle(player.getInventory(), 9, 36);
+        assertNotNull(bundleAfter, "Blacklisted bundle must still be present after sort");
+
+        // Bundle contents must be untouched (the 16 cobblestone inside is not pooled/repacked).
+        assertTrue(bundleHas(bundleAfter, Material.COBBLESTONE),
+                "Contents of blacklisted bundle must remain inside it after sort");
+
+        // The loose 8 cobblestone must remain loose (not packed into the blacklisted bundle).
+        int looseCount = 0;
+        for (int i = 9; i < 36; i++) {
+            ItemStack is = player.getInventory().getItem(i);
+            if (is != null && is.getType() == Material.COBBLESTONE) looseCount += is.getAmount();
+        }
+        // 8 loose cobblestone should still be loose.
+        assertEquals(8, looseCount,
+                "Loose cobblestone must not be absorbed into the blacklisted bundle");
+    }
 }

@@ -38,6 +38,8 @@ import java.util.*;
  *   <li>Remainders heavier than {@link #MAX_PACK_WEIGHT} are never bundled (inefficient trade).</li>
  *   <li>Ineligible bundle contents (non-stackable, nested shulkers) are never pooled or moved.</li>
  *   <li>Bundles (policy) and shulker boxes (hard limit) are never packed into bundles.</li>
+ *   <li>A bundle whose own material or display name is blocked by the blacklist is never used as a
+ *       bin: its contents are not unpacked and no new items are packed into it.</li>
  * </ul>
  */
 public final class BundlePacker {
@@ -73,7 +75,9 @@ public final class BundlePacker {
      *
      * <p>Entries in {@code blacklist} are treated as ineligible for bundling: loose blacklisted items
      * are not pooled by the caller and blacklisted items already inside bundles are retained (not
-     * unpacked) by this method.
+     * unpacked) by this method. Additionally, a bundle whose <em>own</em> material or display name is
+     * blocked by the blacklist is skipped entirely as a bin — its contents are left untouched and no
+     * new items are packed into it; it is still sorted normally by the caller.
      *
      * @param loosePool  pooled amounts per item type for the loose eligible items; bundle contents are
      *                   merged in by this method (mutated)
@@ -93,7 +97,7 @@ public final class BundlePacker {
         List<Bin> bins = new ArrayList<>();
         if (bundles != null) {
             for (ItemStack b : bundles) {
-                if (b != null && isBundle(b.getType())) {
+                if (b != null && isBundle(b.getType()) && !blacklist.blocks(b)) {
                     addBin(bins, b, loosePool, samples, originBins, blacklist);
                 }
             }
