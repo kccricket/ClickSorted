@@ -14,6 +14,7 @@ package net.kccricket.clicksorted.gui;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.config.LangConfig;
+import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -109,7 +110,7 @@ public class LockGuiHolder implements ClickSortedHolder {
         ItemStack pane = new ItemStack(locked ? Material.BARRIER : Material.LIME_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
         meta.displayName(lang.getColoredMessage(locked ? "lockPaneLocked" : "lockPaneUnlocked"));
-        meta.lore(List.of(
+        meta.lore(MessageUtil.toLore(
                 lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
                 lang.getColoredMessage(locked ? "lockPaneLockedLore" : "lockPaneUnlockedLore")));
         pane.setItemMeta(meta);
@@ -120,7 +121,7 @@ public class LockGuiHolder implements ClickSortedHolder {
         ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
         meta.displayName(lang.getColoredMessage("lockPaneUnsortable"));
-        meta.lore(List.of(lang.getColoredMessage("lockPaneUnsortableLore")));
+        meta.lore(MessageUtil.toLore(lang.getColoredMessage("lockPaneUnsortableLore")));
         pane.setItemMeta(meta);
         return pane;
     }
@@ -137,7 +138,7 @@ public class LockGuiHolder implements ClickSortedHolder {
         ItemStack book = new ItemStack(Material.BOOK);
         ItemMeta meta = book.getItemMeta();
         meta.displayName(lang.getColoredMessage("lockHelpHeadName"));
-        meta.lore(List.of(lang.getColoredMessage("lockHelpHeadLore")));
+        meta.lore(MessageUtil.toLore(lang.getColoredMessage("lockHelpHeadLore")));
         book.setItemMeta(meta);
         return book;
     }

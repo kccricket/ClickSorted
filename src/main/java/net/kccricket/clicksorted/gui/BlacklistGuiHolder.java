@@ -14,6 +14,7 @@ package net.kccricket.clicksorted.gui;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.config.LangConfig;
+import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -209,7 +210,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
     private static ItemStack buildMaterialItem(LangConfig lang, Material material) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.lore(List.of(lang.getColoredMessage("blacklistEntryLore")));
+        meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
         item.setItemMeta(meta);
         return item;
     }
@@ -223,7 +224,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name).decoration(TextDecoration.ITALIC, false));
         meta.setEnchantmentGlintOverride(true);
-        meta.lore(List.of(lang.getColoredMessage("blacklistEntryLore")));
+        meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
         item.setItemMeta(meta);
         return item;
     }
@@ -240,7 +241,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         ItemStack book = new ItemStack(Material.BOOK);
         ItemMeta meta = book.getItemMeta();
         meta.displayName(lang.getColoredMessage("blacklistHelpBookName"));
-        meta.lore(List.of(lang.getColoredMessage("blacklistHelpBookLore")));
+        meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistHelpBookLore")));
         book.setItemMeta(meta);
         return book;
     }
