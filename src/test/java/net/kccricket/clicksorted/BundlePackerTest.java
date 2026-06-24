@@ -30,15 +30,9 @@ class BundlePackerTest extends AbstractClickSortedTest {
     // Test helpers
     // -------------------------------------------------------------------------
 
-    /** Build a bundle ItemStack pre-loaded with the given contents. */
+    /** Build a BUNDLE ItemStack pre-loaded with the given contents. */
     private static ItemStack bundle(ItemStack... contents) {
-        ItemStack b = new ItemStack(Material.BUNDLE, 1);
-        if (contents.length > 0) {
-            BundleMeta meta = (BundleMeta) b.getItemMeta();
-            meta.setItems(Arrays.asList(contents));
-            b.setItemMeta(meta);
-        }
-        return b;
+        return bundle(Material.BUNDLE, contents);
     }
 
     /**
@@ -121,6 +115,41 @@ class BundlePackerTest extends AbstractClickSortedTest {
         return seen.size();
     }
 
+    /** Build a bundle ItemStack of the given type pre-loaded with the given contents. */
+    private static ItemStack bundle(Material type, ItemStack... contents) {
+        ItemStack b = new ItemStack(type, 1);
+        if (contents.length > 0) {
+            BundleMeta meta = (BundleMeta) b.getItemMeta();
+            meta.setItems(Arrays.asList(contents));
+            b.setItemMeta(meta);
+        }
+        return b;
+    }
+
+    // -------------------------------------------------------------------------
+    // isBundle
+    // -------------------------------------------------------------------------
+
+    @Test
+    void isBundle_bundle_true() {
+        assertTrue(BundlePacker.isBundle(Material.BUNDLE));
+    }
+
+    @Test
+    void isBundle_coloredBundle_true() {
+        assertTrue(BundlePacker.isBundle(Material.RED_BUNDLE));
+    }
+
+    @Test
+    void isBundle_cobblestone_false() {
+        assertFalse(BundlePacker.isBundle(Material.COBBLESTONE));
+    }
+
+    @Test
+    void isBundle_null_false() {
+        assertFalse(BundlePacker.isBundle(null));
+    }
+
     // -------------------------------------------------------------------------
     // canBundle
     // -------------------------------------------------------------------------
@@ -133,6 +162,11 @@ class BundlePackerTest extends AbstractClickSortedTest {
     @Test
     void canBundle_bundle_false() {
         assertFalse(BundlePacker.canBundle(new ItemStack(Material.BUNDLE, 1)));
+    }
+
+    @Test
+    void canBundle_coloredBundle_false() {
+        assertFalse(BundlePacker.canBundle(new ItemStack(Material.RED_BUNDLE, 1)));
     }
 
     @Test
@@ -314,5 +348,15 @@ class BundlePackerTest extends AbstractClickSortedTest {
     void pack_emptyPoolNoBundles_returnsEmpty() {
         List<ItemStack> leftover = pack(List.of(), new ArrayList<>(), 0);
         assertTrue(leftover.isEmpty(), "Nothing to pack → no leftover stacks");
+    }
+
+    @Test
+    void pack_coloredBundleUsedAsBin() {
+        // A RED_BUNDLE should be recognized as a bin and receive the remainder, just like BUNDLE.
+        List<ItemStack> bundles = new ArrayList<>(List.of(bundle(Material.RED_BUNDLE)));
+        List<ItemStack> leftover = pack(List.of(new ItemStack(Material.COBBLESTONE, 10)), bundles, 0);
+
+        assertEquals(0, looseSlots(leftover, Material.COBBLESTONE), "Nothing left loose");
+        assertEquals(10, bundleAmount(bundles.get(0), Material.COBBLESTONE), "Remainder is inside the colored bundle");
     }
 }

@@ -95,7 +95,7 @@ public final class SortEngine {
 
     /** Whether an item is fungible: stackable and not a bundle, so it may be quantity-merged. */
     private static boolean isFungible(ItemStack is) {
-        return is.getType() != Material.BUNDLE && is.getType().getMaxStackSize() > 1;
+        return !BundlePacker.isBundle(is.getType()) && is.getType().getMaxStackSize() > 1;
     }
 
     /**
