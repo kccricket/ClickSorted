@@ -249,7 +249,7 @@ public class InventorySortService {
             if (is == null) {
                 continue;
             }
-            if (is.getType() == Material.BUNDLE) {
+            if (BundlePacker.isBundle(is.getType())) {
                 bundles.add(is.clone());
             } else if (BundlePacker.canBundle(is)) {
                 SortKey key = SortKey.poolKey(is);

@@ -82,7 +82,7 @@ public final class BundlePacker {
         List<Bin> bins = new ArrayList<>();
         if (bundles != null) {
             for (ItemStack b : bundles) {
-                if (b != null && b.getType() == Material.BUNDLE) {
+                if (b != null && isBundle(b.getType())) {
                     addBin(bins, b, loosePool, samples, originBins);
                 }
             }
@@ -208,6 +208,14 @@ public final class BundlePacker {
     }
 
     /**
+     * Returns true if {@code mat} is a bundle (the undyed {@code BUNDLE} or any dyed color
+     * variant such as {@code WHITE_BUNDLE}, {@code RED_BUNDLE}, etc., added in 1.21.2).
+     */
+    public static boolean isBundle(Material mat) {
+        return mat != null && (mat == Material.BUNDLE || mat.name().endsWith("_BUNDLE"));
+    }
+
+    /**
      * Returns true if {@code is} may be placed into a bundle.
      *
      * <p>Shulker boxes cannot go in bundles (Minecraft hard limit). Bundles are excluded by
@@ -218,7 +226,7 @@ public final class BundlePacker {
     public static boolean canBundle(ItemStack is) {
         if (is == null) return false;
         Material mat = is.getType();
-        if (mat == Material.BUNDLE) return false;
+        if (isBundle(mat)) return false;
         if (mat.name().contains("SHULKER_BOX")) return false;
         if (mat.getMaxStackSize() <= 1) return false;
         return true;
