@@ -7,6 +7,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.gui.BlacklistGuiHolder;
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.logging.DebugLevel;
 import net.kccricket.clicksorted.migration.PreferenceRepair;
@@ -16,12 +17,10 @@ import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
-import net.kccricket.clicksorted.text.ItemNames;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -397,7 +396,7 @@ public class ClickSortedCommands {
                     if (player == null || throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
-                    sendBlacklistStatus(plugin, player);
+                    player.openInventory(new BlacklistGuiHolder(plugin, player).getInventory());
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(Commands.literal("add")
@@ -481,29 +480,6 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundleBlacklistName(ClickSortedPlugin plugin) {
         return Commands.literal("name")
-                .then(Commands.literal("hand")
-                        .executes(ctx -> {
-                            Player player = requirePlayer(plugin, ctx);
-                            if (player == null || throttled(plugin, ctx.getSource())) {
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            var lang = plugin.getConfigManager().lang();
-                            ItemStack held = player.getInventory().getItemInMainHand();
-                            String name = heldDisplayName(held);
-                            if (name == null) {
-                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameNoHeld"));
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            boolean added = plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
-                            if (added) {
-                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAdded",
-                                        Placeholder.unparsed("name", name)));
-                            } else {
-                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAlreadyPresent",
-                                        Placeholder.unparsed("name", name)));
-                            }
-                            return Command.SINGLE_SUCCESS;
-                        }))
                 .then(Commands.literal("add")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(ctx -> {
@@ -556,17 +532,6 @@ public class ClickSortedCommands {
                                     }
                                     return Command.SINGLE_SUCCESS;
                                 })));
-    }
-
-    /**
-     * Returns the displayed name of {@code held} (custom display name if set, otherwise the
-     * items.yml / translation lookup), or {@code null} if the stack is empty/air.
-     */
-    private static String heldDisplayName(ItemStack held) {
-        if (held == null || held.getType() == Material.AIR) {
-            return null;
-        }
-        return ItemNames.lookup(held);
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildLock(ClickSortedPlugin plugin) {

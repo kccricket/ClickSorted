@@ -69,10 +69,21 @@ setBundleBlacklistNameAdded: "Display name <aqua><name><white> added to your bun
 setBundleBlacklistNameAlreadyPresent: "Display name <aqua><name><white> is already in your bundle blacklist."
 setBundleBlacklistNameRemoved: "Display name <aqua><name><white> removed from your bundle blacklist."
 setBundleBlacklistNameNotPresent: "Display name <aqua><name><white> is not in your bundle blacklist."
-# Shown when the player runs 'name hand' but holds nothing.
-setBundleBlacklistNameNoHeld: "Hold an item to blacklist it by name."
 # Placeholder: <list> (comma-separated display names)
 setBundleBlacklistNamesList: "Blacklisted display names: <aqua><list><white>."
+
+# Blacklist GUI (/clicksorted set bundle blacklist with no further arguments)
+blacklistGuiTitle: "<!italic>Bundle Blacklist"
+# Lore shown on every blacklist entry (both material and name entries).
+blacklistEntryLore: "<!italic><gray>Click to remove."
+# Display name for the black-pane filler slots in the control row.
+blacklistFillerName: "<!italic><dark_gray> "
+# Help book in the centre of the control row.
+blacklistHelpBookName: "<!italic>Bundle Blacklist"
+blacklistHelpBookLore: "<!italic><gray>Click an item in your inventory to add it to<newline>the blacklist. Click a listed entry to remove it."
+# Pagination arrow controls.
+blacklistArrowPrev: "<!italic>Previous page"
+blacklistArrowNext: "<!italic>Next page"
 
 # Command feedback — status (/clicksorted status)
 # Placeholder: <method>
