@@ -70,12 +70,13 @@ public class BlacklistGuiListener implements Listener {
         int rawSlot = event.getRawSlot();
 
         if (rawSlot >= 0 && rawSlot < BlacklistGuiHolder.PAGE_SIZE) {
-            // Top section: remove the clicked entry — throttled.
-            if (plugin.getActionThrottle().throttled(player)) {
-                return;
-            }
+            // Top section: remove the clicked entry — throttled (only when an entry is present, so
+            // clicking an empty slot neither consumes the throttle budget nor triggers its notice).
             BlacklistGuiHolder.Entry entry = holder.getEntryAt(rawSlot);
             if (entry == null) {
+                return;
+            }
+            if (plugin.getActionThrottle().throttled(player)) {
                 return;
             }
             removeEntry(player, entry);
@@ -90,12 +91,13 @@ public class BlacklistGuiListener implements Listener {
             }
 
         } else if (rawSlot >= BlacklistGuiHolder.GUI_SIZE) {
-            // Player's real inventory: add the clicked item to the blacklist — throttled.
-            if (plugin.getActionThrottle().throttled(player)) {
-                return;
-            }
+            // Player's real inventory: add the clicked item to the blacklist — throttled (only when a
+            // real item is present, so clicking an empty slot is a free no-op).
             ItemStack item = event.getCurrentItem();
             if (item == null || item.getType() == Material.AIR) {
+                return;
+            }
+            if (plugin.getActionThrottle().throttled(player)) {
                 return;
             }
             addItem(player, item);

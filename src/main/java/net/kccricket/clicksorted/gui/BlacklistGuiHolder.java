@@ -210,8 +210,12 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
     private static ItemStack buildMaterialItem(LangConfig lang, Material material) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
-        item.setItemMeta(meta);
+        // Non-item materials (e.g. a stale entry stored before validation) have no ItemMeta; show the
+        // bare item rather than throwing and breaking the whole GUI.
+        if (meta != null) {
+            meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
+            item.setItemMeta(meta);
+        }
         return item;
     }
 

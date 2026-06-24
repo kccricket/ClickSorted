@@ -126,10 +126,19 @@ public class ClickSortedCommands {
     }
 
     /**
+     * Materials offered as completions for the bundle-blacklist {@code add} argument: non-legacy
+     * materials that have an item form (so a bare block-only material such as {@code WATER}, which
+     * cannot be a bundle entry and has no {@link org.bukkit.inventory.meta.ItemMeta}, is excluded).
+     * Note that block materials with an item form (e.g. {@code DIRT}) still qualify.
+     */
+    static final java.util.function.Predicate<Material> SUGGESTABLE_MATERIAL =
+            mat -> !mat.isLegacy() && mat.isItem();
+
+    /**
      * Suggests the lower-cased names of {@code values} that pass {@code include} and prefix-match the
      * current (case-insensitive) input. Shared by every enum-valued argument's {@code suggests} hook.
      */
-    private static <E extends Enum<E>> java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestEnum(
+    static <E extends Enum<E>> java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestEnum(
             com.mojang.brigadier.suggestion.SuggestionsBuilder builder, E[] values, java.util.function.Predicate<E> include) {
         String input = builder.getRemaining().toUpperCase();
         for (E value : values) {
@@ -401,7 +410,7 @@ public class ClickSortedCommands {
                 })
                 .then(Commands.literal("add")
                         .then(Commands.argument("material", StringArgumentType.word())
-                                .suggests((ctx, b) -> suggestEnum(b, Material.values(), mat -> !mat.isLegacy()))
+                                .suggests((ctx, b) -> suggestEnum(b, Material.values(), SUGGESTABLE_MATERIAL))
                                 .executes(ctx -> {
                                     Player player = requirePlayer(plugin, ctx);
                                     if (player == null || throttled(plugin, ctx.getSource())) {
@@ -409,7 +418,9 @@ public class ClickSortedCommands {
                                     }
                                     String raw = StringArgumentType.getString(ctx, "material");
                                     Material mat = Material.matchMaterial(raw);
-                                    if (mat == null || mat.isLegacy()) {
+                                    // Reject non-item materials (e.g. WATER): they can never be a bundle
+                                    // entry and yield a null ItemMeta that would NPE the blacklist GUI.
+                                    if (mat == null || mat.isLegacy() || !mat.isItem()) {
                                         sendInvalidValue(plugin, player, raw, "a material name");
                                         return Command.SINGLE_SUCCESS;
                                     }
