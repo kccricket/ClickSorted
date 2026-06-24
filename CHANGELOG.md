@@ -1,3 +1,30 @@
+# ClickSorted 1.2.1
+
+Release date: 2026-06-23
+
+ClickSorted 1.2.1 fixes bundle packing silently ignoring dyed bundles as pack targets.
+
+## Bug Fixes
+
+- **Colored bundles not recognized as pack bins** — `BundlePacker` now matches all bundle color variants (e.g. `RED_BUNDLE`, `BLUE_BUNDLE`) when scanning for pack targets, not just `Material.BUNDLE`. Dyed bundles in an inventory were passed over as bins and left empty during a bundle-packing sort.
+
+## Compatibility
+
+✔️ Paper/Folia 1.21.5 – 26.1.x
+✔️ Java 21+
+
+## Upgrading
+
+1. Stop your server.
+2. Replace the old jar in `plugins/` with this release.
+3. Start your server.
+
+## What's Changed
+
+- Fix bundle packing to match all bundle color variants by @kccricket
+
+---
+
 # ClickSorted 1.2.0
 
 Release date: 2026-06-22
@@ -61,7 +88,7 @@ A "preference repair" procedure runs on player join and resets any per-player PD
 ## Compatibility
 
 ✔️ Paper/Folia 1.21.5 – 26.1.x
-✔️ Java 21
+✔️ Java 21+
 
 ## Upgrading
 
@@ -116,7 +143,7 @@ ClickSorted 1.1.1 adds explicit Folia support, hardens shared state for Folia's 
 ## Compatibility
 
 ✔️ Paper/Folia 1.20.6 – 26.1.x
-✔️ Java 21
+✔️ Java 21+
 
 ## Upgrading
 
@@ -191,7 +218,7 @@ A global per-player rate limiter (`action_cooldown_ms`, default 150 ms) gates ev
 ## Compatibility
 
 ✔️ Paper/Folia 1.20.6 – 26.1.x
-✔️ Java 21
+✔️ Java 21+
 
 ## Upgrading
 
@@ -290,7 +317,7 @@ giving GROUP sort a more intuitive ordering for current-version items.
 ## Compatibility
 
 ✔️ Paper/Folia 1.20.6+  
-✔️ Java 21  
+✔️ Java 21+
 
 ## Upgrading from ClickSort (original fork)
 
