@@ -23,9 +23,9 @@ import java.util.Set;
  * packed into or unpacked from bundles during sorting.
  *
  * <p>A material entry blocks any item of that type regardless of its display name. A name entry blocks
- * any item whose custom display name (plain-text, color-stripped) exactly matches — only items that
- * <em>have</em> a custom display name are checked against the name set; vanilla unnamed items are the
- * material blacklist's job.
+ * any item whose resolved display name (plain-text, color-stripped) exactly matches — that is the
+ * item's custom display name when it has one, otherwise its vanilla / {@code items.yml} name (see
+ * {@link ItemNames#lookup}), so a name entry can target both renamed items and plain vanilla ones.
  */
 public record BundleBlacklist(Set<Material> materials, Set<String> names) {
 
