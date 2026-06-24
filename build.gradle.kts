@@ -5,10 +5,18 @@ plugins {
     jacoco
     id("com.gradleup.shadow") version "9.4.2"
     id("org.bxteam.runserver") version "1.2.2"
+    id("com.modrinth.minotaur") version "2.9.0"
+    id("io.papermc.hangar-publish-plugin") version "0.1.4"
 }
 
 group = project.property("group") as String
 version = project.property("version") as String
+
+// Game versions supported by this release, kept in gradle.properties (comma-separated).
+// Append new versions there when compatibility is verified — no other changes needed.
+val gameVersionsList: List<String> = (project.findProperty("gameVersions") as? String)
+    ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+    ?: listOf("1.21.5")
 
 repositories {
     mavenCentral()
@@ -109,7 +117,7 @@ tasks.jacocoTestReport {
 
 // Shadow JAR configuration — replaces maven-shade-plugin
 tasks.shadowJar {
-    // Produce build/libs/clicksorted.jar (no classifier, fixed name)
+    // Produce build/libs/ClickSorted-${version}.jar — the distributable artifact.
     archiveFileName.set("ClickSorted-${version}.jar")
     // Relocate bStats so it doesn't conflict with other plugins bundling the same library
     relocate("org.bstats", "net.kccricket.clicksorted.thirdparty")
@@ -117,6 +125,12 @@ tasks.shadowJar {
     manifest {
         attributes["Main-Class"] = "net.kccricket.clicksorted.ClickSortedPlugin"
     }
+}
+
+// The shadow JAR is the distributable artifact; disable the plain jar task to prevent a
+// naming collision between the two outputs on case-insensitive filesystems (macOS/Windows).
+tasks.jar {
+    enabled = false
 }
 
 // Make the standard 'build' task produce the shadow JAR
@@ -132,4 +146,72 @@ tasks.runServer {
     acceptMojangEula()
     // Use the Shadow JAR (bStats relocated) instead of the plain jar task output.
     inputTask(tasks.named("shadowJar"))
+}
+
+// ---------------------------------------------------------------------------
+// Release publishing
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts the body of the latest CHANGELOG.md entry, stripping the version heading
+ * and "Release date:" line. Entries are delimited by horizontal-rule ("---") separators.
+ */
+fun latestChangelog(): String {
+    val lines = file("CHANGELOG.md").readLines()
+    val startIdx = lines.indexOfFirst { it.matches(Regex("^# ClickSorted \\S+.*")) }
+    require(startIdx >= 0) { "No '# ClickSorted <version>' heading found in CHANGELOG.md" }
+    val body = lines.drop(startIdx + 1) // skip the heading line itself
+    val endIdx = body.indexOfFirst { it.matches(Regex("^---\\s*$")) }
+    val entryLines = if (endIdx >= 0) body.take(endIdx) else body
+    return entryLines
+        .filter { !it.startsWith("Release date:") }
+        .joinToString("\n")
+        .trim()
+}
+
+/** Writes the latest changelog entry to build/release-notes.md for the GitHub release step. */
+tasks.register("writeReleaseNotes") {
+    description = "Writes the latest CHANGELOG.md entry to build/release-notes.md"
+    val outputFile = layout.buildDirectory.file("release-notes.md")
+    outputs.file(outputFile)
+    doLast {
+        outputFile.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(latestChangelog())
+        }
+    }
+}
+
+modrinth {
+    token.set(providers.environmentVariable("MODRINTH_TOKEN"))
+    projectId.set("clicksorted")
+    versionNumber.set(version.toString())
+    versionName.set("ClickSorted ${version}")
+    versionType.set("release")
+    uploadFile.set(tasks.shadowJar.flatMap { it.archiveFile })
+    gameVersions.set(gameVersionsList)
+    loaders.set(listOf("paper", "folia"))
+    changelog.set(providers.provider { latestChangelog() })
+    // Keep the Modrinth resource page body in sync with DESCRIPTION.md on each publish.
+    syncBodyFrom.set(providers.fileContents(layout.projectDirectory.file("DESCRIPTION.md")).asText)
+}
+
+hangarPublish {
+    publications.register("plugin") {
+        version.set(project.version as String)
+        id.set("ClickSorted")
+        channel.set("Release")
+        changelog.set(latestChangelog())
+        apiKey.set(providers.environmentVariable("HANGAR_API_TOKEN"))
+        // Keep the Hangar resource page body in sync with DESCRIPTION.md on each publish.
+        pages {
+            resourcePage(project.file("DESCRIPTION.md").readText())
+        }
+        platforms {
+            paper {
+                jar.set(tasks.shadowJar.flatMap { it.archiveFile })
+                platformVersions.set(gameVersionsList)
+            }
+        }
+    }
 }
