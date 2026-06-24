@@ -28,3 +28,6 @@ sortable_inventories:
   - "HOPPER_MINECART"
   - "DROPPER"
   - "DISPENSER"
+blacklist:
+  materials: []
+  names: []

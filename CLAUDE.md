@@ -31,7 +31,7 @@ net.kccricket.clicksorted
 ├── gui/                     ClickSortedHolder, LockGuiHolder, LockGuiListener
 ├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
 │                            BundlePacker, BundleBenchmark, GridGeometry, SlotOrder,
-│                            TreemapPacker, PrefsCycleHandler
+│                            TreemapPacker, PrefsCycleHandler, ProtectedItems
 ├── migration/               ValueMigration, Migrations, PlayerMigrationListener,
 │                            PreferenceRepair
 ├── text/                    MessageUtil, CooldownMessenger, ItemNames
@@ -72,8 +72,9 @@ the lineage definitions stay pure data.
 4. When bundle packing is enabled for the target (`defaults.bundle_inventory` / `defaults.bundle_others`, toggled per-player), `InventorySortService` first runs `BundlePacker` to repack partial stacks into bundles before the sort.
 5. A custom `InventorySortEvent` fires after sorting so third-party plugins can intervene.
 6. For player inventories, any slots the player has locked (via `/clicksorted set lock`) are excluded from the sortable set before `SortEngine` runs — locked slots are neither read nor overwritten.
-7. On startup (and after `/clicksorted reload`), `UpdateChecker` runs an async best-effort Modrinth API call and logs a console notice if a newer release exists (`check_for_updates: true`).
-8. On `PlayerJoinEvent`, `PreferenceRepair` validates the player's PDC preferences and resets any that hold unrecognised values, notifying the player in chat.
+7. Admin-blacklisted slots are also excluded from the sortable set (for all inventory types, not just player), immediately after locked slots. A slot is excluded if its item matches the admin `ProtectedItems` list — checked against `config.yml`'s `blacklist.materials`/`blacklist.names` and the sorting player's explicit `clicksorted.blacklist.*` permission nodes.
+8. On startup (and after `/clicksorted reload`), `UpdateChecker` runs an async best-effort Modrinth API call and logs a console notice if a newer release exists (`check_for_updates: true`).
+9. On `PlayerJoinEvent`, `PreferenceRepair` validates the player's PDC preferences and resets any that hold unrecognised values, notifying the player in chat.
 
 ### Key Classes
 
@@ -97,6 +98,7 @@ the lineage definitions stay pure data.
 | `TreemapPacker` | sort | Implements the `TREEMAP` sort method: assigns each item type a contiguous near-square block sized to its stack count; respects `StartCorner` and `FillAxis`; falls back to gap-free fill when rectangles no longer fit |
 | `PrefsCycleHandler` | sort | Handles a click-method-driven preference cycle (used internally by InventoryClickListener) |
 | `BundlePacker` | sort | Pure pool-and-repack of bundle-eligible items into bundles (no plugin state) |
+| `ProtectedItems` | sort | Immutable admin "do not touch" snapshot: items matching the server-wide config blacklist or the sorting player's explicit `clicksorted.blacklist.*` permission nodes are excluded from the sortable slot set entirely (never sorted, moved, or packed). Config names are matched case-insensitively; permission name nodes use a slug (`ProtectedItems.nameToken`) — lowercase, collapse non-`[a-z0-9]` runs to `_`, strip edges. Uses `isPermissionSet` before `hasPermission` to avoid OP-default false positives for undeclared dynamic nodes. |
 | `BundleBenchmark` | sort | In-situ micro-benchmark of the sort and bundle-repack paths (`/clicksorted benchmark`) |
 | `ClickSortedHolder` | gui | Base `InventoryHolder` marker for all ClickSorted-owned GUIs (used to block self-sort) |
 | `PreferenceRepair` | migration | Validates and resets invalid per-player PDC preferences on login, notifying the player |
@@ -111,7 +113,7 @@ the lineage definitions stay pure data.
 
 ### Configuration Files (src/main/resources)
 
-- `config.yml` — debug level, sortable inventory types, `player_sort_min`/`player_sort_max` slot range, `action_cooldown_ms` throttle, `check_for_updates` flag, and per-player `defaults` (click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing)
+- `config.yml` — debug level, sortable inventory types, `player_sort_min`/`player_sort_max` slot range, `action_cooldown_ms` throttle, `check_for_updates` flag, per-player `defaults` (click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), and the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone)
 - `groups.yml` — item groupings for GROUP sort method
 - `items.yml` — persistent store of material → display-name mappings
 - `lang.yml` — all user-facing messages (MiniMessage format)
@@ -135,6 +137,19 @@ Commands are implemented as a Brigadier tree in `ClickSortedCommands` and regist
 Player-facing command handlers resolve the executor via the shared `requirePlayer(plugin, ctx)` helper and gate on `ActionThrottle.throttled(player)`; both return early on failure. Boolean on/off arguments are parsed via `parseState` (the sole consumer of the `ON_WORDS`/`OFF_WORDS` vocabularies).
 
 Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
+
+### Admin "do not touch" blacklist
+
+Admins can prevent ClickSorted from ever touching specific items — they are never sorted, moved, or packed/unpacked regardless of player preferences. Two enforcement channels (unioned):
+
+1. **Config** (`config.yml → blacklist.materials` / `blacklist.names`) — server-wide. Materials matched exactly; names matched case-insensitively against the item's plain-text display name. Unknown material names are warned and skipped on load/reload.
+2. **Permission** — `clicksorted.blacklist.material.<material>` (e.g. `clicksorted.blacklist.material.nether_star`) and `clicksorted.blacklist.name.<slug>` (e.g. `clicksorted.blacklist.name.creative_menu`). Nodes are dynamic, constructed from the item at sort time and checked with `hasPermission` — no enumeration needed, so group inheritance works natively via permissions plugins (LuckPerms, etc.).
+
+**Name slug rule** (`ProtectedItems.nameToken`): strip legacy `§X` color codes → lowercase (`Locale.ROOT`) → collapse non-`[a-z0-9]` runs to `_` → strip edge underscores. E.g. `"Creative Menu"` → `creative_menu`.
+
+**OP note**: The permission channel uses `isPermissionSet` before `hasPermission` to avoid Bukkit's OP default (undeclared nodes return `true` for OPs via `PermissionDefault.OP`). Only explicitly-attached permission nodes trigger the blacklist — OPs without explicit node grants are unaffected.
+
+This blacklist is **admin-only** and not exposed to players via any command or GUI. For player-controlled bundle exclusions, see the per-player bundle blacklist (`PlayerSortingPrefs`, `BundleBlacklist`).
 
 ### Version Compatibility
 

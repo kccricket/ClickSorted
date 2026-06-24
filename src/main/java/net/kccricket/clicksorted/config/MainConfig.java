@@ -7,10 +7,13 @@ import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
+import org.bukkit.Material;
 import org.bukkit.event.inventory.InventoryType;
 
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -30,6 +33,9 @@ public class MainConfig implements ManagedConfig {
     // Reassigned on reload; read on Folia region threads, so publish via volatile.
     // EnumSet for O(1) membership tests on the per-click sort path.
     private volatile Set<InventoryType> sortableInventories = Set.of();
+    // Admin "do not touch" blacklist — parsed once on load/reload, checked on every sort.
+    private volatile Set<Material> blacklistMaterials = Set.of();
+    private volatile Set<String> blacklistNamesLower = Set.of();
 
     public MainConfig(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -146,6 +152,19 @@ public class MainConfig implements ManagedConfig {
                 "Values must be valid Bukkit InventoryType names (case-sensitive).",
                 "See https://jd.papermc.io/paper/1.21.5/org/bukkit/event/inventory/InventoryType.html",
                 "Unrecognized names are silently ignored."));
+        cfg.setComments("blacklist", List.of(
+                "Admin-enforced 'do not touch' list: items matching these entries are excluded from",
+                "every sort — they are never moved, reordered, or packed into / unpacked from bundles.",
+                "This is a server-wide admin setting; players cannot modify it.",
+                "Alternatively, grant a player the permission node to blacklist a specific item:",
+                "  clicksorted.blacklist.material.<material>  (e.g. clicksorted.blacklist.material.nether_star)",
+                "  clicksorted.blacklist.name.<slug>          (e.g. clicksorted.blacklist.name.creative_menu)",
+                "The name slug is the item name in lowercase without special characters and spaces replaced with underscores."));
+        cfg.setComments("blacklist.materials", List.of(
+                "Exact Bukkit material names (case-insensitive). Unknown names are skipped with a warning."));
+        cfg.setComments("blacklist.names", List.of(
+                "Plain-text display names (case-insensitive). Matches the name the client shows:",
+                "the item's custom display name when it has one, otherwise its vanilla / items.yml name."));
     }
 
     private void normalizeValues() {
@@ -167,6 +186,23 @@ public class MainConfig implements ManagedConfig {
             }
         }
         sortableInventories = parsed;
+
+        Set<Material> parsedMats = EnumSet.noneOf(Material.class);
+        for (String s : plugin.getConfig().getStringList("blacklist.materials")) {
+            Material m = Material.matchMaterial(s);
+            if (m != null) {
+                parsedMats.add(m);
+            } else {
+                Log.warning("Unknown material in blacklist.materials: '" + s + "' — skipping");
+            }
+        }
+        blacklistMaterials = parsedMats;
+
+        Set<String> parsedNames = new HashSet<>();
+        for (String s : plugin.getConfig().getStringList("blacklist.names")) {
+            parsedNames.add(s.toLowerCase(Locale.ROOT));
+        }
+        blacklistNamesLower = parsedNames;
     }
 
     // -------------------------------------------------------------------------
@@ -237,5 +273,21 @@ public class MainConfig implements ManagedConfig {
         if (invSlot < 0) return false;
         if (invSlot < 9) return true; // hotbar: Bukkit slots 0-8
         return invSlot >= getPlayerSortMin() && invSlot < getPlayerSortMax();
+    }
+
+    /**
+     * Returns the admin-configured set of materials whose items must never be touched during a sort.
+     * Parsed and cached on load/reload.
+     */
+    public Set<Material> getBlacklistMaterials() {
+        return blacklistMaterials;
+    }
+
+    /**
+     * Returns the admin-configured set of display names (lowercased) whose items must never be
+     * touched during a sort. Matched case-insensitively. Parsed and cached on load/reload.
+     */
+    public Set<String> getBlacklistNamesLower() {
+        return blacklistNamesLower;
     }
 }

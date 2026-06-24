@@ -144,6 +144,20 @@ public class InventorySortService {
             }
         }
 
+        // Exclude slots whose items are on the admin-enforced "do not touch" blacklist.
+        // Applies to player and container inventories alike. Uses the same excludeSlot mechanism as
+        // locked slots: excluded slots are never read, sorted, packed, or overwritten.
+        ProtectedItems protectedItems = ProtectedItems.forSort(p, mainCfg);
+        if (!protectedItems.isEmpty()) {
+            ItemStack[] slotContents = inv.getContents();
+            for (int s : List.copyOf(sortableSlots)) {
+                ItemStack is = slotContents[s];
+                if (is != null && protectedItems.blocks(is)) {
+                    sortEvent.excludeSlot(s);
+                }
+            }
+        }
+
         var prefs = plugin.getSortingPrefs();
         boolean packEnabled = (playerMainStorage && prefs.getBundlePackInventory(p))
                 || (container && prefs.getBundlePackOthers(p));
