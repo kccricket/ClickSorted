@@ -101,6 +101,16 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         return n;
     }
 
+    /** Total item amount across slots [from, to) that contain the given material. */
+    private static int totalAmount(Inventory inv, int from, int to, Material mat) {
+        int n = 0;
+        for (int i = from; i < to; i++) {
+            ItemStack is = inv.getItem(i);
+            if (is != null && is.getType() == mat) n += is.getAmount();
+        }
+        return n;
+    }
+
     /** Find first bundle in [from, to) or null. */
     private static ItemStack findBundle(Inventory inv, int from, int to) {
         for (int i = from; i < to; i++) {
@@ -321,12 +331,8 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         // Dirt must be loose and merged into a single stack (20+15=35).
         int dirtLoose = looseSlots(player.getInventory(), 9, 36, Material.DIRT);
         assertEquals(1, dirtLoose, "Two dirt partials should merge into one loose stack");
-        int totalDirt = 0;
-        for (int i = 9; i < 36; i++) {
-            ItemStack is = player.getInventory().getItem(i);
-            if (is != null && is.getType() == Material.DIRT) totalDirt += is.getAmount();
-        }
-        assertEquals(35, totalDirt, "All dirt should be accounted for");
+        assertEquals(35, totalAmount(player.getInventory(), 9, 36, Material.DIRT),
+                "All dirt should be accounted for");
 
         // Cobblestone (not blacklisted) packs into the bundle.
         ItemStack bundle = findBundle(player.getInventory(), 9, 36);
@@ -634,13 +640,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 "Contents of blacklisted bundle must remain inside it after sort");
 
         // The loose 8 cobblestone must remain loose (not packed into the blacklisted bundle).
-        int looseCount = 0;
-        for (int i = 9; i < 36; i++) {
-            ItemStack is = player.getInventory().getItem(i);
-            if (is != null && is.getType() == Material.COBBLESTONE) looseCount += is.getAmount();
-        }
-        // 8 loose cobblestone should still be loose.
-        assertEquals(8, looseCount,
+        assertEquals(8, totalAmount(player.getInventory(), 9, 36, Material.COBBLESTONE),
                 "Loose cobblestone must not be absorbed into the blacklisted bundle");
     }
 }
