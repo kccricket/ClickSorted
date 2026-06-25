@@ -107,9 +107,8 @@ public class MainConfig implements ManagedConfig {
         cfg.setComments("defaults.click_mode", List.of(
                 "How a player triggers a sort.",
                 "Values: SWAP (press the swap-offhand key over a slot), SINGLE_CLICK (left-click an empty slot),",
-                "        DOUBLE_CLICK (double-click), CONTROL_DROP (Ctrl+Q over a slot),",
-                "        SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK.",
-                "To disable sorting for all players by default, set defaults.enabled: false instead."));
+                "        DOUBLE_CLICK (double-click), CONTROL_DROP (Ctrl+Q over an item),",
+                "        SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK."));
         cfg.setComments("defaults.sort_mode", List.of(
                 "Algorithm used to order and lay out items.",
                 "Values: NAME (alphabetical by display name), GROUP (by group defined in groups.yml),",
