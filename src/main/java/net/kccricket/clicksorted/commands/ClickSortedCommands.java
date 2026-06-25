@@ -408,6 +408,15 @@ public class ClickSortedCommands {
                     player.openInventory(new BlacklistGuiHolder(plugin, player).getInventory());
                     return Command.SINGLE_SUCCESS;
                 })
+                .then(Commands.literal("gui")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            player.openInventory(new BlacklistGuiHolder(plugin, player).getInventory());
+                            return Command.SINGLE_SUCCESS;
+                        }))
                 .then(Commands.literal("add")
                         .then(Commands.argument("material", StringArgumentType.word())
                                 .suggests((ctx, b) -> suggestEnum(b, Material.values(), SUGGESTABLE_MATERIAL))
