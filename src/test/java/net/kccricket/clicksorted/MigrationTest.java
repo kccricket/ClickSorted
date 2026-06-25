@@ -170,4 +170,109 @@ class MigrationTest extends AbstractClickSortedTest {
         assertFalse(plugin.getMigrations().migrate(cfg),
                 "No legacy values and no deprecated paths → no change");
     }
+
+    // --- Structural transform: player_sort_min / player_sort_max → locked_slots.player ---
+
+    @Test
+    void migrateSortBounds_defaultMinMaxAddsNoLockedSlots() {
+        // min=9, max=36 are the defaults — no slots are excluded, so no locks should be added.
+        // The deprecated keys are still removed (migrate returns true because of path removal),
+        // but no locked_slots.player entries should appear.
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("player_sort_min", 9);
+        cfg.set("player_sort_max", 36);
+
+        plugin.getMigrations().migrate(cfg); // return value not asserted — key removal makes it true
+        assertTrue(cfg.getIntegerList("locked_slots.player").isEmpty(),
+                "No slots should be added when min/max are at defaults");
+        assertFalse(cfg.contains("player_sort_min"), "player_sort_min must be dropped");
+        assertFalse(cfg.contains("player_sort_max"), "player_sort_max must be dropped");
+    }
+
+    @Test
+    void migrateSortBounds_customMinAddsLockedSlots() {
+        // min=18 means slots 9..17 were formerly excluded from sorting.
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("player_sort_min", 18);
+        cfg.set("player_sort_max", 36);
+
+        assertTrue(plugin.getMigrations().migrate(cfg));
+        java.util.List<Integer> locked = cfg.getIntegerList("locked_slots.player");
+        for (int i = 9; i < 18; i++) {
+            assertTrue(locked.contains(i), "Slot " + i + " should be in locked_slots.player");
+        }
+        assertEquals(9, locked.size(), "Exactly 9 slots should be added (9..17)");
+        assertFalse(cfg.contains("player_sort_min"), "player_sort_min must be dropped");
+        assertFalse(cfg.contains("player_sort_max"), "player_sort_max must be dropped");
+    }
+
+    @Test
+    void migrateSortBounds_customMaxAddsLockedSlots() {
+        // max=27 means slots 27..35 were formerly excluded from sorting.
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("player_sort_min", 9);
+        cfg.set("player_sort_max", 27);
+
+        assertTrue(plugin.getMigrations().migrate(cfg));
+        java.util.List<Integer> locked = cfg.getIntegerList("locked_slots.player");
+        for (int i = 27; i < 36; i++) {
+            assertTrue(locked.contains(i), "Slot " + i + " should be in locked_slots.player");
+        }
+        assertEquals(9, locked.size(), "Exactly 9 slots should be added (27..35)");
+    }
+
+    @Test
+    void migrateSortBounds_bothCustomMergesCorrectly() {
+        // min=18, max=27 → slots 9..17 and 27..35 are excluded.
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("player_sort_min", 18);
+        cfg.set("player_sort_max", 27);
+
+        plugin.getMigrations().migrate(cfg);
+        java.util.List<Integer> locked = cfg.getIntegerList("locked_slots.player");
+        for (int i = 9; i < 18; i++) assertTrue(locked.contains(i), "Slot " + i + " expected");
+        for (int i = 27; i < 36; i++) assertTrue(locked.contains(i), "Slot " + i + " expected");
+        assertEquals(18, locked.size(), "18 slots total should be locked (9 low + 9 high)");
+    }
+
+    @Test
+    void migrateSortBounds_unionsWithExistingLockedSlots() {
+        // Pre-existing locked_slots.player entry [12] must be preserved and merged (no duplicate).
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("locked_slots.player", java.util.List.of(12));
+        cfg.set("player_sort_min", 18); // would add 9..17, which includes 12
+        cfg.set("player_sort_max", 36);
+
+        plugin.getMigrations().migrate(cfg);
+        java.util.List<Integer> locked = cfg.getIntegerList("locked_slots.player");
+        // 9..17 including 12 (no duplicate) — exactly 9 unique entries.
+        assertEquals(9, locked.size(), "Should have exactly 9 unique entries (no duplicate for 12)");
+        for (int i = 9; i < 18; i++) {
+            assertTrue(locked.contains(i), "Slot " + i + " expected in merged result");
+        }
+    }
+
+    @Test
+    void migrateSortBounds_isIdempotent() {
+        // First pass should report a change; second pass (no more min/max keys) must be a no-op.
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("player_sort_min", 18);
+        cfg.set("player_sort_max", 36);
+
+        assertTrue(plugin.getMigrations().migrate(cfg), "First migration pass must report a change");
+        assertFalse(cfg.contains("player_sort_min"), "player_sort_min must be gone after first pass");
+
+        assertFalse(plugin.getMigrations().migrate(cfg),
+                "Second migration pass must be a no-op (keys already removed)");
+    }
+
+    @Test
+    void migrateSortBounds_absentKeysIsNoOp() {
+        // If neither key is present, the transform must not change anything.
+        YamlConfiguration cfg = new YamlConfiguration();
+        assertFalse(plugin.getMigrations().migrate(cfg),
+                "Absent player_sort_min/max → no change");
+        assertFalse(cfg.contains("locked_slots.player"),
+                "No locked_slots.player entry should be created when no migration was needed");
+    }
 }

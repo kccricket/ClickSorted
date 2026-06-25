@@ -18,12 +18,15 @@ package net.kccricket.clicksorted.model;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -36,6 +39,8 @@ public class PlayerSortingPrefs {
     private final NamespacedKey bundleInventoryKey;
     private final NamespacedKey bundleOthersKey;
     private final NamespacedKey bundleStackLimitKey;
+    private final NamespacedKey bundleBlacklistKey;
+    private final NamespacedKey bundleBlacklistNamesKey;
     private final NamespacedKey startCornerKey;
     private final NamespacedKey fillAxisKey;
 
@@ -48,6 +53,8 @@ public class PlayerSortingPrefs {
         this.bundleInventoryKey = new NamespacedKey(plugin, "bundle_inventory");
         this.bundleOthersKey = new NamespacedKey(plugin, "bundle_others");
         this.bundleStackLimitKey = new NamespacedKey(plugin, "bundle_stack_limit");
+        this.bundleBlacklistKey = new NamespacedKey(plugin, "bundle_blacklist");
+        this.bundleBlacklistNamesKey = new NamespacedKey(plugin, "bundle_blacklist_names");
         this.startCornerKey = new NamespacedKey(plugin, "start_corner");
         this.fillAxisKey = new NamespacedKey(plugin, "fill_axis");
     }
@@ -146,6 +153,125 @@ public class PlayerSortingPrefs {
 
     public void setBundleStackLimit(Player player, int limit) {
         player.getPersistentDataContainer().set(bundleStackLimitKey, PersistentDataType.INTEGER, Math.max(0, limit));
+    }
+
+    /**
+     * Returns the player's bundle blacklist: materials that will not be packed into or unpacked from
+     * bundles during sorting. Unknown tokens (e.g. from a removed material) are silently dropped.
+     * Returns an empty, unmodifiable set when no blacklist has been stored.
+     */
+    public Set<Material> getBundleBlacklist(Player player) {
+        String stored = player.getPersistentDataContainer().get(bundleBlacklistKey, PersistentDataType.STRING);
+        if (stored == null || stored.isBlank()) {
+            return Set.of();
+        }
+        Set<Material> result = EnumSet.noneOf(Material.class);
+        for (String token : stored.split(",")) {
+            Material mat = Material.matchMaterial(token);
+            if (mat != null) {
+                result.add(mat);
+            }
+        }
+        return result.isEmpty() ? Set.of() : Set.copyOf(result);
+    }
+
+    /**
+     * Adds a material to the player's bundle blacklist.
+     *
+     * @return {@code true} if the material was newly added, {@code false} if it was already present
+     */
+    public boolean addToBundleBlacklist(Player player, Material material) {
+        Set<Material> current = new HashSet<>(getBundleBlacklist(player));
+        boolean added = current.add(material);
+        if (added) {
+            setBundleBlacklist(player, current);
+        }
+        return added;
+    }
+
+    /**
+     * Removes a material from the player's bundle blacklist.
+     *
+     * @return {@code true} if the material was removed, {@code false} if it was not present
+     */
+    public boolean removeFromBundleBlacklist(Player player, Material material) {
+        Set<Material> current = new HashSet<>(getBundleBlacklist(player));
+        boolean removed = current.remove(material);
+        if (removed) {
+            setBundleBlacklist(player, current);
+        }
+        return removed;
+    }
+
+    /** Clears all entries (materials and display names) from the player's bundle blacklist. */
+    public void clearBundleBlacklist(Player player) {
+        player.getPersistentDataContainer().remove(bundleBlacklistKey);
+        player.getPersistentDataContainer().remove(bundleBlacklistNamesKey);
+    }
+
+    private void setBundleBlacklist(Player player, Set<Material> materials) {
+        if (materials.isEmpty()) {
+            player.getPersistentDataContainer().remove(bundleBlacklistKey);
+        } else {
+            String value = materials.stream().map(Material::name).collect(Collectors.joining(","));
+            player.getPersistentDataContainer().set(bundleBlacklistKey, PersistentDataType.STRING, value);
+        }
+    }
+
+    /**
+     * Returns the player's display-name bundle blacklist: plain-text display names that will not be
+     * packed into or unpacked from bundles during sorting. Blank tokens are silently dropped.
+     * Returns an empty, unmodifiable set when no name blacklist has been stored.
+     */
+    public Set<String> getBundleBlacklistNames(Player player) {
+        String stored = player.getPersistentDataContainer().get(bundleBlacklistNamesKey, PersistentDataType.STRING);
+        if (stored == null || stored.isBlank()) {
+            return Set.of();
+        }
+        Set<String> result = new LinkedHashSet<>();
+        for (String token : stored.split("\n")) {
+            if (!token.isBlank()) {
+                result.add(token);
+            }
+        }
+        return result.isEmpty() ? Set.of() : Set.copyOf(result);
+    }
+
+    /**
+     * Adds a display name to the player's bundle name blacklist.
+     *
+     * @return {@code true} if the name was newly added, {@code false} if it was already present
+     */
+    public boolean addToBundleBlacklistName(Player player, String name) {
+        Set<String> current = new LinkedHashSet<>(getBundleBlacklistNames(player));
+        boolean added = current.add(name);
+        if (added) {
+            setBundleBlacklistNames(player, current);
+        }
+        return added;
+    }
+
+    /**
+     * Removes a display name from the player's bundle name blacklist.
+     *
+     * @return {@code true} if the name was removed, {@code false} if it was not present
+     */
+    public boolean removeFromBundleBlacklistName(Player player, String name) {
+        Set<String> current = new LinkedHashSet<>(getBundleBlacklistNames(player));
+        boolean removed = current.remove(name);
+        if (removed) {
+            setBundleBlacklistNames(player, current);
+        }
+        return removed;
+    }
+
+    private void setBundleBlacklistNames(Player player, Set<String> names) {
+        if (names.isEmpty()) {
+            player.getPersistentDataContainer().remove(bundleBlacklistNamesKey);
+        } else {
+            String value = String.join("\n", names);
+            player.getPersistentDataContainer().set(bundleBlacklistNamesKey, PersistentDataType.STRING, value);
+        }
     }
 
     public Set<Integer> getLockedSlots(Player player) {

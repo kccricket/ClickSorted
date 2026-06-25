@@ -14,6 +14,7 @@ package net.kccricket.clicksorted;
 
 import net.kccricket.clicksorted.commands.ClickSortedCommands;
 import net.kccricket.clicksorted.config.ConfigManager;
+import net.kccricket.clicksorted.gui.BlacklistGuiListener;
 import net.kccricket.clicksorted.gui.LockGuiListener;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.migration.Migrations;
@@ -71,6 +72,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new InventoryClickListener(this, sortService), this);
         pm.registerEvents(new LockGuiListener(this), this);
+        pm.registerEvents(new BlacklistGuiListener(this), this);
         pm.registerEvents(new PlayerMigrationListener(this), this);
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->

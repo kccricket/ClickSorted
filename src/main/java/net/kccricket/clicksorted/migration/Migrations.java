@@ -14,26 +14,54 @@ package net.kccricket.clicksorted.migration;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.clicksorted.config.MainConfig;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Owns the full catalog of <em>what is stored where</em> and <em>which lineage applies</em>, and
  * exposes one entry point per store. Callers (config loader, join listener) pass only the store; the
  * loader/store has no knowledge of which settings get migrated.
- * <p>
- * The catalog has two kinds of rules per store: value-remap lineages ({@link ValueMigration}) keyed
- * by storage location (config path / PDC key name), and deprecated locations to drop outright. As a
- * setting's stored values are renamed, extend the matching lineage; as a setting is removed, add its
- * location to the deprecated list.
+ *
+ * <p>The catalog has <em>three</em> kinds of rules per config store, applied in order on every
+ * {@link #migrate(ConfigurationSection)} call:
+ * <ol>
+ *   <li><b>Structural transforms</b> ({@link ConfigTransform}) — derive new state from old (e.g.
+ *       translate a deprecated numeric range into an equivalent slot list). Run <em>before</em>
+ *       the removal pass so the old keys are still readable. Adding a future transform is a
+ *       one-line append to {@link #CONFIG_TRANSFORMS}.</li>
+ *   <li><b>Value-remap lineages</b> ({@link ValueMigration}) — rewrite a stored string token to
+ *       its canonical form across potentially many historical renames in a single pass.</li>
+ *   <li><b>Deprecated-path removal</b> — drop keys that have been removed from the schema.
+ *       Source-key removal for structural transforms is done here, not inside the transform.</li>
+ * </ol>
+ *
+ * <p>PDC migrations have only value-remap lineages and deprecated-key removal (no structural
+ * transforms are in scope), applied symmetrically by {@link #migrate(Player)}.
  */
 public final class Migrations {
+
+    /**
+     * A self-contained structural config migration: derives new config state from old values,
+     * in place. Returns {@code true} if anything was changed.
+     *
+     * <p>Source-key removal is <strong>not</strong> the transform's responsibility — list the
+     * old paths in {@link #DEPRECATED_CONFIG_PATHS} so the removal pass cleans them up after
+     * the transforms have already read them.
+     */
+    @FunctionalInterface
+    interface ConfigTransform {
+        boolean apply(ConfigurationSection config);
+    }
 
     /**
      * {@code defaults.click_mode} in config and the per-player {@code click} PDC key.
@@ -57,6 +85,14 @@ public final class Migrations {
      */
     public static final ValueMigration FILL_AXIS = ValueMigration.builder().build();
 
+    /**
+     * Structural config transforms, applied in order before value-remap and removal passes.
+     * To add a future structural migration, append here — the engine loop in
+     * {@link #migrate(ConfigurationSection)} iterates this list generically.
+     */
+    private static final List<ConfigTransform> CONFIG_TRANSFORMS = List.of(
+            Migrations::migrateSortBounds);
+
     /** Config paths (value-remap): path → lineage. */
     private static final Map<String, ValueMigration> CONFIG = Map.of(
             "defaults.click_mode", CLICK_METHOD,
@@ -71,7 +107,9 @@ public final class Migrations {
 
     /** Config paths for settings that have been removed entirely and should be dropped. */
     private static final List<String> DEPRECATED_CONFIG_PATHS = List.of(
-            "defaults.shift_click");
+            "defaults.shift_click",
+            "player_sort_min",
+            "player_sort_max");
 
     /** Per-player PDC key names for settings that have been removed entirely and should be dropped. */
     private static final List<String> DEPRECATED_PDC_KEYS = List.of(
@@ -84,16 +122,28 @@ public final class Migrations {
     }
 
     /**
-     * Applies the config catalog to {@code config} in place: rewrites renamed values and drops
-     * deprecated paths. The caller is responsible for persisting the configuration afterward.
+     * Applies the full config catalog to {@code config} in place, in three passes:
+     * <ol>
+     *   <li>Structural transforms (read old keys before removal).</li>
+     *   <li>Value-remap lineages.</li>
+     *   <li>Deprecated-path removal.</li>
+     * </ol>
+     * The caller is responsible for persisting the configuration afterward.
      *
-     * @return true if any value was rewritten or any deprecated path was removed
+     * @return true if any value was rewritten, any deprecated path was removed, or any
+     *         structural transform made a change
      */
     public boolean migrate(ConfigurationSection config) {
         boolean changed = false;
+        // Pass 1: structural transforms — must run before removal so old keys are still readable.
+        for (ConfigTransform transform : CONFIG_TRANSFORMS) {
+            changed |= transform.apply(config);
+        }
+        // Pass 2: value-remap lineages.
         for (Map.Entry<String, ValueMigration> entry : CONFIG.entrySet()) {
             changed |= apply(config, entry.getKey(), entry.getValue());
         }
+        // Pass 3: deprecated-path removal (also removes source keys for structural transforms).
         for (String path : DEPRECATED_CONFIG_PATHS) {
             changed |= removePath(config, path);
         }
@@ -113,6 +163,56 @@ public final class Migrations {
         for (String name : DEPRECATED_PDC_KEYS) {
             removeKey(pdc, new NamespacedKey(plugin, name));
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Structural transform implementations
+    // -------------------------------------------------------------------------
+
+    /**
+     * Translates legacy {@code player_sort_min} / {@code player_sort_max} into equivalent
+     * {@code locked_slots.player} entries so that any customised sort window is preserved.
+     *
+     * <p>The old settings defined a contiguous sortable window {@code [min, max)} within the
+     * player main-storage range {@code [9, 36)}. The slots outside that window — {@code [9, min)}
+     * and {@code [max, 36)} — are now expressed as admin-locked slots. This method computes those
+     * slots and unions them into the existing {@code locked_slots.player} list (deduplicated,
+     * sorted). If neither key is present, or if both are at their defaults (9 and 36),
+     * no change is made.
+     *
+     * <p>Source-key removal is handled by {@link #DEPRECATED_CONFIG_PATHS}, not here.
+     *
+     * @return {@code true} if {@code locked_slots.player} was written (changed)
+     */
+    private static boolean migrateSortBounds(ConfigurationSection config) {
+        boolean hasSortMin = config.contains("player_sort_min");
+        boolean hasSortMax = config.contains("player_sort_max");
+        if (!hasSortMin && !hasSortMax) {
+            return false; // neither key present — idempotent no-op on subsequent loads
+        }
+
+        int min = Math.max(0, Math.min(config.getInt("player_sort_min", 9), MainConfig.PLAYER_STORAGE_END));
+        int max = Math.max(0, Math.min(config.getInt("player_sort_max", MainConfig.PLAYER_STORAGE_END), MainConfig.PLAYER_STORAGE_END));
+
+        // Slots formerly excluded: [9, min) ∪ [max, 36)
+        List<Integer> excluded = new ArrayList<>();
+        for (int i = 9; i < min; i++) excluded.add(i);
+        for (int i = max; i < MainConfig.PLAYER_STORAGE_END; i++) excluded.add(i);
+
+        if (excluded.isEmpty()) {
+            return false; // min/max were at their effective defaults — nothing to lock
+        }
+
+        // Union with any pre-existing locked_slots.player entries (deduplicated, sorted).
+        Set<Integer> merged = new LinkedHashSet<>(config.getIntegerList("locked_slots.player"));
+        merged.addAll(excluded);
+        List<Integer> sorted = new ArrayList<>(merged);
+        sorted.sort(Integer::compareTo);
+        config.set("locked_slots.player", sorted);
+
+        Log.debug("migrateSortBounds: player_sort_min=" + min + ", player_sort_max=" + max
+                + " → locked " + sorted);
+        return true;
     }
 
     // -------------------------------------------------------------------------

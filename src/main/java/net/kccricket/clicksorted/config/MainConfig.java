@@ -7,10 +7,13 @@ import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
+import org.bukkit.Material;
 import org.bukkit.event.inventory.InventoryType;
 
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -24,12 +27,17 @@ import java.util.Set;
 public class MainConfig implements ManagedConfig {
 
     /** One past the last sortable player slot: slots 36+ are armor and off-hand, never sorted. */
-    private static final int PLAYER_STORAGE_END = 36;
+    public static final int PLAYER_STORAGE_END = 36;
 
     private final ClickSortedPlugin plugin;
     // Reassigned on reload; read on Folia region threads, so publish via volatile.
     // EnumSet for O(1) membership tests on the per-click sort path.
     private volatile Set<InventoryType> sortableInventories = Set.of();
+    // Admin "do not touch" item blacklist — parsed once on load/reload, checked on every sort.
+    private volatile Set<Material> blacklistMaterials = Set.of();
+    private volatile Set<String> blacklistNamesLower = Set.of();
+    // Admin-enforced player slot locks — parsed once on load/reload, checked on every sort and GUI render.
+    private volatile Set<Integer> lockedPlayerSlots = Set.of();
 
     public MainConfig(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -127,13 +135,18 @@ public class MainConfig implements ManagedConfig {
                 "12 = tooltip-preview limit (bundles show the 12 most-recently-added items).",
                 "0 disables the entry limit (weight-only limit applies instead).",
                 "Players can change this with /clicksorted bundle stacklimit <n|off>."));
-        cfg.setComments("player_sort_min", List.of(
-                "First inventory slot included when sorting a player's main inventory (inclusive).",
-                "Slot 9 is the first row of main storage (slots 0-8 are the hotbar)."));
-        cfg.setComments("player_sort_max", List.of(
-                "One past the last inventory slot included when sorting a player's main inventory (exclusive).",
-                "Slot 35 is the last main-storage slot, so 36 sorts all of main storage;",
-                "slots 36+ are armor and off-hand. Values are clamped to the 0..36 range."));
+        cfg.setComments("locked_slots", List.of(
+                "Admin-enforced slot locks: slots listed here (or granted via permission) are excluded",
+                "from every sort — they are never moved, reordered, or packed into / unpacked from bundles.",
+                "Players cannot (un)lock these slots via the lock GUI. This is a server-wide admin setting.",
+                "The 'player' category covers player inventory slots (0-8 hotbar, 9-35 main storage).",
+                "Future categories (e.g. container title-based locks) will appear as siblings.",
+                "Alternatively, grant a player the permission node to lock a specific slot:",
+                "  clicksorted.lock.player.slot.<n>  (e.g. clicksorted.lock.player.slot.9)",
+                "Nodes are dynamic and not declared in plugin.yml; use a permissions plugin to grant them."));
+        cfg.setComments("locked_slots.player", List.of(
+                "List of player inventory slot indices to lock server-wide (integers, range 0..35).",
+                "Out-of-range values are skipped with a warning on load/reload."));
         cfg.setComments("action_cooldown_ms", List.of(
                 "Minimum milliseconds between successive ClickSorted actions per player",
                 "(sorting, bundle-packing, in-inventory mode cycling, lock-GUI toggles, commands).",
@@ -146,6 +159,19 @@ public class MainConfig implements ManagedConfig {
                 "Values must be valid Bukkit InventoryType names (case-sensitive).",
                 "See https://jd.papermc.io/paper/1.21.5/org/bukkit/event/inventory/InventoryType.html",
                 "Unrecognized names are silently ignored."));
+        cfg.setComments("blacklist", List.of(
+                "Admin-enforced 'do not touch' list: items matching these entries are excluded from",
+                "every sort — they are never moved, reordered, or packed into / unpacked from bundles.",
+                "This is a server-wide admin setting; players cannot modify it.",
+                "Alternatively, grant a player the permission node to blacklist a specific item:",
+                "  clicksorted.blacklist.material.<material>  (e.g. clicksorted.blacklist.material.nether_star)",
+                "  clicksorted.blacklist.name.<slug>          (e.g. clicksorted.blacklist.name.creative_menu)",
+                "The name slug is the item name in lowercase without special characters and spaces replaced with underscores."));
+        cfg.setComments("blacklist.materials", List.of(
+                "Exact Bukkit material names (case-insensitive). Unknown names are skipped with a warning."));
+        cfg.setComments("blacklist.names", List.of(
+                "Plain-text display names (case-insensitive). Matches the name the client shows:",
+                "the item's custom display name when it has one, otherwise its vanilla / items.yml name."));
     }
 
     private void normalizeValues() {
@@ -167,6 +193,33 @@ public class MainConfig implements ManagedConfig {
             }
         }
         sortableInventories = parsed;
+
+        Set<Material> parsedMats = EnumSet.noneOf(Material.class);
+        for (String s : plugin.getConfig().getStringList("blacklist.materials")) {
+            Material m = Material.matchMaterial(s);
+            if (m != null) {
+                parsedMats.add(m);
+            } else {
+                Log.warning("Unknown material in blacklist.materials: '" + s + "' — skipping");
+            }
+        }
+        blacklistMaterials = parsedMats;
+
+        Set<String> parsedNames = new HashSet<>();
+        for (String s : plugin.getConfig().getStringList("blacklist.names")) {
+            parsedNames.add(s.toLowerCase(Locale.ROOT));
+        }
+        blacklistNamesLower = parsedNames;
+
+        Set<Integer> parsedSlots = new HashSet<>();
+        for (int s : plugin.getConfig().getIntegerList("locked_slots.player")) {
+            if (s >= 0 && s < PLAYER_STORAGE_END) {
+                parsedSlots.add(s);
+            } else {
+                Log.warning("Out-of-range slot index in locked_slots.player: " + s + " — skipping");
+            }
+        }
+        lockedPlayerSlots = parsedSlots;
     }
 
     // -------------------------------------------------------------------------
@@ -216,10 +269,6 @@ public class MainConfig implements ManagedConfig {
         return plugin.getConfig().getInt("defaults.bundle_stack_limit");
     }
 
-    public int getPlayerSortMin() {
-        return Math.max(0, Math.min(plugin.getConfig().getInt("player_sort_min"), PLAYER_STORAGE_END));
-    }
-
     /**
      * Minimum milliseconds between successive per-player actions ({@code action_cooldown_ms}).
      * A value ≤ 0 disables the {@link net.kccricket.clicksorted.security.ActionThrottle}.
@@ -228,14 +277,27 @@ public class MainConfig implements ManagedConfig {
         return plugin.getConfig().getInt("action_cooldown_ms", 150);
     }
 
-    public int getPlayerSortMax() {
-        return Math.max(0, Math.min(plugin.getConfig().getInt("player_sort_max"), PLAYER_STORAGE_END));
+    /**
+     * Returns the admin-configured set of player inventory slot indices (0–35) that are
+     * server-wide locked. Parsed and cached on load/reload.
+     */
+    public Set<Integer> getLockedPlayerSlots() {
+        return lockedPlayerSlots;
     }
 
-    /** Returns true if the given player inventory slot falls within the sortable range. */
-    public boolean isPlayerSlotSortable(int invSlot) {
-        if (invSlot < 0) return false;
-        if (invSlot < 9) return true; // hotbar: Bukkit slots 0-8
-        return invSlot >= getPlayerSortMin() && invSlot < getPlayerSortMax();
+    /**
+     * Returns the admin-configured set of materials whose items must never be touched during a sort.
+     * Parsed and cached on load/reload.
+     */
+    public Set<Material> getBlacklistMaterials() {
+        return blacklistMaterials;
+    }
+
+    /**
+     * Returns the admin-configured set of display names (lowercased) whose items must never be
+     * touched during a sort. Matched case-insensitively. Parsed and cached on load/reload.
+     */
+    public Set<String> getBlacklistNamesLower() {
+        return blacklistNamesLower;
     }
 }

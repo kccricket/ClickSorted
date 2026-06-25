@@ -63,10 +63,11 @@ class SlotOrderTest {
 
     @Test
     void partialTopRowAndLockedSlotComposeOverAnAlignedBase() {
-        // Player main storage with a mid-row player_sort_min (11) and a locked slot (13). GridGeometry
-        // hands SlotOrder the row-aligned base (9), so slots 9..10 are out-of-range gaps and 13 is a
-        // locked gap — both just absent from the set. BOTTOM_LEFT proves the partial physical top row
-        // (11,12,14..17) stays grouped as one row and fills last, with the lock a hole inside it.
+        // Player main storage: admin-locked slots 9..10 (absent from the set) and player-locked
+        // slot 13 (also absent). GridGeometry is constructed with the full row-aligned base (9),
+        // so slots 9..10 are gaps from admin locks and 13 is a player-lock gap — both just absent
+        // from the sortable set. BOTTOM_LEFT proves the partial physical top row (11,12,14..17)
+        // stays grouped as one row and fills last, with the lock a hole inside it.
         List<Integer> slots = new ArrayList<>();
         for (int s = 11; s <= 35; s++) {
             if (s != 13) {

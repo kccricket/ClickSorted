@@ -13,6 +13,7 @@ package net.kccricket.clicksorted.sort;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.config.MainConfig;
 import net.kccricket.clicksorted.events.InventorySortEvent;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.FillAxis;
@@ -84,7 +85,6 @@ public class InventorySortService {
         boolean playerMainStorage = false; // packing applies here (not the hotbar)
         boolean container = false;
         if (type == InventoryType.PLAYER) {
-            int playerSortMax = mainCfg.getPlayerSortMax();
             if (slot < 9) {
                 // hotbar
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.hotbar")) {
@@ -92,13 +92,13 @@ public class InventorySortService {
                 }
                 min = 0;
                 max = 9;
-            } else if (slot < playerSortMax) {
+            } else if (slot < MainConfig.PLAYER_STORAGE_END) {
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.player")) {
                     return false;
                 }
                 // main player inventory
-                min = mainCfg.getPlayerSortMin();
-                max = playerSortMax;
+                min = 9;
+                max = MainConfig.PLAYER_STORAGE_END;
                 playerMainStorage = true;
             } else {
                 // armor / offhand slots — never sort
@@ -139,16 +139,43 @@ public class InventorySortService {
 
         Set<Integer> sortableSlots = sortEvent.getSortableSlots();
         if (type == InventoryType.PLAYER) {
+            // Per-player locked slots (player-controlled via /clicksorted set lock).
             for (int locked : plugin.getSortingPrefs().getLockedSlots(p)) {
                 sortEvent.excludeSlot(locked);
+            }
+            // Admin-enforced slot locks (config locked_slots.player and clicksorted.lock.player.slot.N).
+            ProtectedSlots protectedSlots = ProtectedSlots.forSort(p, mainCfg);
+            if (!protectedSlots.isEmpty()) {
+                for (int s : List.copyOf(sortableSlots)) {
+                    if (protectedSlots.blocks(s)) {
+                        sortEvent.excludeSlot(s);
+                    }
+                }
+            }
+        }
+
+        // Exclude slots whose items are on the admin-enforced "do not touch" blacklist.
+        // Applies to player and container inventories alike. Uses the same excludeSlot mechanism as
+        // locked slots: excluded slots are never read, sorted, packed, or overwritten.
+        ProtectedItems protectedItems = ProtectedItems.forSort(p, mainCfg);
+        if (!protectedItems.isEmpty()) {
+            ItemStack[] slotContents = inv.getContents();
+            for (int s : List.copyOf(sortableSlots)) {
+                ItemStack is = slotContents[s];
+                if (is != null && is.getType() != Material.AIR && protectedItems.blocks(is)) {
+                    sortEvent.excludeSlot(s);
+                }
             }
         }
 
         var prefs = plugin.getSortingPrefs();
         boolean packEnabled = (playerMainStorage && prefs.getBundlePackInventory(p))
                 || (container && prefs.getBundlePackOthers(p));
+        BundleBlacklist blacklist = packEnabled
+                ? new BundleBlacklist(prefs.getBundleBlacklist(p), prefs.getBundleBlacklistNames(p))
+                : BundleBlacklist.EMPTY;
         List<ItemStack> sortedItems = packEnabled
-                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p))
+                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p), blacklist)
                 : SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
@@ -237,7 +264,8 @@ public class InventorySortService {
      * @return the sorted, stack-merged list ready to be written back into {@code sortableSlots}
      */
     private List<ItemStack> packAndSort(Inventory inv, Set<Integer> sortableSlots,
-                                        SortingMethod sortMethod, int stackLimit) {
+                                        SortingMethod sortMethod, int stackLimit,
+                                        BundleBlacklist blacklist) {
         Map<SortKey, Long> loosePool = new LinkedHashMap<>();
         Map<SortKey, ItemStack> samples = new LinkedHashMap<>();
         List<ItemStack> bundles = new ArrayList<>();       // bins (mutated by the packer)
@@ -251,7 +279,7 @@ public class InventorySortService {
             }
             if (BundlePacker.isBundle(is.getType())) {
                 bundles.add(is.clone());
-            } else if (BundlePacker.canBundle(is)) {
+            } else if (BundlePacker.canBundle(is, blacklist)) {
                 SortKey key = SortKey.poolKey(is);
                 // Lambda, not Long::sum: a method ref binds the boxed map values straight to
                 // primitive params, tripping JDT's "needs unchecked conversion" null warning.
@@ -262,7 +290,7 @@ public class InventorySortService {
             }
         }
 
-        List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, bundles, stackLimit);
+        List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, bundles, stackLimit, blacklist);
         toSort.addAll(leftover);
         toSort.addAll(bundles);
 

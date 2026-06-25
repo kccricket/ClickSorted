@@ -53,6 +53,38 @@ setBundlePackOthersStatus: "Bundle packing in other containers is now <aqua><sta
 # Placeholder: <limit> (max distinct entries per bundle, or "off" for weight-only)
 setBundleStackLimitStatus: "Your <aqua>bundle stack limit<white> is now <aqua><limit><white>."
 
+# Command feedback — bundle blacklist (/clicksorted set bundle blacklist add|remove|list|clear)
+# Placeholder: <material> (material name)
+setBundleBlacklistAdded: "<aqua><material><white> added to your bundle blacklist."
+setBundleBlacklistAlreadyPresent: "<aqua><material><white> is already in your bundle blacklist."
+setBundleBlacklistRemoved: "<aqua><material><white> removed from your bundle blacklist."
+setBundleBlacklistNotPresent: "<aqua><material><white> is not in your bundle blacklist."
+# Placeholder: <list> (comma-separated material names)
+setBundleBlacklistMaterialsList: "Blacklisted materials: <aqua><list><white>."
+setBundleBlacklistEmpty: "Your bundle blacklist is <aqua>empty<white>."
+setBundleBlacklistCleared: "Your bundle blacklist has been <aqua>cleared<white>."
+# Command feedback — bundle blacklist name sub-branch (/clicksorted set bundle blacklist name ...)
+# Placeholder: <name> (plain-text display name)
+setBundleBlacklistNameAdded: "Display name <aqua><name><white> added to your bundle blacklist."
+setBundleBlacklistNameAlreadyPresent: "Display name <aqua><name><white> is already in your bundle blacklist."
+setBundleBlacklistNameRemoved: "Display name <aqua><name><white> removed from your bundle blacklist."
+setBundleBlacklistNameNotPresent: "Display name <aqua><name><white> is not in your bundle blacklist."
+# Placeholder: <list> (comma-separated display names)
+setBundleBlacklistNamesList: "Blacklisted display names: <aqua><list><white>."
+
+# Blacklist GUI (/clicksorted set bundle blacklist with no further arguments)
+blacklistGuiTitle: "<!italic>Bundle Blacklist"
+# Lore shown on every blacklist entry (both material and name entries).
+blacklistEntryLore: "<!italic><gray>Click to remove."
+# Display name for the black-pane filler slots in the control row.
+blacklistFillerName: "<!italic><dark_gray> "
+# Help book in the centre of the control row.
+blacklistHelpBookName: "<!italic>Bundle Blacklist"
+blacklistHelpBookLore: "<!italic><gray>Click an item in your inventory to add it to<newline>the blacklist. Click a listed entry to remove it."
+# Pagination arrow controls.
+blacklistArrowPrev: "<!italic>Previous page"
+blacklistArrowNext: "<!italic>Next page"
+
 # Command feedback — status (/clicksorted status)
 # Placeholder: <method>
 statusClickMethod: "Click method: <method>"
@@ -97,14 +129,14 @@ actionTooFast: "<red>Slow down — you're acting too quickly."
 lockGuiTitle: "<!italic>Inventory Sorting Locks"
 lockPaneUnlocked: "<!italic><green>Unlocked"
 lockPaneLocked: "<!italic><red>Locked"
+lockPaneAdmin: "<!italic><dark_gray>Server Locked"
 # Placeholder: <number>
 lockPaneSlotInventory: "<!italic><gray>Inventory slot <number>"
 # Placeholder: <number>
 lockPaneSlotHotbar: "<!italic><gray>Hotbar slot <number>"
 lockPaneUnlockedLore: "<!italic><gray>Click to lock this slot."
 lockPaneLockedLore: "<!italic><gray>Click to unlock this slot."
-lockPaneUnsortable: "<!italic><dark_gray>Not sortable"
-lockPaneUnsortableLore: "<!italic><gray>This slot is always excluded from sorting."
+lockPaneAdminLore: "<!italic><gray>This slot is locked by the server and cannot be changed."
 lockDividerName: "<!italic><dark_gray>--------"
 lockHelpHeadName: "<!italic>What is this?"
 lockHelpHeadLore: "<!italic><gray>Locked inventory slots will not be sorted and<newline>bundles in a locked slot will not be packed."
