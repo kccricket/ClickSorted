@@ -13,6 +13,7 @@ package net.kccricket.clicksorted.gui;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -22,6 +23,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 /**
  * Handles all inventory interaction for the {@link BlacklistGuiHolder} GUI.
@@ -122,9 +124,10 @@ public class BlacklistGuiListener implements Listener {
     }
 
     private void addItem(Player player, ItemStack item) {
-        if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
-            String name = PlainTextComponentSerializer.plainText()
-                    .serialize(item.getItemMeta().displayName());
+        ItemMeta meta = item.getItemMeta();
+        Component displayName = (meta != null && meta.hasDisplayName()) ? meta.displayName() : null;
+        if (displayName != null) {
+            String name = PlainTextComponentSerializer.plainText().serialize(displayName);
             plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
         } else {
             plugin.getSortingPrefs().addToBundleBlacklist(player, item.getType());

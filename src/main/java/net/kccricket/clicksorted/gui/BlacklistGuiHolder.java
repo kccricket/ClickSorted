@@ -163,8 +163,8 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         for (String n : plugin.getSortingPrefs().getBundleBlacklistNames(player)) {
             list.add(new NameEntry(n));
         }
-        // Sort alphabetically descending (Z→A), case-insensitive.
-        list.sort(Comparator.comparing(BlacklistGuiHolder::entryLabel, String.CASE_INSENSITIVE_ORDER).reversed());
+        // Sort alphabetically ascending (A→Z), case-insensitive.
+        list.sort(Comparator.comparing(BlacklistGuiHolder::entryLabel, String.CASE_INSENSITIVE_ORDER));
         return list;
     }
 

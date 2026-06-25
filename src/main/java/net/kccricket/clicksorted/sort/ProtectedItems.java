@@ -21,6 +21,7 @@ import org.bukkit.permissions.Permissible;
 
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Immutable snapshot of the admin-enforced "do not touch" list: any slot whose item matches
@@ -49,6 +50,10 @@ import java.util.Set;
  * @see #forSort(Permissible, MainConfig)
  */
 public record ProtectedItems(Set<Material> materials, Set<String> namesLower, Permissible permissible) {
+
+    private static final Pattern STRIP_COLOR = Pattern.compile("§.");
+    private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]+");
+    private static final Pattern TRIM_UNDERSCORE = Pattern.compile("^_+|_+$");
 
     /** A list that blocks nothing; use when the feature is unconfigured. */
     public static final ProtectedItems EMPTY = new ProtectedItems(Set.of(), Set.of(), null);
@@ -88,7 +93,7 @@ public record ProtectedItems(Set<Material> materials, Set<String> namesLower, Pe
             // node has been granted. isPermissionSet is true only when the node was explicitly
             // attached to the player, avoiding the OP-default false-positive.
             String materialNode = Permissions.PERM_BLACKLIST_MATERIAL + is.getType().name().toLowerCase(Locale.ROOT);
-            if (permissible.isPermissionSet(materialNode) && permissible.hasPermission(materialNode)) {
+            if (Permissions.isExplicitlyGranted(permissible, materialNode)) {
                 return true;
             }
             if (name == null) {
@@ -98,7 +103,7 @@ public record ProtectedItems(Set<Material> materials, Set<String> namesLower, Pe
                 String token = nameToken(name);
                 if (!token.isEmpty()) {
                     String nameNode = Permissions.PERM_BLACKLIST_NAME + token;
-                    if (permissible.isPermissionSet(nameNode) && permissible.hasPermission(nameNode)) {
+                    if (Permissions.isExplicitlyGranted(permissible, nameNode)) {
                         return true;
                     }
                 }
@@ -122,10 +127,11 @@ public record ProtectedItems(Set<Material> materials, Set<String> namesLower, Pe
      * permission check in that case to avoid constructing a bare {@code ...name.} node.
      */
     public static String nameToken(String name) {
-        return name.replaceAll("§.", "")           // strip legacy Minecraft color/format codes
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
+        return TRIM_UNDERSCORE.matcher(
+                        NON_ALNUM.matcher(
+                                STRIP_COLOR.matcher(name).replaceAll("").toLowerCase(Locale.ROOT))
+                        .replaceAll("_"))
+                .replaceAll("");
     }
 
     /**

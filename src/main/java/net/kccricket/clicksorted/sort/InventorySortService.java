@@ -162,7 +162,7 @@ public class InventorySortService {
             ItemStack[] slotContents = inv.getContents();
             for (int s : List.copyOf(sortableSlots)) {
                 ItemStack is = slotContents[s];
-                if (is != null && protectedItems.blocks(is)) {
+                if (is != null && is.getType() != Material.AIR && protectedItems.blocks(is)) {
                     sortEvent.excludeSlot(s);
                 }
             }

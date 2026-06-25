@@ -77,7 +77,7 @@ public record ProtectedSlots(Set<Integer> configSlots, Permissible permissible) 
             // node has been granted. isPermissionSet is true only when the node was explicitly
             // attached to the player, avoiding the OP-default false-positive.
             String node = Permissions.PERM_LOCK_PLAYER_SLOT + slot;
-            if (permissible.isPermissionSet(node) && permissible.hasPermission(node)) {
+            if (Permissions.isExplicitlyGranted(permissible, node)) {
                 return true;
             }
         }

@@ -3,6 +3,7 @@ package net.kccricket.clicksorted.commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -277,7 +278,7 @@ public class ClickSortedCommands {
 
     /** Resolve the executing player, or {@code null} (after sending the console notice) if not a player. */
     private static Player requirePlayer(ClickSortedPlugin plugin,
-                                        com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx) {
+                                        CommandContext<CommandSourceStack> ctx) {
         if (ctx.getSource().getExecutor() instanceof Player player) {
             return player;
         }
@@ -377,6 +378,15 @@ public class ClickSortedCommands {
         sendBlacklistStatus(plugin, player);
     }
 
+    private static int openBlacklistGui(ClickSortedPlugin plugin, CommandContext<CommandSourceStack> ctx) {
+        Player player = requirePlayer(plugin, ctx);
+        if (player == null || throttled(plugin, ctx.getSource())) {
+            return Command.SINGLE_SUCCESS;
+        }
+        player.openInventory(new BlacklistGuiHolder(plugin, player).getInventory());
+        return Command.SINGLE_SUCCESS;
+    }
+
     private static void sendBlacklistStatus(ClickSortedPlugin plugin, Player player) {
         var lang = plugin.getConfigManager().lang();
         var prefs = plugin.getSortingPrefs();
@@ -400,23 +410,9 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundleBlacklist(ClickSortedPlugin plugin) {
         return Commands.literal("blacklist")
-                .executes(ctx -> {
-                    Player player = requirePlayer(plugin, ctx);
-                    if (player == null || throttled(plugin, ctx.getSource())) {
-                        return Command.SINGLE_SUCCESS;
-                    }
-                    player.openInventory(new BlacklistGuiHolder(plugin, player).getInventory());
-                    return Command.SINGLE_SUCCESS;
-                })
+                .executes(ctx -> openBlacklistGui(plugin, ctx))
                 .then(Commands.literal("gui")
-                        .executes(ctx -> {
-                            Player player = requirePlayer(plugin, ctx);
-                            if (player == null || throttled(plugin, ctx.getSource())) {
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            player.openInventory(new BlacklistGuiHolder(plugin, player).getInventory());
-                            return Command.SINGLE_SUCCESS;
-                        }))
+                        .executes(ctx -> openBlacklistGui(plugin, ctx)))
                 .then(Commands.literal("add")
                         .then(Commands.argument("material", StringArgumentType.word())
                                 .suggests((ctx, b) -> suggestEnum(b, Material.values(), SUGGESTABLE_MATERIAL))

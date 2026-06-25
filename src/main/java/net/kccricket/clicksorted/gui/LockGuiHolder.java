@@ -101,16 +101,17 @@ public class LockGuiHolder implements ClickSortedHolder {
      * line 1 — slot label ("Inventory slot N" or "Hotbar slot N");
      * line 2 — click-to-toggle instruction.
      */
+    private static String resolveSlotLangKey(int chestSlot) {
+        return chestSlot < DIVIDER_START ? "lockPaneSlotInventory" : "lockPaneSlotHotbar";
+    }
+
+    private static int resolveDisplayNumber(int chestSlot) {
+        return chestSlot < DIVIDER_START ? chestSlot + 1 : chestSlot - DIVIDER_END + 1;
+    }
+
     public static ItemStack buildPane(LangConfig lang, boolean locked, int chestSlot) {
-        String slotLangKey;
-        int displayNumber;
-        if (chestSlot < DIVIDER_START) {
-            slotLangKey = "lockPaneSlotInventory";
-            displayNumber = chestSlot + 1;
-        } else {
-            slotLangKey = "lockPaneSlotHotbar";
-            displayNumber = chestSlot - DIVIDER_END + 1;
-        }
+        String slotLangKey = resolveSlotLangKey(chestSlot);
+        int displayNumber = resolveDisplayNumber(chestSlot);
 
         ItemStack pane = new ItemStack(locked ? Material.BARRIER : Material.LIME_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
@@ -129,15 +130,8 @@ public class LockGuiHolder implements ClickSortedHolder {
      * {@code clicksorted.lock.player.slot.<n>} permission node.
      */
     public static ItemStack buildAdminLockedPane(LangConfig lang, int chestSlot) {
-        String slotLangKey;
-        int displayNumber;
-        if (chestSlot < DIVIDER_START) {
-            slotLangKey = "lockPaneSlotInventory";
-            displayNumber = chestSlot + 1;
-        } else {
-            slotLangKey = "lockPaneSlotHotbar";
-            displayNumber = chestSlot - DIVIDER_END + 1;
-        }
+        String slotLangKey = resolveSlotLangKey(chestSlot);
+        int displayNumber = resolveDisplayNumber(chestSlot);
 
         ItemStack pane = new ItemStack(Material.IRON_BARS);
         ItemMeta meta = pane.getItemMeta();

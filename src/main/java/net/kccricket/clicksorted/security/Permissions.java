@@ -2,6 +2,7 @@ package net.kccricket.clicksorted.security;
 
 import net.kccricket.clicksorted.logging.Log;
 import org.bukkit.command.CommandSender;
+import org.bukkit.permissions.Permissible;
 
 public class Permissions {
 
@@ -40,6 +41,17 @@ public class Permissions {
     public static final String PERM_LOCK_PLAYER_SLOT = "clicksorted.lock.player.slot.";
 
     // -------------------------------------------------------------------------
+
+    /**
+     * Returns {@code true} only when {@code node} is explicitly attached to {@code who} AND
+     * grants the permission. Uses {@code isPermissionSet} before {@code hasPermission} to avoid
+     * Bukkit's {@link org.bukkit.permissions.PermissionDefault#OP} trap: undeclared nodes return
+     * {@code true} for OPs via {@code hasPermission} alone, so we guard with {@code isPermissionSet}
+     * first to ensure only explicitly-granted nodes trigger the check.
+     */
+    public static boolean isExplicitlyGranted(Permissible who, String node) {
+        return who.isPermissionSet(node) && who.hasPermission(node);
+    }
 
     /**
      * Check if the player has the specified permission node.
