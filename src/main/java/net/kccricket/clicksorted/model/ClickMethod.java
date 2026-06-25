@@ -7,7 +7,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import java.util.Optional;
 
 public enum ClickMethod {
-    DOUBLE_CLICK, SINGLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE;
+    DOUBLE_CLICK, SINGLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK;
 
     public static final ClickMethod DEFAULT = SWAP;
 
@@ -58,7 +58,6 @@ public enum ClickMethod {
             case CONTROL_DROP -> lang.getMessage("instructionControlDrop");
             case SHIFT_LEFT_CLICK -> lang.getMessage("instructionShiftLeftClick");
             case SHIFT_RIGHT_CLICK -> lang.getMessage("instructionShiftRightClick");
-            default -> lang.getMessage("instructionDisabled");
         };
     }
 

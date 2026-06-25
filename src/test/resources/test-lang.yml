@@ -1,4 +1,6 @@
 prefix: "MSG.prefix "
+setEnabledStatus: "MSG.setEnabledStatus <status>"
+statusEnabled: "MSG.statusEnabled <status>"
 setSortingMethodTo: "MSG.setSortingMethodTo <method>"
 setClickMethodTo: "MSG.setClickMethodTo <method> <instruction>"
 setSortOverItemsStatus: "MSG.setSortOverItemsStatus <status>"

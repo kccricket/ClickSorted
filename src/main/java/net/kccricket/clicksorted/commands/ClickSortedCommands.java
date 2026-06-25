@@ -44,6 +44,15 @@ public class ClickSortedCommands {
 
     public static LiteralCommandNode<CommandSourceStack> build(ClickSortedPlugin plugin) {
         return Commands.literal("clicksorted")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.enabled"))
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    applyEnabledSetting(plugin, player, !plugin.getSortingPrefs().getEnabled(player));
+                    return Command.SINGLE_SUCCESS;
+                })
                 .then(buildSet(plugin))
                 .then(buildStatus(plugin))
                 .then(buildReload(plugin))
@@ -55,6 +64,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSet(ClickSortedPlugin plugin) {
         return Commands.literal("set")
+                .then(buildEnabled(plugin))
                 .then(buildSortMethod(plugin))
                 .then(buildClickMethod(plugin))
                 .then(buildStartCorner(plugin))
@@ -62,6 +72,42 @@ public class ClickSortedCommands {
                 .then(buildHover(plugin))
                 .then(buildBundle(plugin))
                 .then(buildLock(plugin));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildEnabled(ClickSortedPlugin plugin) {
+        return Commands.literal("enabled")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.enabled"))
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    applyEnabledSetting(plugin, player, !plugin.getSortingPrefs().getEnabled(player));
+                    return Command.SINGLE_SUCCESS;
+                })
+                .then(Commands.argument("state", StringArgumentType.word())
+                        .suggests((ctx, b) -> { b.suggest("on"); b.suggest("off"); return b.buildFuture(); })
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            String raw = StringArgumentType.getString(ctx, "state");
+                            Boolean state = parseState(raw);
+                            if (state == null) {
+                                sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            applyEnabledSetting(plugin, player, state);
+                            return Command.SINGLE_SUCCESS;
+                        }));
+    }
+
+    private static void applyEnabledSetting(ClickSortedPlugin plugin, Player player, boolean enabled) {
+        plugin.getSortingPrefs().setEnabled(player, enabled);
+        MessageUtil.statusMessage(player,
+                plugin.getConfigManager().lang().getColoredMessage("setEnabledStatus",
+                        Placeholder.unparsed("status", enabledLabel(enabled))));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStartCorner(ClickSortedPlugin plugin) {
@@ -573,11 +619,14 @@ public class ClickSortedCommands {
                     }
                     var prefs = plugin.getSortingPrefs();
                     var lang = plugin.getConfigManager().lang();
+                    boolean enabled = prefs.getEnabled(player);
                     ClickMethod clickMethod = prefs.getClickMethod(player);
                     SortingMethod sortMethod = prefs.getSortingMethod(player);
                     StartCorner startCorner = prefs.getStartCorner(player);
                     FillAxis fillAxis = prefs.getFillAxis(player);
                     boolean hover = prefs.getSortOverItems(player);
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusEnabled",
+                            Placeholder.unparsed("status", enabledLabel(enabled))));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusClickMethod",
                             Placeholder.unparsed("method", clickMethod.toString())));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusSortMethod",

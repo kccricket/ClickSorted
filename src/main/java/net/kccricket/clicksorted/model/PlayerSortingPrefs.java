@@ -34,6 +34,7 @@ public class PlayerSortingPrefs {
     private final ClickSortedPlugin plugin;
     private final NamespacedKey sortKey;
     private final NamespacedKey clickKey;
+    private final NamespacedKey enabledKey;
     private final NamespacedKey sortOverItemsKey;
     private final NamespacedKey lockedSlotsKey;
     private final NamespacedKey bundleInventoryKey;
@@ -46,8 +47,9 @@ public class PlayerSortingPrefs {
 
     public PlayerSortingPrefs(ClickSortedPlugin plugin) {
         this.plugin = plugin;
-        this.sortKey = new NamespacedKey(plugin, "sort");
-        this.clickKey = new NamespacedKey(plugin, "click");
+        this.sortKey = new NamespacedKey(plugin, "sort_mode");
+        this.clickKey = new NamespacedKey(plugin, "click_mode");
+        this.enabledKey = new NamespacedKey(plugin, "enabled");
         this.sortOverItemsKey = new NamespacedKey(plugin, "sort_over_items");
         this.lockedSlotsKey = new NamespacedKey(plugin, "locked_slots");
         this.bundleInventoryKey = new NamespacedKey(plugin, "bundle_inventory");
@@ -66,6 +68,18 @@ public class PlayerSortingPrefs {
 
     public void setSortingMethod(Player player, SortingMethod sortMethod) {
         player.getPersistentDataContainer().set(sortKey, PersistentDataType.STRING, sortMethod.name());
+    }
+
+    /**
+     * Returns true if click-sorting is enabled for this player.
+     * Falls back to the server default when the player has no stored preference.
+     */
+    public boolean getEnabled(Player player) {
+        return getBool(player, enabledKey, plugin.getConfigManager().main()::getDefaultEnabled);
+    }
+
+    public void setEnabled(Player player, boolean enabled) {
+        setBool(player, enabledKey, enabled);
     }
 
     public ClickMethod getClickMethod(Player player) {

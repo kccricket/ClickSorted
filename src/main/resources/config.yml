@@ -6,6 +6,7 @@ drop_excess: true
 default_group_name: '000-default'
 ignore_plugin_inventory: false
 defaults:
+  enabled: true
   click_mode: SWAP
   sort_mode: NAME
   start_corner: TOP_LEFT

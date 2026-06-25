@@ -1,6 +1,9 @@
 package net.kccricket.clicksorted;
 
+import net.kccricket.clicksorted.migration.Migration;
+import static net.kccricket.clicksorted.migration.Migration.*;
 import net.kccricket.clicksorted.migration.Migrations;
+import net.kccricket.clicksorted.migration.Store;
 import net.kccricket.clicksorted.migration.ValueMigration;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kyori.adventure.text.Component;
@@ -76,40 +79,84 @@ class MigrationTest extends AbstractClickSortedTest {
     @Test
     void legacyClickMethodMigratedByMigrateEntryPoint() {
         PlayerMock player = server.addPlayer("Alice");
-        NamespacedKey key = new NamespacedKey(plugin, "click");
-        player.getPersistentDataContainer().set(key, PersistentDataType.STRING, "DOUBLE");
+        NamespacedKey oldKey = new NamespacedKey(plugin, "click");
+        NamespacedKey newKey = new NamespacedKey(plugin, "click_mode");
+        player.getPersistentDataContainer().set(oldKey, PersistentDataType.STRING, "DOUBLE");
 
         plugin.getMigrations().migrate(player);
 
-        // The stored token is rewritten in place, so reads see the renamed constant.
+        // Old key is renamed to click_mode; value is further remapped to canonical form.
+        assertNull(player.getPersistentDataContainer().get(oldKey, PersistentDataType.STRING),
+                "Legacy 'click' key must be removed after rename");
         assertEquals("DOUBLE_CLICK",
-                player.getPersistentDataContainer().get(key, PersistentDataType.STRING));
+                player.getPersistentDataContainer().get(newKey, PersistentDataType.STRING));
         assertEquals(ClickMethod.DOUBLE_CLICK, plugin.getSortingPrefs().getClickMethod(player));
     }
 
     @Test
     void playerJoinEventTriggersPdcMigration() {
         PlayerMock player = server.addPlayer("Alice");
-        NamespacedKey key = new NamespacedKey(plugin, "click");
-        player.getPersistentDataContainer().set(key, PersistentDataType.STRING, "SINGLE");
+        NamespacedKey oldKey = new NamespacedKey(plugin, "click");
+        NamespacedKey newKey = new NamespacedKey(plugin, "click_mode");
+        player.getPersistentDataContainer().set(oldKey, PersistentDataType.STRING, "SINGLE");
 
         server.getPluginManager().callEvent(new PlayerJoinEvent(player, Component.empty()));
 
+        assertNull(player.getPersistentDataContainer().get(oldKey, PersistentDataType.STRING),
+                "Legacy 'click' key must be removed after rename");
         assertEquals("SINGLE_CLICK",
-                player.getPersistentDataContainer().get(key, PersistentDataType.STRING));
+                player.getPersistentDataContainer().get(newKey, PersistentDataType.STRING));
     }
 
     @Test
-    void migratePlayer_isNoOpForCanonicalAndMissingValues() {
+    void migratePlayer_renamesClickKeyAndPreservesCanonicalValue() {
         PlayerMock player = server.addPlayer("Alice");
-        NamespacedKey key = new NamespacedKey(plugin, "click");
+        NamespacedKey oldKey = new NamespacedKey(plugin, "click");
+        NamespacedKey newKey = new NamespacedKey(plugin, "click_mode");
 
-        plugin.getMigrations().migrate(player); // no stored value → nothing to migrate
-        assertNull(player.getPersistentDataContainer().get(key, PersistentDataType.STRING));
+        plugin.getMigrations().migrate(player); // nothing stored → neither key created
+        assertNull(player.getPersistentDataContainer().get(oldKey, PersistentDataType.STRING));
+        assertNull(player.getPersistentDataContainer().get(newKey, PersistentDataType.STRING));
 
-        player.getPersistentDataContainer().set(key, PersistentDataType.STRING, "SWAP");
-        plugin.getMigrations().migrate(player); // canonical value → unchanged
-        assertEquals("SWAP", player.getPersistentDataContainer().get(key, PersistentDataType.STRING));
+        player.getPersistentDataContainer().set(oldKey, PersistentDataType.STRING, "SWAP");
+        plugin.getMigrations().migrate(player); // canonical value moved to new key
+        assertNull(player.getPersistentDataContainer().get(oldKey, PersistentDataType.STRING),
+                "Old 'click' key must be removed after rename");
+        assertEquals("SWAP", player.getPersistentDataContainer().get(newKey, PersistentDataType.STRING),
+                "Canonical value must be preserved under the new key");
+    }
+
+    @Test
+    void migratePlayer_noneClickMethodBecomesEnabledFalseAndSwap() {
+        PlayerMock player = server.addPlayer("Alice");
+        NamespacedKey clickKey = new NamespacedKey(plugin, "click");
+        NamespacedKey clickModeKey = new NamespacedKey(plugin, "click_mode");
+        NamespacedKey enabledKey = new NamespacedKey(plugin, "enabled");
+        player.getPersistentDataContainer().set(clickKey, PersistentDataType.STRING, "NONE");
+
+        plugin.getMigrations().migrate(player);
+
+        assertNull(player.getPersistentDataContainer().get(clickKey, PersistentDataType.STRING),
+                "Old 'click' key must be removed");
+        assertEquals("SWAP",
+                player.getPersistentDataContainer().get(clickModeKey, PersistentDataType.STRING),
+                "click_mode must be SWAP after NONE migration");
+        assertEquals((byte) 0,
+                player.getPersistentDataContainer().get(enabledKey, PersistentDataType.BYTE),
+                "enabled must be false (0) after NONE migration");
+        assertFalse(plugin.getSortingPrefs().getEnabled(player));
+    }
+
+    @Test
+    void migrateConfig_noneClickModeBecomesEnabledFalseAndSwap() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("defaults.click_mode", "NONE");
+
+        assertTrue(plugin.getMigrations().migrate(cfg));
+        assertEquals("SWAP", cfg.getString("defaults.click_mode"),
+                "defaults.click_mode must be SWAP after NONE migration");
+        assertEquals(false, cfg.get("defaults.enabled"),
+                "defaults.enabled must be false after NONE migration");
     }
 
     // --- Config migration (eager rewrite on load) ---
@@ -274,5 +321,36 @@ class MigrationTest extends AbstractClickSortedTest {
                 "Absent player_sort_min/max → no change");
         assertFalse(cfg.contains("locked_slots.player"),
                 "No locked_slots.player entry should be created when no migration was needed");
+    }
+
+    // --- when…then primitive in isolation ---
+
+    @Test
+    void whenThenPrimitive_firesOnMatchAndIsNoOpOnMismatch() {
+        // Use an in-memory store fake to verify the when…then mechanism independently.
+        java.util.Map<String, String> data = new java.util.HashMap<>();
+        Store fake = new Store() {
+            @Override public String getString(String key) { return data.get(key); }
+            @Override public void setString(String key, String value) { data.put(key, value); }
+            @Override public void setBoolean(String key, boolean value) { data.put(key, String.valueOf(value)); }
+            @Override public void clear(String key) { data.remove(key); }
+            @Override public boolean contains(String key) { return data.containsKey(key); }
+        };
+
+        Migration rule = when("mode").is("LEGACY").then(set("mode", "MODERN"), set("flag", "true"));
+
+        // Absent key → no-op.
+        assertFalse(rule.apply(fake), "Should be a no-op when key is absent");
+
+        // Wrong value → no-op.
+        data.put("mode", "OTHER");
+        assertFalse(rule.apply(fake), "Should be a no-op when value doesn't match");
+        assertEquals("OTHER", data.get("mode"));
+
+        // Matching value → effects applied.
+        data.put("mode", "LEGACY");
+        assertTrue(rule.apply(fake));
+        assertEquals("MODERN", data.get("mode"), "mode must be rewritten to MODERN");
+        assertEquals("true", data.get("flag"), "flag must be set to true");
     }
 }

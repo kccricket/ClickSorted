@@ -10,6 +10,10 @@
 # Prepended to every status/error/alert message sent to players. MiniMessage. Set to "" to disable.
 prefix: "<gray>[<aqua>ClickSorted<gray>] "
 
+# Command feedback — enabled toggle (/clicksorted set enabled, bare /clicksorted)
+# Placeholder: <status> (ENABLED or DISABLED)
+setEnabledStatus: "Click-sorting is now <aqua><status><white> for you."
+
 # Command feedback — sort mode
 # Placeholder: <method>
 setSortingMethodTo: "Your <aqua>sort mode<white> is now set to: <aqua><method><white>."
@@ -86,6 +90,8 @@ blacklistArrowPrev: "<!italic>Previous page"
 blacklistArrowNext: "<!italic>Next page"
 
 # Command feedback — status (/clicksorted status)
+# Placeholder: <status> (ENABLED or DISABLED)
+statusEnabled: "Click-sorting: <status>"
 # Placeholder: <method>
 statusClickMethod: "Click method: <method>"
 # Placeholder: <method>
@@ -117,7 +123,6 @@ instructionSwap: "Press the offhand-swap key to sort."
 instructionControlDrop: "Press Ctrl+Q (drop key) over a slot to sort."
 instructionShiftLeftClick: "Shift-left-click a slot to sort."
 instructionShiftRightClick: "Shift-right-click a slot to sort."
-instructionDisabled: "Click-sorting has been disabled."
 
 # Error shown when a player-only command is run from the console
 notFromConsole: "This command can only be used by a player."

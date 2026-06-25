@@ -100,11 +100,16 @@ public class MainConfig implements ManagedConfig {
                 "When false (default), any inventory whose type appears in sortable_inventories can be sorted."));
         cfg.setComments("defaults", List.of(
                 "Default preferences applied to new players (or any player whose PDC entry is missing)."));
+        cfg.setComments("defaults.enabled", List.of(
+                "Whether click-sorting is enabled by default.",
+                "Players can toggle this with /clicksorted set enabled on|off",
+                "or via the bare /clicksorted command."));
         cfg.setComments("defaults.click_mode", List.of(
                 "How a player triggers a sort.",
                 "Values: SWAP (press the swap-offhand key over a slot), SINGLE_CLICK (left-click an empty slot),",
                 "        DOUBLE_CLICK (double-click), CONTROL_DROP (Ctrl+Q over a slot),",
-                "        SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE (click-sorting disabled)"));
+                "        SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK.",
+                "To disable sorting for all players by default, set defaults.enabled: false instead."));
         cfg.setComments("defaults.sort_mode", List.of(
                 "Algorithm used to order and lay out items.",
                 "Values: NAME (alphabetical by display name), GROUP (by group defined in groups.yml),",
@@ -248,6 +253,10 @@ public class MainConfig implements ManagedConfig {
 
     public FillAxis getDefaultFillAxis() {
         return FillAxis.parse(plugin.getConfig().getString("defaults.fill_axis"), FillAxis.DEFAULT);
+    }
+
+    public boolean getDefaultEnabled() {
+        return plugin.getConfig().getBoolean("defaults.enabled", true);
     }
 
     public boolean getDefaultSortOverItems() {

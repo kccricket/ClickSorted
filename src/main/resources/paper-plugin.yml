@@ -13,6 +13,7 @@ permissions:
     default: op
     children:
       clicksorted.commands.reload: true
+      clicksorted.commands.enabled: true
       clicksorted.commands.sort: true
       clicksorted.commands.click: true
       clicksorted.commands.hover: true
@@ -23,6 +24,9 @@ permissions:
       clicksorted.commands.debug: true
       clicksorted.commands.benchmark: true
       clicksorted.throttle.bypass: true
+  clicksorted.commands.enabled:
+    description: Allow toggling click-sorting on/off (/clicksorted set enabled, bare /clicksorted)
+    default: true
   clicksorted.commands.reload:
     description: Allow use of the /clicksorted reload command
     default: op

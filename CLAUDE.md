@@ -32,8 +32,8 @@ net.kccricket.clicksorted
 ├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
 │                            BundlePacker, BundleBenchmark, GridGeometry, SlotOrder,
 │                            TreemapPacker, PrefsCycleHandler, ProtectedItems, ProtectedSlots
-├── migration/               ValueMigration, Migrations, PlayerMigrationListener,
-│                            PreferenceRepair
+├── migration/               ValueMigration, Migration, Store, Migrations,
+│                            PlayerMigrationListener, PreferenceRepair
 ├── text/                    MessageUtil, CooldownMessenger, ItemNames
 ├── logging/                 Log, DebugLevel
 ├── security/                Permissions, ActionThrottle
@@ -50,25 +50,43 @@ config is migrated in `MainConfig.load()` (`plugin.getMigrations().migrate(plugi
 `PlayerMigrationListener` on `PlayerJoinEvent` (`plugin.getMigrations().migrate(player)`). `Migrations`
 exposes exactly one entry point per store: `migrate(ConfigurationSection)` and `migrate(Player)`.
 
-Three kinds of catalog rule for config (applied in order); the last two are also applied symmetrically to PDC:
+**Rule hierarchy** (three layers, applied in order on every `migrate(config)` call):
 
-- **Structural transforms** (`ConfigTransform` — config only). Derive new config state from old values in place (e.g. translate a deprecated numeric range into an equivalent list). Run *first*, before removal, so old keys are still readable. Adding a future transform is a one-line append to `CONFIG_TRANSFORMS`. Source-key removal is not the transform's job — list old paths in `DEPRECATED_CONFIG_PATHS` instead.
-- **Renamed values.** Declare a `ValueMigration` lineage with
-  `ValueMigration.builder().rename(old).to(next).to(newer)…build()`. The last token is the current
-  canonical value; every earlier token maps **directly** to it, so any value ever stored converges in a
-  single pass. Adding a future rename is a pure append (`.to("X")`). The catalog maps each storage
-  location to its lineage (config path `defaults.click_mode` and PDC key `click` both → `CLICK_METHOD`).
-- **Removed settings.** List the deprecated storage location in `DEPRECATED_CONFIG_PATHS` /
-  `DEPRECATED_PDC_KEYS` and the migrator drops it from the store (e.g. `defaults.shift_click` /
-  `shift_click`, or the removed `player_sort_min` / `player_sort_max`).
+1. **Structural transforms** (`ConfigTransform` — config only). Derive new config state from old values in place (e.g. translate a deprecated numeric range into an equivalent slot list). Run *first*, before removal, so old keys are still readable. Adding a future transform is a one-line append to `CONFIG_TRANSFORMS`. Source-key removal is not the transform's job.
+2. **Root-path removal** (`DEPRECATED_ROOT_PATHS` — config only). Drop root-level config keys that have been removed (e.g. `player_sort_min`, `player_sort_max`). These are not in `defaults.*` so they fall outside the shared `Store` namespace.
+3. **Shared rules** (`SHARED` — applied to both config and PDC via `Store` adapters). A single ordered `List<Migration>` covers all `defaults.*` / PDC settings with no per-key mapping table.
 
-The per-location read→migrate→write and removal logic lives in **private** helpers inside `Migrations`;
-the lineage definitions stay pure data.
+**`Store` and `Migration`** are the shared rule mechanism. `Store` is a store-neutral interface (`getString`, `setString`, `setBoolean`, `clear`, `contains`); each adapter applies its own namespace:
+- `Store.ConfigStore` wraps a `ConfigurationSection`; leaf `k` → path `defaults.k`. No per-key map.
+- `Store.PdcStore` wraps a `PersistentDataContainer` + plugin; leaf `k` → `NamespacedKey(plugin, k)`. Strings via `STRING`, booleans via `BYTE`. No per-key map.
+
+PDC leaf names now match config-default leaf names (`click_mode`, `sort_mode`, `start_corner`, `fill_axis`, `sort_over_items`, `enabled`, `bundle_*`), which is what allows the namespace-only adapter with no mapping table.
+
+**`Migration`** is a composable rule (`boolean apply(Store)`). Factory methods cover four cases:
+- `renameKey(oldLeaf, newLeaf)` — move a value from one leaf to another (clears old).
+- `remap(leaf, ValueMigration lineage)` — rewrite a value via a lineage.
+- `remove(leaf)` — drop a deprecated leaf.
+- `when(leaf).is(value).then(effects…)` — conditional branch; effect factories: `set(leaf, String)`, `set(leaf, boolean)`, `clear(leaf)`.
+
+`ValueMigration` (unchanged) models old→new value renames; `ValueMigration.builder().rename(old).to(next).to(newer)…build()` collapses every historical alias directly to the canonical last token.
+
+The **`SHARED` list** (order encodes data dependency — renames first, then remaps, then conditionals, then removals):
+```
+renameKey("click", "click_mode")    // PDC rename; no-op on config (already click_mode)
+renameKey("sort",  "sort_mode")     // PDC rename; no-op on config
+remap("click_mode",  CLICK_METHOD)  // e.g. DOUBLE → DOUBLE_CLICK
+remap("start_corner", START_CORNER)
+remap("fill_axis",    FILL_AXIS)
+when("click_mode").is("NONE").then(set("enabled", false), set("click_mode", "SWAP"))
+remove("shift_click")               // drops defaults.shift_click (config) and shift_click PDC
+```
+
+Config-only structural work (slot-bounds migration, root-path removal) stays outside `SHARED` as the dedicated escape hatch for store-specific migrations.
 
 ### Core Flow
 
 1. `InventoryClickEvent` fires when a player clicks inside an inventory.
-2. `InventoryClickListener` checks the player's `PlayerSortingPrefs` (stored in Bukkit's Persistent Data Container) to see if the click matches their configured `ClickMethod`, applies the "sort over items" gate, and runs the shared `ActionThrottle` rate-limiter.
+2. `InventoryClickListener` checks the player's `PlayerSortingPrefs` (stored in Bukkit's Persistent Data Container): first the `enabled` flag (sorting disabled → early exit), then whether the click matches their configured `ClickMethod`, then the "sort over items" gate, then the shared `ActionThrottle` rate-limiter.
 3. If it matches, `InventorySortService` delegates to `SortEngine`: fungible items are collapsed into a `HashMap<SortKey, Integer>` (material → quantity) and non-fungible items (bundles, non-stackables) are kept discrete, then everything is reconstructed into stacks and written back to the inventory.
 4. When bundle packing is enabled for the target (`defaults.bundle_inventory` / `defaults.bundle_others`, toggled per-player), `InventorySortService` first runs `BundlePacker` to repack partial stacks into bundles before the sort.
 5. A custom `InventorySortEvent` fires after sorting so third-party plugins can intervene.
@@ -83,12 +101,14 @@ the lineage definitions stay pure data.
 | Class | Package | Role |
 |---|---|---|
 | `ClickSortedPlugin` | root | `JavaPlugin` entry point, wires all components |
-| `PlayerSortingPrefs` | model | Per-player state (ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, bundle material blacklist, bundle display-name blacklist, locked slots) stored via PDC |
+| `PlayerSortingPrefs` | model | Per-player state (enabled flag, ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, bundle material blacklist, bundle display-name blacklist, locked slots) stored via PDC. PDC leaf names match config-default names (`click_mode`, `sort_mode`, `enabled`, etc.) |
 | `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier/iron-bars panes and maps chest↔inventory slots; admin-locked slots (config or permission) render as IRON_BARS and are non-toggleable |
 | `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; guards admin-locked slots via `ProtectedSlots.forSort`, toggles per-player lock state, and cancels all real-inventory interaction |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
 | `SortingMethod` | model | Enum (NAME, GROUP, TREEMAP) controlling `SortKey.makeSortPrefix()`; `isTreemap()` routes placement through `TreemapPacker` instead of `SlotOrder` |
-| `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE) |
+| `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK). `NONE` was removed — use the `enabled` preference instead |
+| `Migration` | migration | Composable rule interface (`boolean apply(Store)`). Factory methods: `renameKey`, `remap`, `remove`, `when(…).is(…).then(effects…)`. Effect factories: `set(leaf, String/boolean)`, `clear(leaf)` |
+| `Store` | migration | Store-neutral key/value handle; `ConfigStore` (namespace `defaults.*`) and `PdcStore` (namespace `NamespacedKey(plugin, leaf)`) adapters |
 | `StartCorner` | model | Enum (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT) — which corner the sort grid begins from |
 | `FillAxis` | model | Enum (HORIZONTAL, VERTICAL) — whether rows or columns fill first from the start corner |
 | `EnumParse` | model | Case-insensitive enum parse helper used by StartCorner, FillAxis, and others |
@@ -116,7 +136,7 @@ the lineage definitions stay pure data.
 
 ### Configuration Files (src/main/resources)
 
-- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag, per-player `defaults` (click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
+- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag, per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
 - `groups.yml` — item groupings for GROUP sort method
 - `items.yml` — persistent store of material → display-name mappings
 - `lang.yml` — all user-facing messages (MiniMessage format)
@@ -131,8 +151,9 @@ There is a known non-obvious setup required for MockBukkit v4 on Java 16+; see `
 
 Commands are implemented as a Brigadier tree in `ClickSortedCommands` and registered via `LifecycleEvents.COMMANDS`. Each subcommand is a static builder method. The tree is:
 
-- **`set`** — per-player preferences: `set sort-method <NAME|GROUP|TREEMAP>`, `set click-method <…>`, `set start-corner <TOP_LEFT|TOP_RIGHT|BOTTOM_LEFT|BOTTOM_RIGHT>`, `set fill-axis <HORIZONTAL|VERTICAL>`, `set hover [on|off]` (toggles when no arg; some click methods govern this automatically), `set lock` (opens the lock GUI), and `set bundle` (no-arg prints status; `set bundle inventory|others <on|off>`; `set bundle stacklimit <n|off>`; `set bundle blacklist` / `set bundle blacklist gui` opens a 54-slot GUI — click an item in the player's real inventory to add it to the blacklist by material (vanilla items) or by display name (custom-named items); click a listed entry to remove it; arrows navigate pagination; `set bundle blacklist add|remove <material>`, `set bundle blacklist list`, `set bundle blacklist clear`, `set bundle blacklist name add|remove <text>` are text-command alternatives — materials in the blacklist are never packed into or unpacked from bundles; normal stack-merging still applies; items whose plain-text display name matches a name entry are also kept out of bundles).
-- **`status`** — print the player's current click method, sort method, start corner, fill axis, and sort-over-items state.
+- **`/clicksorted` (bare)** — toggles the player's `enabled` flag (on→off or off→on) and reports the new state. Requires `clicksorted.commands.enabled` (default: true).
+- **`set`** — per-player preferences: `set enabled [on|off]` (toggles when no arg — same as the bare command), `set sort-method <NAME|GROUP|TREEMAP>`, `set click-method <…>`, `set start-corner <TOP_LEFT|TOP_RIGHT|BOTTOM_LEFT|BOTTOM_RIGHT>`, `set fill-axis <HORIZONTAL|VERTICAL>`, `set hover [on|off]` (toggles when no arg; some click methods govern this automatically), `set lock` (opens the lock GUI), and `set bundle` (no-arg prints status; `set bundle inventory|others <on|off>`; `set bundle stacklimit <n|off>`; `set bundle blacklist` / `set bundle blacklist gui` opens a 54-slot GUI — click an item in the player's real inventory to add it to the blacklist by material (vanilla items) or by display name (custom-named items); click a listed entry to remove it; arrows navigate pagination; `set bundle blacklist add|remove <material>`, `set bundle blacklist list`, `set bundle blacklist clear`, `set bundle blacklist name add|remove <text>` are text-command alternatives — materials in the blacklist are never packed into or unpacked from bundles; normal stack-merging still applies; items whose plain-text display name matches a name entry are also kept out of bundles).
+- **`status`** — print the player's current enabled state, click method, sort method, start corner, fill axis, and sort-over-items state.
 - **`reload`**, **`getcfg`**, **`debug [level]`**, **`benchmark [iterations]`** — admin/diagnostic commands.
 
 `set hover` toggles the per-player "sort over items" flag (server default `defaults.sort_over_items`), which controls whether a sort fires only on an empty slot or also while hovering an occupied one.
