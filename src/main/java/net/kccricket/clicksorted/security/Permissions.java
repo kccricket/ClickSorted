@@ -23,6 +23,23 @@ public class Permissions {
     public static final String PERM_BLACKLIST_NAME = "clicksorted.blacklist.name.";
 
     // -------------------------------------------------------------------------
+    // Admin-enforced slot lock permission-node prefix
+    // -------------------------------------------------------------------------
+
+    /**
+     * Prefix for admin player-slot-lock nodes. Append the slot index to form the full node,
+     * e.g. {@code clicksorted.lock.player.slot.9}.
+     *
+     * <p>These are dynamic, undeclared nodes — intentionally not listed in {@code paper-plugin.yml}
+     * so that {@code isPermissionSet} is {@code false} for OPs who have not been explicitly
+     * granted the node (avoiding the {@link org.bukkit.permissions.PermissionDefault#OP} trap).
+     *
+     * <p>The {@code player} segment reserves the namespace for future lock categories
+     * (e.g. {@code clicksorted.lock.container.*}).
+     */
+    public static final String PERM_LOCK_PLAYER_SLOT = "clicksorted.lock.player.slot.";
+
+    // -------------------------------------------------------------------------
 
     /**
      * Check if the player has the specified permission node.

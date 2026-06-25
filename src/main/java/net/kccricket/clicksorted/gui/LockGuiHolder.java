@@ -14,6 +14,7 @@ package net.kccricket.clicksorted.gui;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.config.LangConfig;
+import net.kccricket.clicksorted.sort.ProtectedSlots;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
@@ -58,16 +59,17 @@ public class LockGuiHolder implements ClickSortedHolder {
         this.inventory = Bukkit.createInventory(this, GUI_SIZE,
                 lang.getColoredMessage("lockGuiTitle"));
 
+        // Build admin-slot snapshot covering both config and permission channels for this player.
+        ProtectedSlots admin = ProtectedSlots.forSort(player, plugin.getConfigManager().main());
         Set<Integer> locked = plugin.getSortingPrefs().getLockedSlots(player);
-        ItemStack unsortable = buildUnsortablePane(lang);
 
         // Rows 1-3: main storage slots 9-35 → chest slots 0-26
         for (int chestSlot = 0; chestSlot < DIVIDER_START; chestSlot++) {
             int invSlot = chestSlotToInvSlot(chestSlot);
-            if (plugin.getConfigManager().main().isPlayerSlotSortable(invSlot)) {
-                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+            if (admin.blocks(invSlot)) {
+                inventory.setItem(chestSlot, buildAdminLockedPane(lang, chestSlot));
             } else {
-                inventory.setItem(chestSlot, unsortable.clone());
+                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
             }
         }
 
@@ -81,7 +83,11 @@ public class LockGuiHolder implements ClickSortedHolder {
         // Row 5: hotbar slots 0-8 → chest slots 36-44
         for (int chestSlot = DIVIDER_END; chestSlot < GUI_SIZE; chestSlot++) {
             int invSlot = chestSlotToInvSlot(chestSlot);
-            inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+            if (admin.blocks(invSlot)) {
+                inventory.setItem(chestSlot, buildAdminLockedPane(lang, chestSlot));
+            } else {
+                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+            }
         }
     }
 
@@ -116,11 +122,29 @@ public class LockGuiHolder implements ClickSortedHolder {
         return pane;
     }
 
-    public static ItemStack buildUnsortablePane(LangConfig lang) {
-        ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+    /**
+     * Build an iron-bars pane indicating an admin-locked slot.  Uses the slot position to
+     * produce the same "Inventory slot N" / "Hotbar slot N" label as {@link #buildPane}.
+     * Players see this for slots locked via {@code locked_slots.player} config or the
+     * {@code clicksorted.lock.player.slot.<n>} permission node.
+     */
+    public static ItemStack buildAdminLockedPane(LangConfig lang, int chestSlot) {
+        String slotLangKey;
+        int displayNumber;
+        if (chestSlot < DIVIDER_START) {
+            slotLangKey = "lockPaneSlotInventory";
+            displayNumber = chestSlot + 1;
+        } else {
+            slotLangKey = "lockPaneSlotHotbar";
+            displayNumber = chestSlot - DIVIDER_END + 1;
+        }
+
+        ItemStack pane = new ItemStack(Material.IRON_BARS);
         ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("lockPaneUnsortable"));
-        meta.lore(MessageUtil.toLore(lang.getColoredMessage("lockPaneUnsortableLore")));
+        meta.displayName(lang.getColoredMessage("lockPaneAdmin"));
+        meta.lore(MessageUtil.toLore(
+                lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
+                lang.getColoredMessage("lockPaneAdminLore")));
         pane.setItemMeta(meta);
         return pane;
     }

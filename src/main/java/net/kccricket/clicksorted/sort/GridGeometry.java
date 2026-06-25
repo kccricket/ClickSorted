@@ -70,12 +70,13 @@ public record GridGeometry(int base, int width, int rows) {
         int width = SlotOrder.widthFor(type);
         // Normal inventories are anchored at slot 0, so the grid origin is the start of the row that
         // contains `min` — round `min` down to a row boundary rather than using it directly. For every
-        // current config this is a no-op (containers start at 0, player storage at 9, both already
+        // standard case this is a no-op (containers start at 0, player storage at 9, both already
         // aligned), and even when it isn't, the linear layout is unaffected (shifting the origin by
-        // whole rows can't change the fill order). It only matters when an admin carves
-        // `player_sort_min` mid-row: using `min` as the origin would shear every row/col, scrambling
-        // the non-default corners/axes and the treemap; rounding keeps the grid aligned to the real
-        // inventory rows, with the leading out-of-range slots simply treated as gaps (like locked ones).
+        // whole rows can't change the fill order). Rounding matters only when `min` falls mid-row
+        // (e.g. a caller that excludes the first two slots of a row via admin slot locks): using `min`
+        // as the origin directly would shear every row/col, scrambling non-default corners/axes and the
+        // treemap; rounding keeps the grid aligned to real inventory rows, with leading excluded slots
+        // treated as gaps (exactly like player-locked or admin-locked slots).
         int rowStart = min / width;
         int rowEnd = (max - 1) / width;
         return new GridGeometry(rowStart * width, width, Math.max(1, rowEnd - rowStart + 1));

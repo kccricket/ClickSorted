@@ -49,8 +49,9 @@ class GridGeometryTest extends AbstractClickSortedTest {
         assertEquals(2, twoRows.rows());
 
         // A mid-row min (11) rounds DOWN to its row boundary (9) so the grid stays aligned to the real
-        // inventory rows; the row span still reaches the last row. Slots 9..10 fall outside the sortable
-        // range and are handled downstream as gaps, exactly like locked slots.
+        // inventory rows; the row span still reaches the last row. Slots 9..10 (excluded via admin slot
+        // locks or any other exclusion mechanism) are handled downstream as gaps, exactly like player-
+        // locked slots.
         GridGeometry midRow = GridGeometry.of(InventoryType.PLAYER, null, 11, 36);
         assertEquals(9, midRow.base());
         assertEquals(9, midRow.width());

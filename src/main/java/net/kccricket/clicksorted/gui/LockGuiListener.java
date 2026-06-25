@@ -14,6 +14,7 @@ package net.kccricket.clicksorted.gui;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
+import net.kccricket.clicksorted.sort.ProtectedSlots;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -62,7 +63,11 @@ public class LockGuiListener implements Listener {
         }
 
         int invSlot = LockGuiHolder.chestSlotToInvSlot(rawSlot);
-        if (!plugin.getConfigManager().main().isPlayerSlotSortable(invSlot)) {
+        // Divider slots map to -1; admin-locked slots are non-toggleable.
+        if (invSlot < 0) {
+            return;
+        }
+        if (ProtectedSlots.forSort(player, plugin.getConfigManager().main()).blocks(invSlot)) {
             return;
         }
 

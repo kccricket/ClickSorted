@@ -14,8 +14,8 @@ defaults:
   bundle_inventory: false
   bundle_others: false
   bundle_stack_limit: 12
-player_sort_min: 9
-player_sort_max: 36
+locked_slots:
+  player: []
 action_cooldown_ms: 150
 sortable_inventories:
   - "PLAYER"

@@ -13,6 +13,7 @@ package net.kccricket.clicksorted.sort;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.config.MainConfig;
 import net.kccricket.clicksorted.events.InventorySortEvent;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.FillAxis;
@@ -84,7 +85,6 @@ public class InventorySortService {
         boolean playerMainStorage = false; // packing applies here (not the hotbar)
         boolean container = false;
         if (type == InventoryType.PLAYER) {
-            int playerSortMax = mainCfg.getPlayerSortMax();
             if (slot < 9) {
                 // hotbar
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.hotbar")) {
@@ -92,13 +92,13 @@ public class InventorySortService {
                 }
                 min = 0;
                 max = 9;
-            } else if (slot < playerSortMax) {
+            } else if (slot < MainConfig.PLAYER_STORAGE_END) {
                 if (!Permissions.isAllowedTo(p, "clicksorted.sort.player")) {
                     return false;
                 }
                 // main player inventory
-                min = mainCfg.getPlayerSortMin();
-                max = playerSortMax;
+                min = 9;
+                max = MainConfig.PLAYER_STORAGE_END;
                 playerMainStorage = true;
             } else {
                 // armor / offhand slots — never sort
@@ -139,8 +139,18 @@ public class InventorySortService {
 
         Set<Integer> sortableSlots = sortEvent.getSortableSlots();
         if (type == InventoryType.PLAYER) {
+            // Per-player locked slots (player-controlled via /clicksorted set lock).
             for (int locked : plugin.getSortingPrefs().getLockedSlots(p)) {
                 sortEvent.excludeSlot(locked);
+            }
+            // Admin-enforced slot locks (config locked_slots.player and clicksorted.lock.player.slot.N).
+            ProtectedSlots protectedSlots = ProtectedSlots.forSort(p, mainCfg);
+            if (!protectedSlots.isEmpty()) {
+                for (int s : List.copyOf(sortableSlots)) {
+                    if (protectedSlots.blocks(s)) {
+                        sortEvent.excludeSlot(s);
+                    }
+                }
             }
         }
 
