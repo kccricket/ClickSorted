@@ -27,7 +27,7 @@ public interface Migration {
     }
 
     /**
-     * Moves the value stored at {@code oldLeaf} to {@code newLeaf} and clears the old leaf.
+     * Moves the string value stored at {@code oldLeaf} to {@code newLeaf} and clears the old leaf.
      * No-op when the old leaf is absent.
      */
     static Migration renameKey(String oldLeaf, String newLeaf) {
@@ -35,6 +35,21 @@ public interface Migration {
             if (!store.contains(oldLeaf)) return false;
             String value = store.getString(oldLeaf);
             if (value != null) store.setString(newLeaf, value);
+            store.clear(oldLeaf);
+            return true;
+        };
+    }
+
+    /**
+     * Moves the boolean value stored at {@code oldLeaf} to {@code newLeaf} and clears the old leaf.
+     * No-op when the old leaf is absent. Use instead of {@link #renameKey} for boolean preferences
+     * (PDC stores these as BYTE, not STRING, so {@code getString} returns null for them).
+     */
+    static Migration renameBooleanKey(String oldLeaf, String newLeaf) {
+        return store -> {
+            if (!store.contains(oldLeaf)) return false;
+            Boolean value = store.getBoolean(oldLeaf);
+            if (value != null) store.setBoolean(newLeaf, value);
             store.clear(oldLeaf);
             return true;
         };

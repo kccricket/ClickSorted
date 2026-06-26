@@ -405,16 +405,12 @@ public class ClickSortedCommands {
         return Commands.literal("bundle")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.bundle"))
                 .then(buildBundleEnabled(plugin))
-                .then(bundleToggle(plugin, "in-inventory", "setBundlePackInInventoryStatus",
-                        (player, status) -> plugin.getSortingPrefs().setBundlePackInInventory(player, status)))
-                .then(bundleToggle(plugin, "in-containers", "setBundlePackInContainersStatus",
-                        (player, status) -> plugin.getSortingPrefs().setBundlePackInContainers(player, status)))
                 .then(buildBundleStackLimit(plugin))
                 .then(buildBundleBlacklist(plugin));
     }
 
     // -------------------------------------------------------------------------
-    // /clicksorted bundle enabled [yes|no] — combined toggle for both flags
+    // /clicksorted bundle enabled — combined toggle; in-inventory / in-containers below
     // -------------------------------------------------------------------------
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundleEnabled(ClickSortedPlugin plugin) {
@@ -446,7 +442,11 @@ public class ClickSortedCommands {
                             }
                             applyBundleEnabled(plugin, player, state);
                             return Command.SINGLE_SUCCESS;
-                        }));
+                        }))
+                .then(bundleToggle(plugin, "in-inventory", "setBundlePackInInventoryStatus",
+                        (player, status) -> plugin.getSortingPrefs().setBundlePackInInventory(player, status)))
+                .then(bundleToggle(plugin, "in-containers", "setBundlePackInContainersStatus",
+                        (player, status) -> plugin.getSortingPrefs().setBundlePackInContainers(player, status)));
     }
 
     private static void applyBundleEnabled(ClickSortedPlugin plugin, Player player, boolean enabled) {

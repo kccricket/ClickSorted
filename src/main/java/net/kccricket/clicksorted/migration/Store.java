@@ -15,6 +15,8 @@ import org.bukkit.persistence.PersistentDataType;
  */
 public interface Store {
     String getString(String key);
+    /** Returns the stored boolean, or {@code null} if the key is absent or not a boolean type. */
+    Boolean getBoolean(String key);
     void setString(String key, String value);
     void setBoolean(String key, boolean value);
     void clear(String key);
@@ -36,6 +38,7 @@ public interface Store {
         }
 
         @Override public String getString(String key) { return section.getString(path(key)); }
+        @Override public Boolean getBoolean(String key) { Object v = section.get(path(key)); return v instanceof Boolean b ? b : null; }
         @Override public void setString(String key, String value) { section.set(path(key), value); }
         @Override public void setBoolean(String key, boolean value) { section.set(path(key), value); }
         @Override public void clear(String key) { section.set(path(key), null); }
@@ -61,6 +64,7 @@ public interface Store {
         }
 
         @Override public String getString(String key) { return pdc.get(nsKey(key), PersistentDataType.STRING); }
+        @Override public Boolean getBoolean(String key) { Byte b = pdc.get(nsKey(key), PersistentDataType.BYTE); return b != null ? b != 0 : null; }
         @Override public void setString(String key, String value) { pdc.set(nsKey(key), PersistentDataType.STRING, value); }
         @Override public void setBoolean(String key, boolean value) { pdc.set(nsKey(key), PersistentDataType.BYTE, value ? (byte) 1 : (byte) 0); }
         @Override public void clear(String key) { pdc.remove(nsKey(key)); }

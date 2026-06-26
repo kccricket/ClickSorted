@@ -323,6 +323,64 @@ class MigrationTest extends AbstractClickSortedTest {
                 "No locked_slots.player entry should be created when no migration was needed");
     }
 
+    // --- Bundle key renames (bundle_inventory → bundle_in_inventory, bundle_others → bundle_in_containers) ---
+
+    @Test
+    void migratePlayer_renamesBundleInventoryKey() {
+        PlayerMock player = server.addPlayer("Alice");
+        NamespacedKey oldKey = new NamespacedKey(plugin, "bundle_inventory");
+        NamespacedKey newKey = new NamespacedKey(plugin, "bundle_in_inventory");
+        player.getPersistentDataContainer().set(oldKey, PersistentDataType.BYTE, (byte) 1);
+
+        plugin.getMigrations().migrate(player);
+
+        assertNull(player.getPersistentDataContainer().get(oldKey, PersistentDataType.BYTE),
+                "Old 'bundle_inventory' key must be removed after rename");
+        assertEquals((byte) 1, player.getPersistentDataContainer().get(newKey, PersistentDataType.BYTE),
+                "Value must be preserved under 'bundle_in_inventory'");
+        assertTrue(plugin.getSortingPrefs().getBundlePackInInventory(player));
+    }
+
+    @Test
+    void migratePlayer_renamesBundleOthersKey() {
+        PlayerMock player = server.addPlayer("Alice");
+        NamespacedKey oldKey = new NamespacedKey(plugin, "bundle_others");
+        NamespacedKey newKey = new NamespacedKey(plugin, "bundle_in_containers");
+        player.getPersistentDataContainer().set(oldKey, PersistentDataType.BYTE, (byte) 1);
+
+        plugin.getMigrations().migrate(player);
+
+        assertNull(player.getPersistentDataContainer().get(oldKey, PersistentDataType.BYTE),
+                "Old 'bundle_others' key must be removed after rename");
+        assertEquals((byte) 1, player.getPersistentDataContainer().get(newKey, PersistentDataType.BYTE),
+                "Value must be preserved under 'bundle_in_containers'");
+        assertTrue(plugin.getSortingPrefs().getBundlePackInContainers(player));
+    }
+
+    @Test
+    void migrateConfig_renamesBundleInventoryPath() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("defaults.bundle_inventory", true);
+
+        assertTrue(plugin.getMigrations().migrate(cfg));
+        assertFalse(cfg.contains("defaults.bundle_inventory"),
+                "Old 'defaults.bundle_inventory' must be removed after rename");
+        assertEquals(true, cfg.get("defaults.bundle_in_inventory"),
+                "Value must appear under 'defaults.bundle_in_inventory'");
+    }
+
+    @Test
+    void migrateConfig_renamesBundleOthersPath() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("defaults.bundle_others", true);
+
+        assertTrue(plugin.getMigrations().migrate(cfg));
+        assertFalse(cfg.contains("defaults.bundle_others"),
+                "Old 'defaults.bundle_others' must be removed after rename");
+        assertEquals(true, cfg.get("defaults.bundle_in_containers"),
+                "Value must appear under 'defaults.bundle_in_containers'");
+    }
+
     // --- when…then primitive in isolation ---
 
     @Test
@@ -331,6 +389,7 @@ class MigrationTest extends AbstractClickSortedTest {
         java.util.Map<String, String> data = new java.util.HashMap<>();
         Store fake = new Store() {
             @Override public String getString(String key) { return data.get(key); }
+            @Override public Boolean getBoolean(String key) { String v = data.get(key); return v != null ? Boolean.parseBoolean(v) : null; }
             @Override public void setString(String key, String value) { data.put(key, value); }
             @Override public void setBoolean(String key, boolean value) { data.put(key, String.valueOf(value)); }
             @Override public void clear(String key) { data.remove(key); }
