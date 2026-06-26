@@ -72,7 +72,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void inventoryPackingOn_packsPartialsAndSorts() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
         player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 10));
@@ -94,7 +94,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     void inventoryPackingOff_onlySortsLeavesBundleEmpty() {
         PlayerMock player = addOpPlayer("Alice");
         // packing disabled by default; be explicit
-        plugin.getSortingPrefs().setBundlePackInventory(player, false);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, false);
 
         player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
         player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 10));
@@ -112,7 +112,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void mergeHappensWithoutBundle() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         // No bundle present — the sort should still consolidate the two partials.
         player.getInventory().setItem(9, new ItemStack(Material.COBBLESTONE, 40));
@@ -127,7 +127,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void hotbarBundleNotUsedForMainStorageSort() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         // Bundle in the hotbar (region-scoped packing must not use it for a main-storage sort).
         player.getInventory().setItem(0, new ItemStack(Material.BUNDLE, 1));
@@ -147,7 +147,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void lockedBundleAndItemUntouched() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         player.getInventory().setItem(20, new ItemStack(Material.COBBLESTONE, 12));
         player.getInventory().setItem(21, new ItemStack(Material.BUNDLE, 1));
@@ -172,7 +172,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void combineThenPackFreesSlots() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         // Empty bundle + five 32-count cobblestone (=160). Merge → 64+64+32; the 32 (weight 32)
         // packs into the bundle → two full loose stacks + a bundle = 3 occupied slots.
@@ -204,7 +204,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     void controlDropClickMethodTriggersSortAndCancels() {
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setClickMethod(player, net.kccricket.clicksorted.model.ClickMethod.CONTROL_DROP);
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
         plugin.getSortingPrefs().setSortOverItems(player, true);
 
         player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
@@ -234,7 +234,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void othersPackingOn_packsChestBundle() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackOthers(player, true);
+        plugin.getSortingPrefs().setBundlePackInContainers(player, true);
         plugin.getSortingPrefs().setSortOverItems(player, true);
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
@@ -254,7 +254,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void othersPackingOff_leavesChestBundleEmpty() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackOthers(player, false);
+        plugin.getSortingPrefs().setBundlePackInContainers(player, false);
         plugin.getSortingPrefs().setSortOverItems(player, true);
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);

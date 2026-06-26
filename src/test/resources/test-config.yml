@@ -11,8 +11,8 @@ defaults:
   # Tests exercise sorting over occupied slots, so enable this by default here
   # (production config.yml ships with sort_over_items: false).
   sort_over_items: true
-  bundle_inventory: false
-  bundle_others: false
+  bundle_in_inventory: false
+  bundle_in_containers: false
   bundle_stack_limit: 12
 locked_slots:
   player: []

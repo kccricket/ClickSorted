@@ -12,8 +12,8 @@ defaults:
   start_corner: TOP_LEFT
   fill_axis: HORIZONTAL
   sort_over_items: false
-  bundle_inventory: false
-  bundle_others: false
+  bundle_in_inventory: false
+  bundle_in_containers: false
   bundle_stack_limit: 12
 locked_slots:
   player: []

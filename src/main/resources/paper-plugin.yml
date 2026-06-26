@@ -25,37 +25,37 @@ permissions:
       clicksorted.commands.benchmark: true
       clicksorted.throttle.bypass: true
   clicksorted.commands.enabled:
-    description: Allow toggling click-sorting on/off (/clicksorted set enabled, bare /clicksorted)
+    description: Allow toggling click-sorting on/off (/clicksorted sort enabled, bare /clicksorted)
     default: true
   clicksorted.commands.reload:
-    description: Allow use of the /clicksorted reload command
+    description: Allow use of the /clicksorted admin reload command
     default: op
   clicksorted.commands.getcfg:
-    description: Allow use of the /clicksorted getcfg command
+    description: Allow use of the /clicksorted admin config command
     default: op
   clicksorted.commands.debug:
-    description: Allow use of the /clicksorted debug command
+    description: Allow use of the /clicksorted admin debug command
     default: op
   clicksorted.commands.benchmark:
-    description: Allow use of the /clicksorted benchmark command
+    description: Allow use of the /clicksorted admin benchmark command
     default: op
   clicksorted.throttle.bypass:
     description: Exempt from the per-player action throttle (action_cooldown_ms)
     default: op
   clicksorted.commands.sort:
-    description: Allow use of the /clicksorted sort command
+    description: Allow use of the /clicksorted sort subcommands
     default: true
   clicksorted.commands.click:
-    description: Allow use of the /clicksorted click command
+    description: Allow use of the /clicksorted click method command
     default: true
   clicksorted.commands.hover:
-    description: Allow use of the /clicksorted hover command
+    description: Allow use of the /clicksorted click allow-on-hover command
     default: true
   clicksorted.commands.lock:
-    description: Allow use of the /clicksorted lock command
+    description: Allow use of the /clicksorted lock-slots command
     default: true
   clicksorted.commands.bundle:
-    description: Allow use of the /clicksorted bundle command
+    description: Allow use of the /clicksorted bundle subcommands
     default: true
   clicksorted.commands.status:
     description: Allow use of the /clicksorted status command

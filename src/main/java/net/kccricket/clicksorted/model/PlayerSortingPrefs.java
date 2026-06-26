@@ -37,8 +37,8 @@ public class PlayerSortingPrefs {
     private final NamespacedKey enabledKey;
     private final NamespacedKey sortOverItemsKey;
     private final NamespacedKey lockedSlotsKey;
-    private final NamespacedKey bundleInventoryKey;
-    private final NamespacedKey bundleOthersKey;
+    private final NamespacedKey bundleInInventoryKey;
+    private final NamespacedKey bundleInContainersKey;
     private final NamespacedKey bundleStackLimitKey;
     private final NamespacedKey bundleBlacklistKey;
     private final NamespacedKey bundleBlacklistNamesKey;
@@ -52,8 +52,8 @@ public class PlayerSortingPrefs {
         this.enabledKey = new NamespacedKey(plugin, "enabled");
         this.sortOverItemsKey = new NamespacedKey(plugin, "sort_over_items");
         this.lockedSlotsKey = new NamespacedKey(plugin, "locked_slots");
-        this.bundleInventoryKey = new NamespacedKey(plugin, "bundle_inventory");
-        this.bundleOthersKey = new NamespacedKey(plugin, "bundle_others");
+        this.bundleInInventoryKey = new NamespacedKey(plugin, "bundle_in_inventory");
+        this.bundleInContainersKey = new NamespacedKey(plugin, "bundle_in_containers");
         this.bundleStackLimitKey = new NamespacedKey(plugin, "bundle_stack_limit");
         this.bundleBlacklistKey = new NamespacedKey(plugin, "bundle_blacklist");
         this.bundleBlacklistNamesKey = new NamespacedKey(plugin, "bundle_blacklist_names");
@@ -125,24 +125,24 @@ public class PlayerSortingPrefs {
      * Returns true if bundle packing is enabled for the player's own inventory.
      * Falls back to the server default when the player has no stored preference.
      */
-    public boolean getBundlePackInventory(Player player) {
-        return getBool(player, bundleInventoryKey, plugin.getConfigManager().main()::getDefaultBundlePackInventory);
+    public boolean getBundlePackInInventory(Player player) {
+        return getBool(player, bundleInInventoryKey, plugin.getConfigManager().main()::getDefaultBundlePackInInventory);
     }
 
-    public void setBundlePackInventory(Player player, boolean enabled) {
-        setBool(player, bundleInventoryKey, enabled);
+    public void setBundlePackInInventory(Player player, boolean enabled) {
+        setBool(player, bundleInInventoryKey, enabled);
     }
 
     /**
      * Returns true if bundle packing is enabled for other (container) inventories the player sorts.
      * Falls back to the server default when the player has no stored preference.
      */
-    public boolean getBundlePackOthers(Player player) {
-        return getBool(player, bundleOthersKey, plugin.getConfigManager().main()::getDefaultBundlePackOthers);
+    public boolean getBundlePackInContainers(Player player) {
+        return getBool(player, bundleInContainersKey, plugin.getConfigManager().main()::getDefaultBundlePackInContainers);
     }
 
-    public void setBundlePackOthers(Player player, boolean enabled) {
-        setBool(player, bundleOthersKey, enabled);
+    public void setBundlePackInContainers(Player player, boolean enabled) {
+        setBool(player, bundleInContainersKey, enabled);
     }
 
     /** Reads a boolean preference stored as a byte, falling back to {@code def} when unset. */

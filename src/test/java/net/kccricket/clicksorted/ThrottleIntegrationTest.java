@@ -52,7 +52,7 @@ class ThrottleIntegrationTest extends AbstractClickSortedTest {
 
         assertEquals(2, countMaterialSlots(chest, Material.STONE),
                 "second sort within the cooldown should be dropped, leaving both stacks");
-        assertTrue(anyMessageContains(player, "Slow down"),
+        assertTrue(anyMessageContains(player, "MSG.actionTooFast"),
                 "player should receive the rate-limited throttle notice");
     }
 

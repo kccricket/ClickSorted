@@ -64,7 +64,7 @@ class OverflowSortTest extends AbstractClickSortedTest {
 
         // 10 materials × 4 stacks = 40 stacks into 27 slots → chest fills, the rest are dropped.
         assertEquals(27, nonEmptySlots(chest), "all sortable slots should be filled");
-        assertTrue(anyMessageContains(player, "dropped"),
+        assertTrue(anyMessageContains(player, "MSG.dropItems"),
                 "player should be alerted that excess items were dropped");
     }
 
@@ -80,7 +80,7 @@ class OverflowSortTest extends AbstractClickSortedTest {
 
         assertEquals(MATS.length, nonEmptySlots(chest), "aborted sort must leave the inventory untouched");
         assertEquals(200, chest.getItem(0).getAmount(), "original over-sized stack should be unchanged");
-        assertTrue(anyMessageContains(player, "overflow"),
+        assertTrue(anyMessageContains(player, "MSG.invOverFlow"),
                 "player should see the inventory-overflow notice");
     }
 }

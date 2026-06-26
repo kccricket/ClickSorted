@@ -328,7 +328,7 @@ class ProtectedItemsTest extends AbstractClickSortedTest {
     void configMaterial_protectedItemNotPacked_whenBundlePackingOn() {
         setConfigMaterials(List.of("DIRT"));
         PlayerMock player = server.addPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         // A bundle + protected DIRT (must not be packed) + cobblestone (may pack).
         player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));

@@ -114,31 +114,31 @@ public class MainConfig implements ManagedConfig {
                 "Values: NAME (alphabetical by display name), GROUP (by group defined in groups.yml),",
                 "        TREEMAP (group by type and lay each type out as a proportional block sized to its",
                 "        stack count, packed to fill the container with empty space pooled in one corner;",
-                "        the most-numerous type anchors start_corner. Ignores fill_axis).",
+                "        the most-numerous type anchors start_corner).",
                 "GROUP requires at least one group to be configured in groups.yml."));
         cfg.setComments("defaults.start_corner", List.of(
                 "The grid corner where a sorted layout begins.",
                 "Values: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT.",
-                "Players can change this with /clicksorted set start-corner <corner>."));
+                "Players can change this with /clicksorted sort start-corner <corner>."));
         cfg.setComments("defaults.fill_axis", List.of(
-                "The direction a sorted layout flows from the start corner (NAME/GROUP sort modes only).",
+                "The direction a sorted layout flows from the start corner.",
                 "Values: HORIZONTAL (fill rows), VERTICAL (fill columns).",
-                "Players can change this with /clicksorted set fill-axis <axis>."));
+                "Players can change this with /clicksorted sort fill-axis <axis>."));
         cfg.setComments("defaults.sort_over_items", List.of(
                 "When true, the configured click method sorts even while hovering an occupied slot;",
                 "when false, sorting only fires on an empty slot.",
-                "Players can toggle this per-session with /clicksorted hover."));
-        cfg.setComments("defaults.bundle_inventory", List.of(
+                "Players can toggle this per-session with /clicksorted click allow-on-hover."));
+        cfg.setComments("defaults.bundle_in_inventory", List.of(
                 "When true, sorting a player's own inventory also packs partial stacks into any bundles",
-                "present there. Players can toggle this with /clicksorted bundle inventory on|off."));
-        cfg.setComments("defaults.bundle_others", List.of(
+                "present there. Players can toggle this with /clicksorted bundle in-inventory yes|no."));
+        cfg.setComments("defaults.bundle_in_containers", List.of(
                 "When true, sorting a container (chest, barrel, …) also packs partial stacks into any",
-                "bundles it holds. Players can toggle this with /clicksorted bundle others on|off."));
+                "bundles it holds. Players can toggle this with /clicksorted bundle in-containers yes|no."));
         cfg.setComments("defaults.bundle_stack_limit", List.of(
                 "Default max number of distinct item entries per bundle when packing.",
                 "12 = tooltip-preview limit (bundles show the 12 most-recently-added items).",
                 "0 disables the entry limit (weight-only limit applies instead).",
-                "Players can change this with /clicksorted bundle stacklimit <n|off>."));
+                "Players can change this with /clicksorted bundle stack-limit <n|off>."));
         cfg.setComments("locked_slots", List.of(
                 "Admin-enforced slot locks: slots listed here (or granted via permission) are excluded",
                 "from every sort — they are never moved, reordered, or packed into / unpacked from bundles.",
@@ -262,12 +262,12 @@ public class MainConfig implements ManagedConfig {
         return plugin.getConfig().getBoolean("defaults.sort_over_items");
     }
 
-    public boolean getDefaultBundlePackInventory() {
-        return plugin.getConfig().getBoolean("defaults.bundle_inventory");
+    public boolean getDefaultBundlePackInInventory() {
+        return plugin.getConfig().getBoolean("defaults.bundle_in_inventory");
     }
 
-    public boolean getDefaultBundlePackOthers() {
-        return plugin.getConfig().getBoolean("defaults.bundle_others");
+    public boolean getDefaultBundlePackInContainers() {
+        return plugin.getConfig().getBoolean("defaults.bundle_in_containers");
     }
 
     /**

@@ -169,8 +169,8 @@ public class InventorySortService {
         }
 
         var prefs = plugin.getSortingPrefs();
-        boolean packEnabled = (playerMainStorage && prefs.getBundlePackInventory(p))
-                || (container && prefs.getBundlePackOthers(p));
+        boolean packEnabled = (playerMainStorage && prefs.getBundlePackInInventory(p))
+                || (container && prefs.getBundlePackInContainers(p));
         BundleBlacklist blacklist = packEnabled
                 ? new BundleBlacklist(prefs.getBundleBlacklist(p), prefs.getBundleBlacklistNames(p))
                 : BundleBlacklist.EMPTY;

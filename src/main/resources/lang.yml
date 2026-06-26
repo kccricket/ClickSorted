@@ -48,12 +48,13 @@ prefResetInvalid: "Your saved <aqua><pref><white> value, <aqua><value><white>, w
 # Placeholders: <value> (what the player typed), <valid> (comma-joined valid options)
 invalidValue: "<red>Invalid value '<value>'. Valid values: <valid>."
 
-# Command feedback — bundle packing toggles (/clicksorted bundle inventory|others on|off)
+# Command feedback — bundle packing toggles (/clicksorted bundle in-inventory|in-containers yes|no)
 # Placeholder: <status> (ENABLED or DISABLED)
-setBundlePackInventoryStatus: "Bundle packing in your inventory is now <aqua><status><white>."
-setBundlePackOthersStatus: "Bundle packing in other containers is now <aqua><status><white>."
+setBundlePackEnabledStatus: "Bundle packing is now <aqua><status><white> for you (inventory and containers)."
+setBundlePackInInventoryStatus: "Bundle packing in your inventory is now <aqua><status><white>."
+setBundlePackInContainersStatus: "Bundle packing in other containers is now <aqua><status><white>."
 
-# Command feedback — bundle stack limit (/clicksorted bundle stacklimit <n|off>)
+# Command feedback — bundle stack limit (/clicksorted bundle stack-limit <n|off>)
 # Placeholder: <limit> (max distinct entries per bundle, or "off" for weight-only)
 setBundleStackLimitStatus: "Your <aqua>bundle stack limit<white> is now <aqua><limit><white>."
 
@@ -102,6 +103,17 @@ statusStartCorner: "Start corner: <corner>"
 statusFillAxis: "Fill direction: <axis>"
 # Placeholder: <status> (ENABLED or DISABLED)
 statusHover: "Sort over items: <status>"
+# Placeholder: <status> (ENABLED or DISABLED)
+statusBundleInInventory: "Bundle (inventory): <status>"
+# Placeholder: <status> (ENABLED or DISABLED)
+statusBundleInContainers: "Bundle (containers): <status>"
+# Placeholder: <limit> (integer, or "off")
+statusBundleStackLimit: "Bundle stack limit: <limit>"
+# Placeholder: <list> (comma-separated material names)
+statusBundleBlacklistMaterials: "Bundle blacklist (materials): <list>"
+# Placeholder: <list> (comma-separated display-name entries)
+statusBundleBlacklistNames: "Bundle blacklist (names): <list>"
+statusBundleBlacklistEmpty: "Bundle blacklist: (empty)"
 
 # Command feedback — debug level
 # Placeholder: <level>

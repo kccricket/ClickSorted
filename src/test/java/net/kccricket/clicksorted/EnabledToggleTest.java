@@ -68,11 +68,11 @@ class EnabledToggleTest extends AbstractClickSortedTest {
         assertTrue(plugin.getSortingPrefs().getEnabled(player),
                 "Enabled should be true by default");
 
-        server.dispatchCommand(player, "clicksorted set enabled off");
+        server.dispatchCommand(player, "clicksorted sort enabled off");
         assertFalse(plugin.getSortingPrefs().getEnabled(player));
         assertMessageSent(drainMessageList(player), "MSG.setEnabledStatus", "DISABLED");
 
-        server.dispatchCommand(player, "clicksorted set enabled on");
+        server.dispatchCommand(player, "clicksorted sort enabled on");
         assertTrue(plugin.getSortingPrefs().getEnabled(player));
         assertMessageSent(drainMessageList(player), "MSG.setEnabledStatus", "ENABLED");
     }

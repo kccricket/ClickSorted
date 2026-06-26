@@ -317,7 +317,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void blacklistedLooseStacksAreMergedButNotBundled() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
         plugin.getSortingPrefs().addToBundleBlacklist(player, Material.DIRT);
 
         // A bundle + two partial dirt stacks (should merge to one stack) + one cobblestone partial.
@@ -443,7 +443,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void blacklistedItemInBundleRemainsAfterSort() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
         plugin.getSortingPrefs().addToBundleBlacklist(player, Material.DIRT);
 
         // Start with dirt already inside the bundle.
@@ -463,7 +463,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void namedItemBlacklistedByName_staysLoose_plainPacksNormally() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
         plugin.getSortingPrefs().addToBundleBlacklistName(player, "Special Dirt");
 
         // One "Special Dirt" (named) and one plain dirt — same material.
@@ -499,7 +499,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void namedItemInsideBundle_blacklistedByName_retainedAfterSort() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
         plugin.getSortingPrefs().addToBundleBlacklistName(player, "Special Dirt");
 
         // Pre-load a bundle with a named dirt item.
@@ -621,7 +621,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void integration_blacklistedBundle_sortedNormallyButNotUsedAsBin() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
         plugin.getSortingPrefs().addToBundleBlacklist(player, Material.BUNDLE);
 
         // A pre-loaded bundle + loose cobblestone; bundle is blacklisted by material.
