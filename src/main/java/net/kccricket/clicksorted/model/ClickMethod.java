@@ -20,6 +20,11 @@ public enum ClickMethod {
         };
     }
 
+    /** Returns true when this method forces a specific hover setting, hiding the allow-on-hover command. */
+    public boolean governsHover() {
+        return this == SINGLE_CLICK || this == CONTROL_DROP;
+    }
+
     /**
      * @return true if triggering this method requires cancelling the originating click event
      *         (SWAP would swap the offhand item; CONTROL_DROP would drop the hovered item;

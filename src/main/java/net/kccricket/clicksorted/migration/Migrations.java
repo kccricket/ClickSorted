@@ -118,8 +118,8 @@ public final class Migrations {
     private static final List<Migration> SHARED = List.of(
             renameKey("click",            "click_mode"),         // PDC-only in practice; no-op on config
             renameKey("sort",             "sort_mode"),           // PDC-only in practice; no-op on config
-            renameBooleanKey("bundle_inventory", "bundle_in_inventory"), // renamed in refactor/reorganize-commands
-            renameBooleanKey("bundle_others",    "bundle_in_containers"),
+            renameBooleanKey("bundle_inventory", "bundle_in_inventory"), // PDC-only in practice; no-op on config
+            renameBooleanKey("bundle_others",    "bundle_in_containers"), // PDC-only in practice; no-op on config
             remap("click_mode",      CLICK_METHOD),
             remap("start_corner",    START_CORNER),
             remap("fill_axis",       FILL_AXIS),

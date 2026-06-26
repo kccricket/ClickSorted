@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class BundleCommandTest extends AbstractClickSortedTest {
 
     // -------------------------------------------------------------------------
-    // bundle in-inventory <yes|no>
+    // bundle enabled in-inventory <yes|no>
     // -------------------------------------------------------------------------
 
     @Test
@@ -25,10 +25,10 @@ class BundleCommandTest extends AbstractClickSortedTest {
         PlayerMock player = addOpPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
-        server.dispatchCommand(player, "clicksorted bundle in-inventory on");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-inventory on");
         assertTrue(prefs.getBundlePackInInventory(player), "'on' should enable inventory packing");
 
-        server.dispatchCommand(player, "clicksorted bundle in-inventory off");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-inventory off");
         assertFalse(prefs.getBundlePackInInventory(player), "'off' should disable inventory packing");
     }
 
@@ -37,13 +37,13 @@ class BundleCommandTest extends AbstractClickSortedTest {
         PlayerMock player = addOpPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
-        server.dispatchCommand(player, "clicksorted bundle in-inventory enable");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-inventory enable");
         assertTrue(prefs.getBundlePackInInventory(player));
-        server.dispatchCommand(player, "clicksorted bundle in-inventory disable");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-inventory disable");
         assertFalse(prefs.getBundlePackInInventory(player));
-        server.dispatchCommand(player, "clicksorted bundle in-inventory true");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-inventory true");
         assertTrue(prefs.getBundlePackInInventory(player));
-        server.dispatchCommand(player, "clicksorted bundle in-inventory false");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-inventory false");
         assertFalse(prefs.getBundlePackInInventory(player));
     }
 
@@ -51,12 +51,12 @@ class BundleCommandTest extends AbstractClickSortedTest {
     void bundleInventorySendsStatusMessage() {
         PlayerMock player = addOpPlayer("Alice");
         drainMessages(player);
-        server.dispatchCommand(player, "clicksorted bundle in-inventory on");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-inventory on");
         assertMessageSent(drainMessageList(player), "MSG.setBundlePackInInventoryStatus", "ENABLED");
     }
 
     // -------------------------------------------------------------------------
-    // bundle in-containers <yes|no>
+    // bundle enabled in-containers <yes|no>
     // -------------------------------------------------------------------------
 
     @Test
@@ -64,10 +64,10 @@ class BundleCommandTest extends AbstractClickSortedTest {
         PlayerMock player = addOpPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
-        server.dispatchCommand(player, "clicksorted bundle in-containers on");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-containers on");
         assertTrue(prefs.getBundlePackInContainers(player), "'on' should enable containers packing");
 
-        server.dispatchCommand(player, "clicksorted bundle in-containers off");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-containers off");
         assertFalse(prefs.getBundlePackInContainers(player), "'off' should disable containers packing");
     }
 
@@ -207,7 +207,7 @@ class BundleCommandTest extends AbstractClickSortedTest {
         boolean before = plugin.getSortingPrefs().getBundlePackInInventory(player);
         drainMessages(player);
 
-        server.dispatchCommand(player, "clicksorted bundle in-inventory GARBAGE");
+        server.dispatchCommand(player, "clicksorted bundle enabled in-inventory GARBAGE");
 
         assertEquals(before, plugin.getSortingPrefs().getBundlePackInInventory(player),
                 "Pref should be unchanged on invalid input");
@@ -234,7 +234,7 @@ class BundleCommandTest extends AbstractClickSortedTest {
     @Test
     void bundleCommandIsPlayerOnly() {
         assertDoesNotThrow(() ->
-                server.dispatchCommand(server.getConsoleSender(), "clicksorted bundle in-inventory on"));
+                server.dispatchCommand(server.getConsoleSender(), "clicksorted bundle enabled in-inventory on"));
     }
 
     @Test

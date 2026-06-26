@@ -8,6 +8,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.config.LangConfig;
 import net.kccricket.clicksorted.gui.BlacklistGuiHolder;
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.logging.DebugLevel;
@@ -315,7 +316,7 @@ public class ClickSortedCommands {
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.hover")
                         // Hide when the player's current click method governs hover automatically.
                         && (!(src.getExecutor() instanceof Player p)
-                                || !plugin.getSortingPrefs().getClickMethod(p).requiredSortOverItems().isPresent()))
+                                || !plugin.getSortingPrefs().getClickMethod(p).governsHover()))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
                     if (player == null || throttled(plugin, ctx.getSource())) {
@@ -427,22 +428,7 @@ public class ClickSortedCommands {
                     applyBundleEnabled(plugin, player, target);
                     return Command.SINGLE_SUCCESS;
                 })
-                .then(Commands.argument("state", StringArgumentType.word())
-                        .suggests((ctx, b) -> { b.suggest("yes"); b.suggest("no"); return b.buildFuture(); })
-                        .executes(ctx -> {
-                            Player player = requirePlayer(plugin, ctx);
-                            if (player == null || throttled(plugin, ctx.getSource())) {
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            String raw = StringArgumentType.getString(ctx, "state");
-                            Boolean state = parseState(raw);
-                            if (state == null) {
-                                sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            applyBundleEnabled(plugin, player, state);
-                            return Command.SINGLE_SUCCESS;
-                        }))
+                .then(boolStateArg(plugin, (player, state) -> applyBundleEnabled(plugin, player, state)))
                 .then(bundleToggle(plugin, "in-inventory", "setBundlePackInInventoryStatus",
                         (player, status) -> plugin.getSortingPrefs().setBundlePackInInventory(player, status)))
                 .then(bundleToggle(plugin, "in-containers", "setBundlePackInContainersStatus",
@@ -462,25 +448,33 @@ public class ClickSortedCommands {
             ClickSortedPlugin plugin, String literal, String langKey,
             java.util.function.BiConsumer<Player, Boolean> setter) {
         return Commands.literal(literal)
-                .then(Commands.argument("state", StringArgumentType.word())
-                        .suggests((ctx, b) -> { b.suggest("yes"); b.suggest("no"); return b.buildFuture(); })
-                        .executes(ctx -> {
-                            Player player = requirePlayer(plugin, ctx);
-                            if (player == null || throttled(plugin, ctx.getSource())) {
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            String raw = StringArgumentType.getString(ctx, "state");
-                            Boolean state = parseState(raw);
-                            if (state == null) {
-                                sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            setter.accept(player, state);
-                            MessageUtil.statusMessage(player,
-                                    plugin.getConfigManager().lang().getColoredMessage(langKey,
-                                            Placeholder.unparsed("status", enabledLabel(state))));
-                            return Command.SINGLE_SUCCESS;
-                        }));
+                .then(boolStateArg(plugin, (player, state) -> {
+                    setter.accept(player, state);
+                    MessageUtil.statusMessage(player,
+                            plugin.getConfigManager().lang().getColoredMessage(langKey,
+                                    Placeholder.unparsed("status", enabledLabel(state))));
+                }));
+    }
+
+    /** A {@code <yes|no>} argument node that parses and validates a boolean state, then calls {@code applyFn}. */
+    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String> boolStateArg(
+            ClickSortedPlugin plugin, java.util.function.BiConsumer<Player, Boolean> applyFn) {
+        return Commands.argument("state", StringArgumentType.word())
+                .suggests((ctx, b) -> { b.suggest("yes"); b.suggest("no"); return b.buildFuture(); })
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    String raw = StringArgumentType.getString(ctx, "state");
+                    Boolean state = parseState(raw);
+                    if (state == null) {
+                        sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    applyFn.accept(player, state);
+                    return Command.SINGLE_SUCCESS;
+                });
     }
 
     // -------------------------------------------------------------------------
@@ -530,22 +524,8 @@ public class ClickSortedCommands {
         int limit = prefs.getBundleStackLimit(player);
         MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleStackLimit",
                 Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
-        Set<Material> materials = prefs.getBundleBlacklist(player);
-        Set<String> names = prefs.getBundleBlacklistNames(player);
-        if (materials.isEmpty() && names.isEmpty()) {
-            MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleBlacklistEmpty"));
-        } else {
-            if (!materials.isEmpty()) {
-                String list = materials.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
-                MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleBlacklistMaterials",
-                        Placeholder.unparsed("list", list)));
-            }
-            if (!names.isEmpty()) {
-                String list = names.stream().sorted().collect(Collectors.joining(", "));
-                MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleBlacklistNames",
-                        Placeholder.unparsed("list", list)));
-            }
-        }
+        printBlacklistSection(player, lang, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
+                "statusBundleBlacklistEmpty", "statusBundleBlacklistMaterials", "statusBundleBlacklistNames");
     }
 
     private static int openBlacklistGui(ClickSortedPlugin plugin, CommandContext<CommandSourceStack> ctx) {
@@ -560,20 +540,25 @@ public class ClickSortedCommands {
     static void sendBlacklistStatus(ClickSortedPlugin plugin, Player player) {
         var lang = plugin.getConfigManager().lang();
         var prefs = plugin.getSortingPrefs();
-        Set<Material> materials = prefs.getBundleBlacklist(player);
-        Set<String> names = prefs.getBundleBlacklistNames(player);
+        printBlacklistSection(player, lang, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
+                "setBundleBlacklistEmpty", "setBundleBlacklistMaterialsList", "setBundleBlacklistNamesList");
+    }
+
+    private static void printBlacklistSection(Player player, LangConfig lang,
+            Set<Material> materials, Set<String> names,
+            String emptyKey, String materialsKey, String namesKey) {
         if (materials.isEmpty() && names.isEmpty()) {
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistEmpty"));
+            MessageUtil.statusMessage(player, lang.getColoredMessage(emptyKey));
             return;
         }
         if (!materials.isEmpty()) {
             String list = materials.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistMaterialsList",
+            MessageUtil.statusMessage(player, lang.getColoredMessage(materialsKey,
                     Placeholder.unparsed("list", list)));
         }
         if (!names.isEmpty()) {
             String list = names.stream().sorted().collect(Collectors.joining(", "));
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNamesList",
+            MessageUtil.statusMessage(player, lang.getColoredMessage(namesKey,
                     Placeholder.unparsed("list", list)));
         }
     }
