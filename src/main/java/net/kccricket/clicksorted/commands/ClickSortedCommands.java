@@ -46,10 +46,15 @@ public class ClickSortedCommands {
 
     public static LiteralCommandNode<CommandSourceStack> build(ClickSortedPlugin plugin) {
         return Commands.literal("clicksorted")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.enabled"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands"))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
                     if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    if (!player.hasPermission("clicksorted.commands.sort.enabled")) {
+                        MessageUtil.errorMessage(player,
+                                plugin.getConfigManager().lang().getColoredMessage("noPermission"));
                         return Command.SINGLE_SUCCESS;
                     }
                     applyEnabledSetting(plugin, player, !plugin.getSortingPrefs().getEnabled(player));
@@ -104,7 +109,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildEnabled(ClickSortedPlugin plugin) {
         return Commands.literal("enabled")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.enabled"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort.enabled"))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
                     if (player == null || throttled(plugin, ctx.getSource())) {
@@ -143,13 +148,13 @@ public class ClickSortedCommands {
     // -------------------------------------------------------------------------
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStartCorner(ClickSortedPlugin plugin) {
-        return enumPref(plugin, "start-corner", "clicksorted.commands.sort", "corner",
+        return enumPref(plugin, "start-corner", "clicksorted.commands.sort.start-corner", "corner",
                 StartCorner.values(), "setStartCornerTo", "corner",
                 (player, corner) -> plugin.getSortingPrefs().setStartCorner(player, corner));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildFillAxis(ClickSortedPlugin plugin) {
-        return enumPref(plugin, "fill-axis", "clicksorted.commands.sort", "axis",
+        return enumPref(plugin, "fill-axis", "clicksorted.commands.sort.fill-axis", "axis",
                 FillAxis.values(), "setFillAxisTo", "axis",
                 (player, axis) -> plugin.getSortingPrefs().setFillAxis(player, axis));
     }
@@ -244,7 +249,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSortMethod(ClickSortedPlugin plugin) {
         return Commands.literal("method")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort.method"))
                 .then(Commands.argument("method", StringArgumentType.word())
                         .suggests((ctx, builder) -> suggestEnum(builder, SortingMethod.values(), SortingMethod::isAvailable))
                         .executes(ctx -> {
@@ -279,7 +284,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildClickMethod(ClickSortedPlugin plugin) {
         return Commands.literal("method")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.click"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.click.method"))
                 .then(Commands.argument("method", StringArgumentType.word())
                         .suggests((ctx, builder) -> suggestEnum(builder, ClickMethod.values(), m -> true))
                         .executes(ctx -> {
@@ -314,7 +319,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildHover(ClickSortedPlugin plugin) {
         return Commands.literal("allow-on-hover")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.hover")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.click.hover")
                         // Hide when the player's current click method governs hover automatically.
                         && (!(src.getExecutor() instanceof Player p)
                                 || !plugin.getSortingPrefs().getClickMethod(p).governsHover()))
@@ -750,7 +755,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildReload(ClickSortedPlugin plugin) {
         return Commands.literal("reload")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.reload"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.reload"))
                 .executes(ctx -> {
                     try {
                         plugin.getConfigManager().reloadAll();
@@ -777,7 +782,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildGetcfg(ClickSortedPlugin plugin) {
         return Commands.literal("config")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.getcfg"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.config"))
                 .executes(ctx -> {
                     for (String key : plugin.getConfig().getKeys(true)) {
                         if (!plugin.getConfig().isConfigurationSection(key)) {
@@ -795,7 +800,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildDebug(ClickSortedPlugin plugin) {
         return Commands.literal("debug")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.debug"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.debug"))
                 .executes(ctx -> {
                     DebugLevel next = Log.getDebugLevel() == DebugLevel.OFF ? DebugLevel.DEBUG : DebugLevel.OFF;
                     Log.setDebugLevel(next);
@@ -833,7 +838,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBenchmark(ClickSortedPlugin plugin) {
         return Commands.literal("benchmark")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.benchmark"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.benchmark"))
                 .executes(ctx -> runBenchmark(plugin, ctx.getSource(), BENCH_DEFAULT_ITERATIONS))
                 .then(Commands.argument("iterations", IntegerArgumentType.integer(BENCH_MIN_ITERATIONS, BENCH_MAX_ITERATIONS))
                         .executes(ctx -> runBenchmark(plugin, ctx.getSource(),

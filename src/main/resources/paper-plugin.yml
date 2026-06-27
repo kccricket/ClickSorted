@@ -9,57 +9,87 @@ folia-supported: true
 
 permissions:
   clicksorted.admin:
-    description: Full admin control for ClickSorted
+    description: Full admin control for ClickSorted (grants all command, sort, and bundle nodes)
     default: op
     children:
-      clicksorted.commands.reload: true
-      clicksorted.commands.enabled: true
+      clicksorted.commands: true
+      clicksorted.admin.commands: true
+      clicksorted.sort: true
+      clicksorted.bundle: true
+      clicksorted.throttle.bypass: true
+  clicksorted.commands:
+    description: Access to the /clicksorted command tree (umbrella; gates the root literal)
+    default: true
+    children:
       clicksorted.commands.sort: true
       clicksorted.commands.click: true
-      clicksorted.commands.hover: true
-      clicksorted.commands.lock: true
       clicksorted.commands.bundle: true
+      clicksorted.commands.lock: true
       clicksorted.commands.status: true
-      clicksorted.commands.getcfg: true
-      clicksorted.commands.debug: true
-      clicksorted.commands.benchmark: true
-      clicksorted.throttle.bypass: true
-  clicksorted.commands.enabled:
-    description: Allow toggling click-sorting on/off (/clicksorted sort enabled, bare /clicksorted)
+  clicksorted.commands.sort:
+    description: Access to /clicksorted sort subcommands
     default: true
-  clicksorted.commands.reload:
-    description: Allow use of the /clicksorted admin reload command
+    children:
+      clicksorted.commands.sort.enabled: true
+      clicksorted.commands.sort.method: true
+      clicksorted.commands.sort.start-corner: true
+      clicksorted.commands.sort.fill-axis: true
+  clicksorted.commands.sort.enabled:
+    description: Allow toggling click-sorting on/off (/clicksorted and /clicksorted sort enabled)
+    default: true
+  clicksorted.commands.sort.method:
+    description: Allow use of /clicksorted sort method
+    default: true
+  clicksorted.commands.sort.start-corner:
+    description: Allow use of /clicksorted sort start-corner
+    default: true
+  clicksorted.commands.sort.fill-axis:
+    description: Allow use of /clicksorted sort fill-axis
+    default: true
+  clicksorted.commands.click:
+    description: Access to /clicksorted click subcommands
+    default: true
+    children:
+      clicksorted.commands.click.method: true
+      clicksorted.commands.click.hover: true
+  clicksorted.commands.click.method:
+    description: Allow use of /clicksorted click method
+    default: true
+  clicksorted.commands.click.hover:
+    description: Allow use of /clicksorted click allow-on-hover
+    default: true
+  clicksorted.commands.bundle:
+    description: Allow use of /clicksorted bundle subcommands
+    default: true
+  clicksorted.commands.lock:
+    description: Allow use of /clicksorted lock-slots
+    default: true
+  clicksorted.commands.status:
+    description: Allow use of /clicksorted status
+    default: true
+  clicksorted.admin.commands:
+    description: Access to /clicksorted admin subcommands
     default: op
-  clicksorted.commands.getcfg:
-    description: Allow use of the /clicksorted admin config command
+    children:
+      clicksorted.admin.commands.reload: true
+      clicksorted.admin.commands.config: true
+      clicksorted.admin.commands.debug: true
+      clicksorted.admin.commands.benchmark: true
+  clicksorted.admin.commands.reload:
+    description: Allow use of /clicksorted admin reload
     default: op
-  clicksorted.commands.debug:
-    description: Allow use of the /clicksorted admin debug command
+  clicksorted.admin.commands.config:
+    description: Allow use of /clicksorted admin config
     default: op
-  clicksorted.commands.benchmark:
-    description: Allow use of the /clicksorted admin benchmark command
+  clicksorted.admin.commands.debug:
+    description: Allow use of /clicksorted admin debug
+    default: op
+  clicksorted.admin.commands.benchmark:
+    description: Allow use of /clicksorted admin benchmark
     default: op
   clicksorted.throttle.bypass:
     description: Exempt from the per-player action throttle (action_cooldown_ms)
     default: op
-  clicksorted.commands.sort:
-    description: Allow use of the /clicksorted sort subcommands
-    default: true
-  clicksorted.commands.click:
-    description: Allow use of the /clicksorted click method command
-    default: true
-  clicksorted.commands.hover:
-    description: Allow use of the /clicksorted click allow-on-hover command
-    default: true
-  clicksorted.commands.lock:
-    description: Allow use of the /clicksorted lock-slots command
-    default: true
-  clicksorted.commands.bundle:
-    description: Allow use of the /clicksorted bundle subcommands
-    default: true
-  clicksorted.commands.status:
-    description: Allow use of the /clicksorted status command
-    default: true
   clicksorted.sort:
     description: Allow all kinds of inventories to be click-sorted
     default: true
@@ -75,4 +105,16 @@ permissions:
     default: true
   clicksorted.sort.container:
     description: Allow container to be click-sorted
+    default: true
+  clicksorted.bundle:
+    description: Allow bundle packing during a sort (both inventory and containers)
+    default: true
+    children:
+      clicksorted.bundle.inventory: true
+      clicksorted.bundle.container: true
+  clicksorted.bundle.inventory:
+    description: Allow bundle packing in the player's main inventory during a sort
+    default: true
+  clicksorted.bundle.container:
+    description: Allow bundle packing in containers during a sort
     default: true

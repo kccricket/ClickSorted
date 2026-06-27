@@ -93,4 +93,29 @@ class EnabledToggleTest extends AbstractClickSortedTest {
         assertEquals(initial, plugin.getSortingPrefs().getEnabled(player),
                 "Second bare /clicksorted must toggle back");
     }
+
+    @Test
+    void denyingSortEnabledPermissionBlocksToggleButLeavesStatusAndBundleAccessible() {
+        PlayerMock player = server.addPlayer("Restricted");
+        // Keep the umbrella clicksorted.commands node (default true), revoke only sort.enabled.
+        player.addAttachment(plugin, "clicksorted.commands.sort.enabled", false);
+        player.recalculatePermissions();
+        drainMessages(player);
+
+        boolean initial = plugin.getSortingPrefs().getEnabled(player);
+
+        // Bare /clicksorted — should refuse with no-permission message, not toggle.
+        server.dispatchCommand(player, "clicksorted");
+        assertEquals(initial, plugin.getSortingPrefs().getEnabled(player),
+                "Enabled state must not change when sort.enabled is denied");
+        assertMessageSent(drainMessageList(player), "MSG.noPermission");
+
+        // /clicksorted status — the root is still accessible (not pruned), so status should work.
+        server.dispatchCommand(player, "clicksorted status");
+        assertMessageSent(drainMessageList(player), "MSG.statusEnabled");
+
+        // /clicksorted bundle enabled — bundle subcommand should also still be accessible.
+        server.dispatchCommand(player, "clicksorted bundle enabled yes");
+        assertMessageSent(drainMessageList(player), "MSG.setBundlePackEnabledStatus");
+    }
 }

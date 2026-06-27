@@ -228,6 +228,57 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     }
 
     // -------------------------------------------------------------------------
+    // Bundle action permission gating
+    // -------------------------------------------------------------------------
+
+    @Test
+    void denyingBundleContainerPermissionBlocksChestPacking() {
+        PlayerMock player = server.addPlayer("PackDenied");
+        plugin.getSortingPrefs().setBundlePackInContainers(player, true);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+        // Revoke the container bundle-pack action node, keep inventory node intact.
+        player.addAttachment(plugin, "clicksorted.bundle.container", false);
+        player.recalculatePermissions();
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, new ItemStack(Material.BUNDLE, 1));
+        chest.setItem(1, new ItemStack(Material.COBBLESTONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        fireClick(view, ClickType.SWAP_OFFHAND, 0);
+
+        // Items are sorted (cobblestone is consolidated) but the bundle stays empty.
+        ItemStack bundle = findBundle(chest, 0, chest.getSize());
+        assertNotNull(bundle, "Bundle should still be in the chest");
+        assertTrue(((BundleMeta) bundle.getItemMeta()).getItems().isEmpty(),
+                "Bundle must stay empty when clicksorted.bundle.container is denied");
+        assertEquals(1, looseSlots(chest, 0, chest.getSize(), Material.COBBLESTONE),
+                "Cobblestone should remain loose");
+    }
+
+    @Test
+    void denyingBundleContainerPermissionDoesNotAffectInventoryPacking() {
+        PlayerMock player = addOpPlayer("PackInventoryOnly");
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
+        // Revoke only the container bundle-pack node; inventory node stays granted (op has it via default).
+        player.addAttachment(plugin, "clicksorted.bundle.container", false);
+        player.recalculatePermissions();
+
+        player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
+        player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 10));
+
+        sortMainStorage(player);
+
+        // Packing in the player's own inventory should still work.
+        assertEquals(0, looseSlots(player.getInventory(), 9, 36, Material.COBBLESTONE),
+                "Inventory packing must still work when only bundle.container is denied");
+        ItemStack bundle = findBundle(player.getInventory(), 9, 36);
+        assertNotNull(bundle);
+        assertTrue(bundleHas(bundle, Material.COBBLESTONE),
+                "Bundle should hold the packed partial");
+    }
+
+    // -------------------------------------------------------------------------
     // Container ("others") packing
     // -------------------------------------------------------------------------
 

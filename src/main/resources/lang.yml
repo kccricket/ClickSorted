@@ -143,6 +143,9 @@ instructionShiftRightClick: "Shift-right-click a slot to sort."
 # Error shown when a player-only command is run from the console
 notFromConsole: "This command can only be used by a player."
 
+# Error shown when a player lacks permission for an action
+noPermission: "<red>You don't have permission to do that."
+
 # Shown (rate-limited) when a player triggers actions faster than action_cooldown_ms allows
 actionTooFast: "<red>Slow down — you're acting too quickly."
 

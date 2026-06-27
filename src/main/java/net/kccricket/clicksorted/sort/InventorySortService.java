@@ -169,8 +169,11 @@ public class InventorySortService {
         }
 
         var prefs = plugin.getSortingPrefs();
-        boolean packEnabled = (playerMainStorage && prefs.getBundlePackInInventory(p))
-                || (container && prefs.getBundlePackInContainers(p));
+        boolean packEnabled =
+                (playerMainStorage && prefs.getBundlePackInInventory(p)
+                        && Permissions.isAllowedTo(p, "clicksorted.bundle.inventory"))
+                || (container && prefs.getBundlePackInContainers(p)
+                        && Permissions.isAllowedTo(p, "clicksorted.bundle.container"));
         BundleBlacklist blacklist = packEnabled
                 ? new BundleBlacklist(prefs.getBundleBlacklist(p), prefs.getBundleBlacklistNames(p))
                 : BundleBlacklist.EMPTY;
