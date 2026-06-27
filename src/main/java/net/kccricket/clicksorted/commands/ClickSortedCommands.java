@@ -12,6 +12,7 @@ import net.kccricket.clicksorted.config.LangConfig;
 import net.kccricket.clicksorted.gui.BlacklistGuiHolder;
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.logging.DebugLevel;
+import net.kccricket.clicksorted.migration.MigrationException;
 import net.kccricket.clicksorted.migration.PreferenceRepair;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
@@ -751,7 +752,16 @@ public class ClickSortedCommands {
         return Commands.literal("reload")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.reload"))
                 .executes(ctx -> {
-                    plugin.getConfigManager().reloadAll();
+                    try {
+                        plugin.getConfigManager().reloadAll();
+                    } catch (MigrationException e) {
+                        Log.severe("Config migration failed on reload; keeping previous configuration.", e);
+                        Throwable root = e.getCause() != null ? e.getCause() : e;
+                        MessageUtil.statusMessage(ctx.getSource().getSender(),
+                                plugin.getConfigManager().lang().getColoredMessage("configReloadFailed",
+                                        Placeholder.unparsed("reason", String.valueOf(root.getMessage()))));
+                        return Command.SINGLE_SUCCESS;
+                    }
                     if (plugin.getConfigManager().main().getCheckForUpdates()) {
                         plugin.getUpdateChecker().check();
                     }

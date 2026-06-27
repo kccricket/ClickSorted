@@ -123,6 +123,8 @@ invalidDebugLevel: "Invalid debug level '<level>'. Valid values: OFF, DEBUG, TRA
 
 # Command feedback — reload
 configReloaded: "Configuration reloaded."
+# Placeholder: <reason>
+configReloadFailed: "<red>Configuration reload failed: <reason>. The previous configuration is still active — see the server console for the full stack trace."
 
 # Inventory overflow messages
 invOverFlow: "Inventory overflow — items were not sorted."

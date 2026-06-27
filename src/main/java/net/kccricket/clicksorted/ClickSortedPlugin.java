@@ -17,6 +17,7 @@ import net.kccricket.clicksorted.config.ConfigManager;
 import net.kccricket.clicksorted.gui.BlacklistGuiListener;
 import net.kccricket.clicksorted.gui.LockGuiListener;
 import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.clicksorted.migration.MigrationException;
 import net.kccricket.clicksorted.migration.Migrations;
 import net.kccricket.clicksorted.migration.PlayerMigrationListener;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
@@ -52,7 +53,14 @@ public class ClickSortedPlugin extends JavaPlugin {
         migrations = new Migrations(this);
 
         configManager = new ConfigManager(this);
-        configManager.loadAll();
+        try {
+            configManager.loadAll();
+        } catch (MigrationException e) {
+            Log.severe("Config migration failed; disabling ClickSorted. Fix or remove the offending "
+                    + "config value, then restart.", e);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         MessageUtil.init(configManager);
 
         if (getConfig().getBoolean("enable_metrics", true)) {

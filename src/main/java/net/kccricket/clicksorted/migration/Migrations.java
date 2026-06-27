@@ -145,15 +145,19 @@ public final class Migrations {
      *         structural transform made a change
      */
     public boolean migrate(ConfigurationSection config) {
-        boolean changed = false;
-        for (ConfigTransform transform : CONFIG_TRANSFORMS) {
-            changed |= transform.apply(config);
+        try {
+            boolean changed = false;
+            for (ConfigTransform transform : CONFIG_TRANSFORMS) {
+                changed |= transform.apply(config);
+            }
+            for (String path : DEPRECATED_ROOT_PATHS) {
+                changed |= removePath(config, path);
+            }
+            changed |= run(SHARED, new Store.ConfigStore(config));
+            return changed;
+        } catch (RuntimeException e) {
+            throw new MigrationException("Config migration failed", e);
         }
-        for (String path : DEPRECATED_ROOT_PATHS) {
-            changed |= removePath(config, path);
-        }
-        changed |= run(SHARED, new Store.ConfigStore(config));
-        return changed;
     }
 
     /**
