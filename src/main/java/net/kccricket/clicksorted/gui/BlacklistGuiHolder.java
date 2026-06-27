@@ -186,11 +186,11 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         }
 
         // Bottom row: fill all with filler, then overlay controls.
-        ItemStack filler = buildFiller(lang);
+        ItemStack filler = ClickSortedHolder.buildFiller(lang);
         for (int slot = PAGE_SIZE; slot < GUI_SIZE; slot++) {
             inventory.setItem(slot, filler.clone());
         }
-        inventory.setItem(SLOT_HELP, buildHelpBook(lang));
+        inventory.setItem(SLOT_HELP, ClickSortedHolder.buildHelpBook(lang, "blacklistHelpBookLore"));
         if (page > 0) {
             inventory.setItem(SLOT_PREV, buildArrow(lang, false));
         }
@@ -231,23 +231,6 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
         item.setItemMeta(meta);
         return item;
-    }
-
-    private static ItemStack buildFiller(LangConfig lang) {
-        ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
-        ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("blacklistFillerName"));
-        pane.setItemMeta(meta);
-        return pane;
-    }
-
-    private static ItemStack buildHelpBook(LangConfig lang) {
-        ItemStack book = new ItemStack(Material.BOOK);
-        ItemMeta meta = book.getItemMeta();
-        meta.displayName(lang.getColoredMessage("blacklistHelpBookName"));
-        meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistHelpBookLore")));
-        book.setItemMeta(meta);
-        return book;
     }
 
     private static ItemStack buildArrow(LangConfig lang, boolean next) {

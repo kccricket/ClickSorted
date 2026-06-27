@@ -74,11 +74,11 @@ public class LockGuiHolder implements ClickSortedHolder {
         }
 
         // Row 4: divider panes, with the rightmost slot replaced by the help head
-        ItemStack divider = buildDividerPane(lang);
+        ItemStack divider = ClickSortedHolder.buildFiller(lang);
         for (int chestSlot = DIVIDER_START; chestSlot < DIVIDER_END - 1; chestSlot++) {
             inventory.setItem(chestSlot, divider.clone());
         }
-        inventory.setItem(DIVIDER_END - 1, buildHelpHead(lang));
+        inventory.setItem(DIVIDER_END - 1, ClickSortedHolder.buildHelpBook(lang, "lockHelpHeadLore"));
 
         // Row 5: hotbar slots 0-8 → chest slots 36-44
         for (int chestSlot = DIVIDER_END; chestSlot < GUI_SIZE; chestSlot++) {
@@ -141,23 +141,6 @@ public class LockGuiHolder implements ClickSortedHolder {
                 lang.getColoredMessage("lockPaneAdminLore")));
         pane.setItemMeta(meta);
         return pane;
-    }
-
-    private static ItemStack buildDividerPane(LangConfig lang) {
-        ItemStack pane = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("lockDividerName"));
-        pane.setItemMeta(meta);
-        return pane;
-    }
-
-    private static ItemStack buildHelpHead(LangConfig lang) {
-        ItemStack book = new ItemStack(Material.BOOK);
-        ItemMeta meta = book.getItemMeta();
-        meta.displayName(lang.getColoredMessage("lockHelpHeadName"));
-        meta.lore(MessageUtil.toLore(lang.getColoredMessage("lockHelpHeadLore")));
-        book.setItemMeta(meta);
-        return book;
     }
 
     /**

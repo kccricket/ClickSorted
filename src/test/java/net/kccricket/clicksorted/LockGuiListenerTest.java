@@ -243,14 +243,14 @@ class LockGuiListenerTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void dividerSlotsAreGrayPanesExceptLast() {
+    void dividerSlotsAreBlackPanesExceptLast() {
         PlayerMock player = addOpPlayer("Alice");
         InventoryView view = openLockGui(player);
 
         for (int slot = 27; slot < 35; slot++) {
-            assertEquals(Material.GRAY_STAINED_GLASS_PANE,
+            assertEquals(Material.BLACK_STAINED_GLASS_PANE,
                     view.getTopInventory().getItem(slot).getType(),
-                    "Divider slot " + slot + " should be a gray pane");
+                    "Divider slot " + slot + " should be a black pane");
         }
         // Slot 35 (rightmost divider) is the help head.
         assertEquals(Material.BOOK,

@@ -77,15 +77,17 @@ setBundleBlacklistNameNotPresent: "Display name <aqua><name><white> is not in yo
 # Placeholder: <list> (comma-separated display names)
 setBundleBlacklistNamesList: "Blacklisted display names: <aqua><list><white>."
 
+# Shared GUI elements (used by all ClickSorted GUIs)
+# Display name for the inert black-pane filler slots.
+guiFillerName: "<!italic><dark_gray>--------"
+# Display name for all help/instructions book items.
+guiHelpBookName: "<!italic>Instructions"
+
 # Blacklist GUI (/clicksorted set bundle blacklist with no further arguments)
 blacklistGuiTitle: "<!italic>Bundle Blacklist"
 # Lore shown on every blacklist entry (both material and name entries).
 blacklistEntryLore: "<!italic><gray>Click to remove."
-# Display name for the black-pane filler slots in the control row.
-blacklistFillerName: "<!italic><dark_gray> "
-# Help book in the centre of the control row.
-blacklistHelpBookName: "<!italic>Bundle Blacklist"
-blacklistHelpBookLore: "<!italic><gray>Click an item in your inventory to add it to<newline>the blacklist. Click a listed entry to remove it."
+blacklistHelpBookLore: "<!italic><gray>Click an item in your inventory to add it to<newline>the blacklist. Click a listed entry to remove it.<newline><newline>Blacklisted item types are never packed into<newline>bundles, and blacklisted bundles colors are<newline>never used for packing."
 # Pagination arrow controls.
 blacklistArrowPrev: "<!italic>Previous page"
 blacklistArrowNext: "<!italic>Next page"
@@ -156,6 +158,4 @@ lockPaneSlotHotbar: "<!italic><gray>Hotbar slot <number>"
 lockPaneUnlockedLore: "<!italic><gray>Click to lock this slot."
 lockPaneLockedLore: "<!italic><gray>Click to unlock this slot."
 lockPaneAdminLore: "<!italic><gray>This slot is locked by the server and cannot be changed."
-lockDividerName: "<!italic><dark_gray>--------"
-lockHelpHeadName: "<!italic>What is this?"
 lockHelpHeadLore: "<!italic><gray>Locked inventory slots will not be sorted and<newline>bundles in a locked slot will not be packed."
