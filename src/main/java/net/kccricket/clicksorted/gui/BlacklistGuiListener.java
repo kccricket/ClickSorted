@@ -13,8 +13,7 @@ package net.kccricket.clicksorted.gui;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kccricket.clicksorted.text.ItemNames;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -23,7 +22,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 /**
  * Handles all inventory interaction for the {@link BlacklistGuiHolder} GUI.
@@ -37,7 +35,8 @@ import org.bukkit.inventory.meta.ItemMeta;
  *       entry from the player's blacklist and refresh the GUI.</li>
  *   <li>Click the <b>previous/next arrow</b> (slot 45 / 53) → navigate one page.</li>
  *   <li>Click an item in the <b>player's real inventory</b> (raw slot ≥ 54) → add the item
- *       to the blacklist by display name if it carries a custom name, otherwise by material.</li>
+ *       to the blacklist by name if it carries an explicit name (custom name, else item name),
+ *       otherwise by material.</li>
  *   <li>All other slots (help book, filler panes): no effect.</li>
  * </ul>
  *
@@ -124,10 +123,8 @@ public class BlacklistGuiListener implements Listener {
     }
 
     private void addItem(Player player, ItemStack item) {
-        ItemMeta meta = item.getItemMeta();
-        Component displayName = (meta != null && meta.hasDisplayName()) ? meta.displayName() : null;
-        if (displayName != null) {
-            String name = PlainTextComponentSerializer.plainText().serialize(displayName);
+        String name = ItemNames.explicitName(item);
+        if (name != null) {
             plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
         } else {
             plugin.getSortingPrefs().addToBundleBlacklist(player, item.getType());

@@ -203,6 +203,51 @@ class SortEngineTest extends AbstractClickSortedTest {
         assertEquals(2, feathers.stream().mapToInt(ItemStack::getAmount).sum(), "no feathers lost");
     }
 
+    @Test
+    void sortAndMerge_fungibleSameMaterialDifferentItemName_doNotMerge() {
+        // item_name is a separate data component from custom_name (anvil name). Two feathers with
+        // distinct item_name values (+ a plain one) must stay three discrete stacks — merging would
+        // silently destroy the data-pack/plugin base name.
+        ItemStack plain = new ItemStack(Material.FEATHER, 1);
+        ItemStack nameX = itemNamedItem(Material.FEATHER, 1, "X");
+        ItemStack nameY = itemNamedItem(Material.FEATHER, 1, "Y");
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(plain, nameX, nameY), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(3, feathers.size(), "plain + two differently item-named feathers must remain distinct");
+        assertEquals(3, feathers.stream().mapToInt(ItemStack::getAmount).sum(), "no feathers lost");
+    }
+
+    @Test
+    void sortAndMerge_fungibleSameItemName_merge() {
+        // The flip side: identical item_name still quantity-merges, and the merged stack keeps the
+        // item_name (guards against a future regression that would over-split).
+        ItemStack a = itemNamedItem(Material.FEATHER, 10, "X");
+        ItemStack b = itemNamedItem(Material.FEATHER, 5, "X");
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(a, b), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(1, feathers.size(), "same material and same item_name merge into one stack");
+        assertEquals(15, feathers.get(0).getAmount());
+        assertTrue(feathers.get(0).getItemMeta().hasItemName(), "merged stack retains the item_name");
+    }
+
+    @Test
+    void sortAndMerge_itemNameVsCustomNameSameText_doNotMerge() {
+        // An item_name feather and a custom_name feather with the SAME text are still distinct: they
+        // differ by which data component carries the name, so their ItemMeta differs.
+        ItemStack itemNamed = itemNamedItem(Material.FEATHER, 1, "Foo");
+        ItemStack customNamed = namedItem(Material.FEATHER, 1, "Foo");
+
+        List<ItemStack> out = SortEngine.sortAndMerge(Arrays.asList(itemNamed, customNamed), SortingMethod.NAME);
+
+        List<ItemStack> feathers = out.stream().filter(is -> is.getType() == Material.FEATHER).toList();
+        assertEquals(2, feathers.size(), "item_name vs custom_name with same text must stay distinct");
+        assertEquals(2, feathers.stream().mapToInt(ItemStack::getAmount).sum(), "no feathers lost");
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -243,6 +288,14 @@ class SortEngineTest extends AbstractClickSortedTest {
         ItemStack is = new ItemStack(mat, amount);
         ItemMeta meta = is.getItemMeta();
         meta.displayName(Component.text(name));
+        is.setItemMeta(meta);
+        return is;
+    }
+
+    private static ItemStack itemNamedItem(Material mat, int amount, String name) {
+        ItemStack is = new ItemStack(mat, amount);
+        ItemMeta meta = is.getItemMeta();
+        meta.itemName(Component.text(name));
         is.setItemMeta(meta);
         return is;
     }

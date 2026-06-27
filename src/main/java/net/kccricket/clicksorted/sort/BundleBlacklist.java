@@ -22,10 +22,11 @@ import java.util.Set;
  * Immutable snapshot of a player's bundle blacklist: materials and display names that must not be
  * packed into or unpacked from bundles during sorting.
  *
- * <p>A material entry blocks any item of that type regardless of its display name. A name entry blocks
- * any item whose resolved display name (plain-text, color-stripped) exactly matches — that is the
- * item's custom display name when it has one, otherwise its vanilla / {@code items.yml} name (see
- * {@link ItemNames#lookup}), so a name entry can target both renamed items and plain vanilla ones.
+ * <p>A material entry blocks any item of that type regardless of its name. A name entry blocks
+ * any item whose resolved name (plain-text, color-stripped) exactly matches, following the precedence
+ * custom name → item name (data-pack/plugin base name) → vanilla / {@code items.yml} name (see
+ * {@link ItemNames#lookup}), so a name entry can target renamed items, data-pack-named items, and
+ * plain vanilla ones.
  */
 public record BundleBlacklist(Set<Material> materials, Set<String> names) {
 

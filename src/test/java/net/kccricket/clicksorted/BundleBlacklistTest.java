@@ -1,5 +1,6 @@
 package net.kccricket.clicksorted;
 
+import net.kccricket.clicksorted.gui.BlacklistGuiHolder;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
@@ -78,6 +79,15 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         ItemStack item = new ItemStack(material, 1);
         var meta = item.getItemMeta();
         meta.displayName(net.kyori.adventure.text.Component.text(name));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    /** Build an ItemStack with an {@code item_name} (data-pack/plugin base name) but no custom name. */
+    private static ItemStack itemNamed(Material material, String name) {
+        ItemStack item = new ItemStack(material, 1);
+        var meta = item.getItemMeta();
+        meta.itemName(net.kyori.adventure.text.Component.text(name));
         item.setItemMeta(meta);
         return item;
     }
@@ -409,6 +419,16 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     }
 
     @Test
+    void blocksReturnsTrueForItemNamedItem() {
+        // item_name (data-pack/plugin base name) is resolved like a name via ItemsConfig.getItemName
+        // → ItemNames.explicitName, so a name entry blocks an item_name-only item too.
+        ItemStack sword = itemNamed(Material.DIAMOND_SWORD, "Magic Sword");
+        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        assertTrue(blacklist.blocks(sword),
+                "blocks() must return true for an item whose item_name is in the name set");
+    }
+
+    @Test
     void blocksReturnsFalseForSameMaterialDifferentName() {
         ItemStack plain = new ItemStack(Material.DIAMOND_SWORD, 1); // no custom name
         BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
@@ -612,6 +632,35 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         boolean cobbLoose = leftover.stream().anyMatch(
                 is -> is != null && is.getType() == Material.COBBLESTONE);
         assertFalse(cobbLoose, "Cobblestone must not appear loose when packed into the bundle");
+    }
+
+    // -------------------------------------------------------------------------
+    // BlacklistGuiListener — GUI add-path classifies item_name items as name entries
+    // -------------------------------------------------------------------------
+
+    @Test
+    void guiAddPath_itemNamedItem_addedAsNameEntry() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+
+        // Open the blacklist GUI so the listener recognises the holder, then click an item_name-only
+        // feather in the player's real inventory region (raw slot >= GUI_SIZE).
+        InventoryView view = player.openInventory(new BlacklistGuiHolder(plugin, player).getInventory());
+        ItemStack featherItemNamed = itemNamed(Material.FEATHER, "Fancy Feather");
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, BlacklistGuiHolder.GUI_SIZE,
+                ClickType.LEFT, InventoryAction.PICKUP_ALL) {
+            @Override
+            public ItemStack getCurrentItem() {
+                return featherItemNamed;
+            }
+        };
+        server.getPluginManager().callEvent(event);
+
+        assertTrue(prefs.getBundleBlacklistNames(player).contains("Fancy Feather"),
+                "item_name item must be added to the name blacklist by its item_name text");
+        assertFalse(prefs.getBundleBlacklist(player).contains(Material.FEATHER),
+                "item_name item must NOT be added as a material entry");
     }
 
     // -------------------------------------------------------------------------
