@@ -35,10 +35,9 @@ class ConservationTest extends AbstractClickSortedTest {
 
     @Test
     void heldCursorItemNotFoldedInOrLostOnSwapSort() {
-        // SWAP sort with a non-empty held cursor: the cursor item must not be folded into the
-        // inventory (duplication risk) and the existing inventory totals must be conserved.
-        // We override getCursor() on the event to simulate a held cursor from the sort code's
-        // perspective; the critical assertion is that DIAMOND never appears in the chest.
+        // SWAP sort with a non-empty held cursor: the cursor item must survive untouched —
+        // not folded into the inventory (duplication risk) and not consumed (loss risk).
+        // openInventory is called first because it clears the cursor; setItemOnCursor must follow.
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setSortOverItems(player, true);
 
@@ -47,15 +46,12 @@ class ConservationTest extends AbstractClickSortedTest {
         chest.setItem(1, stack(Material.STONE, 10));
         chest.setItem(2, stack(Material.DIRT, 3));
 
-        // DIAMOND on the cursor — must never appear in the chest after the sort.
-        ItemStack cursor = stack(Material.DIAMOND, 1);
-
         InventoryView view = player.openInventory(chest);
-        InventoryClickEvent event = new InventoryClickEvent(
-                view, InventoryType.SlotType.CONTAINER, 0, ClickType.SWAP_OFFHAND, InventoryAction.UNKNOWN) {
-            @Override public ItemStack getCursor() { return cursor; }
-        };
-        server.getPluginManager().callEvent(event);
+
+        // DIAMOND on the cursor — must survive the sort unchanged.
+        player.setItemOnCursor(stack(Material.DIAMOND, 1));
+
+        InventoryClickEvent event = fireClick(view, ClickType.SWAP_OFFHAND, 0);
 
         assertTrue(event.isCancelled(), "SWAP sort must cancel the event");
 
@@ -68,6 +64,12 @@ class ConservationTest extends AbstractClickSortedTest {
         // Inventory totals conserved (STONE merged, DIRT unchanged).
         assertEquals(15, invAfter.getOrDefault(Material.STONE, 0), "STONE total must be conserved");
         assertEquals(3, invAfter.getOrDefault(Material.DIRT, 0), "DIRT total must be conserved");
+
+        // Cursor must be intact — the sort must not consume or zero the held item.
+        ItemStack cursorAfter = player.getItemOnCursor();
+        assertNotNull(cursorAfter, "cursor must still hold the DIAMOND after a cancelled SWAP sort");
+        assertEquals(Material.DIAMOND, cursorAfter.getType(), "cursor item type must be DIAMOND");
+        assertEquals(1, cursorAfter.getAmount(), "cursor item amount must be 1");
     }
 
     // -------------------------------------------------------------------------
@@ -148,7 +150,6 @@ class ConservationTest extends AbstractClickSortedTest {
         InventoryClickEvent throttledEvent = new InventoryClickEvent(
                 view, InventoryType.SlotType.CONTAINER, 0, ClickType.DOUBLE_CLICK, InventoryAction.UNKNOWN) {
             @Override public ItemStack getCurrentItem() { return new ItemStack(Material.AIR); }
-            @Override public ItemStack getCursor() { return lifted; }
         };
         server.getPluginManager().callEvent(throttledEvent);
 

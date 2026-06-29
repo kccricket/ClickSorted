@@ -408,7 +408,6 @@ class InventorySortTest extends AbstractClickSortedTest {
         InventoryClickEvent event = new InventoryClickEvent(
                 view, InventoryType.SlotType.CONTAINER, 0, ClickType.DOUBLE_CLICK, InventoryAction.UNKNOWN) {
             @Override public ItemStack getCurrentItem() { return new ItemStack(Material.AIR); }
-            @Override public ItemStack getCursor() { return lifted; }
         };
         callEvent(event);
 
