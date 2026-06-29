@@ -57,7 +57,7 @@ public class InventoryClickListener implements Listener {
         if (event.getInventory().getHolder() instanceof ClickSortedHolder) {
             return;
         }
-        if (!Permissions.isAllowedTo(player, "clicksorted.sort")) {
+        if (!Permissions.isAllowedTo(player, Permissions.PERM_MASTER)) {
             return;
         }
 
@@ -66,7 +66,10 @@ public class InventoryClickListener implements Listener {
 
         ClickMethod clickMethod = prefs.getClickMethod(player);
 
-        if (prefs.getEnabled(player) && clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
+        if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
+            if (!sortService.hasWork(event, player)) {
+                return;
+            }
             // "Sort over items" gate: unless enabled, sorting only fires on an empty slot. Some click
             // methods override the player's preference via ClickMethod.requiredSortOverItems():
             // SINGLE_CLICK forces it off (with it on, every empty-cursor LEFT click on an occupied slot

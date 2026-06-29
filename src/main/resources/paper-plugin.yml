@@ -8,6 +8,12 @@ api-version: 1.21.5
 folia-supported: true
 
 permissions:
+  clicksorted:
+    description: >-
+      Master kill-switch for all player-facing ClickSorted features: click-triggered sorting,
+      bundle packing, and player commands. Denying this node disables all of the above for that
+      player in one move. Does not affect admin access (clicksorted.admin.commands.*).
+    default: true
   clicksorted.admin:
     description: Full admin control for ClickSorted (grants all command, sort, and bundle nodes)
     default: op

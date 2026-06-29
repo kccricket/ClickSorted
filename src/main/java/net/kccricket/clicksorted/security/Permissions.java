@@ -7,6 +7,18 @@ import org.bukkit.permissions.Permissible;
 public class Permissions {
 
     // -------------------------------------------------------------------------
+    // Master kill-switch
+    // -------------------------------------------------------------------------
+
+    /**
+     * Top-level master kill-switch for all player-facing ClickSorted features (click-triggered
+     * sorting, bundle packing, and player commands). Default {@code true}. Denying this node
+     * disables everything for the player in one move; it has no effect on admin access, which
+     * is gated independently by {@code clicksorted.admin.commands.*}.
+     */
+    public static final String PERM_MASTER = "clicksorted";
+
+    // -------------------------------------------------------------------------
     // Admin-enforced "do not touch" blacklist permission-node prefixes
     // -------------------------------------------------------------------------
 

@@ -19,6 +19,7 @@ import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
+import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -52,7 +53,8 @@ public class ClickSortedCommands {
                     if (player == null || throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
-                    if (!player.hasPermission("clicksorted.commands.sort.enabled")) {
+                    if (!player.hasPermission(Permissions.PERM_MASTER)
+                            || !player.hasPermission("clicksorted.commands.sort.enabled")) {
                         MessageUtil.errorMessage(player,
                                 plugin.getConfigManager().lang().getColoredMessage("noPermission"));
                         return Command.SINGLE_SUCCESS;
@@ -87,6 +89,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildClick(ClickSortedPlugin plugin) {
         return Commands.literal("click")
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER))
                 .then(buildClickMethod(plugin))
                 .then(buildHover(plugin));
     }
@@ -97,6 +100,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSort(ClickSortedPlugin plugin) {
         return Commands.literal("sort")
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER))
                 .then(buildEnabled(plugin))
                 .then(buildSortMethod(plugin))
                 .then(buildStartCorner(plugin))
@@ -393,7 +397,8 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildLockSlots(ClickSortedPlugin plugin) {
         return Commands.literal("lock-slots")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.lock"))
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.lock"))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
                     if (player == null || throttled(plugin, ctx.getSource())) {
@@ -410,7 +415,8 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundle(ClickSortedPlugin plugin) {
         return Commands.literal("bundle")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.bundle"))
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.bundle"))
                 .then(buildBundleEnabled(plugin))
                 .then(buildBundleStackLimit(plugin))
                 .then(buildBundleBlacklist(plugin));
@@ -718,7 +724,8 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStatus(ClickSortedPlugin plugin) {
         return Commands.literal("status")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.status"))
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.status"))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
                     if (player == null) {
