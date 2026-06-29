@@ -28,6 +28,8 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class PlayerSortingPrefs {
@@ -40,8 +42,8 @@ public class PlayerSortingPrefs {
     private final NamespacedKey bundleInInventoryKey;
     private final NamespacedKey bundleInContainersKey;
     private final NamespacedKey bundleStackLimitKey;
-    private final NamespacedKey bundleBlacklistKey;
-    private final NamespacedKey bundleBlacklistNamesKey;
+    private final PdcStringSet<Material> bundleBlacklist;
+    private final PdcStringSet<String> bundleBlacklistNames;
     private final NamespacedKey startCornerKey;
     private final NamespacedKey fillAxisKey;
 
@@ -55,8 +57,14 @@ public class PlayerSortingPrefs {
         this.bundleInInventoryKey = new NamespacedKey(plugin, "bundle_in_inventory");
         this.bundleInContainersKey = new NamespacedKey(plugin, "bundle_in_containers");
         this.bundleStackLimitKey = new NamespacedKey(plugin, "bundle_stack_limit");
-        this.bundleBlacklistKey = new NamespacedKey(plugin, "bundle_blacklist");
-        this.bundleBlacklistNamesKey = new NamespacedKey(plugin, "bundle_blacklist_names");
+        this.bundleBlacklist = new PdcStringSet<>(
+                new NamespacedKey(plugin, "bundle_blacklist"), ",",
+                Material::matchMaterial, Material::name,
+                () -> EnumSet.noneOf(Material.class));
+        this.bundleBlacklistNames = new PdcStringSet<>(
+                new NamespacedKey(plugin, "bundle_blacklist_names"), "\n",
+                token -> token.isBlank() ? null : token, name -> name,
+                LinkedHashSet::new);
         this.startCornerKey = new NamespacedKey(plugin, "start_corner");
         this.fillAxisKey = new NamespacedKey(plugin, "fill_axis");
     }
@@ -174,62 +182,26 @@ public class PlayerSortingPrefs {
      * bundles during sorting. Unknown tokens (e.g. from a removed material) are silently dropped.
      * Returns an empty, unmodifiable set when no blacklist has been stored.
      */
-    public Set<Material> getBundleBlacklist(Player player) {
-        String stored = player.getPersistentDataContainer().get(bundleBlacklistKey, PersistentDataType.STRING);
-        if (stored == null || stored.isBlank()) {
-            return Set.of();
-        }
-        Set<Material> result = EnumSet.noneOf(Material.class);
-        for (String token : stored.split(",")) {
-            Material mat = Material.matchMaterial(token);
-            if (mat != null) {
-                result.add(mat);
-            }
-        }
-        return result.isEmpty() ? Set.of() : Set.copyOf(result);
-    }
+    public Set<Material> getBundleBlacklist(Player player) { return bundleBlacklist.get(player); }
 
     /**
      * Adds a material to the player's bundle blacklist.
      *
      * @return {@code true} if the material was newly added, {@code false} if it was already present
      */
-    public boolean addToBundleBlacklist(Player player, Material material) {
-        Set<Material> current = new HashSet<>(getBundleBlacklist(player));
-        boolean added = current.add(material);
-        if (added) {
-            setBundleBlacklist(player, current);
-        }
-        return added;
-    }
+    public boolean addToBundleBlacklist(Player player, Material material) { return bundleBlacklist.add(player, material); }
 
     /**
      * Removes a material from the player's bundle blacklist.
      *
      * @return {@code true} if the material was removed, {@code false} if it was not present
      */
-    public boolean removeFromBundleBlacklist(Player player, Material material) {
-        Set<Material> current = new HashSet<>(getBundleBlacklist(player));
-        boolean removed = current.remove(material);
-        if (removed) {
-            setBundleBlacklist(player, current);
-        }
-        return removed;
-    }
+    public boolean removeFromBundleBlacklist(Player player, Material material) { return bundleBlacklist.remove(player, material); }
 
     /** Clears all entries (materials and display names) from the player's bundle blacklist. */
     public void clearBundleBlacklist(Player player) {
-        player.getPersistentDataContainer().remove(bundleBlacklistKey);
-        player.getPersistentDataContainer().remove(bundleBlacklistNamesKey);
-    }
-
-    private void setBundleBlacklist(Player player, Set<Material> materials) {
-        if (materials.isEmpty()) {
-            player.getPersistentDataContainer().remove(bundleBlacklistKey);
-        } else {
-            String value = materials.stream().map(Material::name).collect(Collectors.joining(","));
-            player.getPersistentDataContainer().set(bundleBlacklistKey, PersistentDataType.STRING, value);
-        }
+        bundleBlacklist.clear(player);
+        bundleBlacklistNames.clear(player);
     }
 
     /**
@@ -237,54 +209,78 @@ public class PlayerSortingPrefs {
      * packed into or unpacked from bundles during sorting. Blank tokens are silently dropped.
      * Returns an empty, unmodifiable set when no name blacklist has been stored.
      */
-    public Set<String> getBundleBlacklistNames(Player player) {
-        String stored = player.getPersistentDataContainer().get(bundleBlacklistNamesKey, PersistentDataType.STRING);
-        if (stored == null || stored.isBlank()) {
-            return Set.of();
-        }
-        Set<String> result = new LinkedHashSet<>();
-        for (String token : stored.split("\n")) {
-            if (!token.isBlank()) {
-                result.add(token);
-            }
-        }
-        return result.isEmpty() ? Set.of() : Set.copyOf(result);
-    }
+    public Set<String> getBundleBlacklistNames(Player player) { return bundleBlacklistNames.get(player); }
 
     /**
      * Adds a display name to the player's bundle name blacklist.
      *
      * @return {@code true} if the name was newly added, {@code false} if it was already present
      */
-    public boolean addToBundleBlacklistName(Player player, String name) {
-        Set<String> current = new LinkedHashSet<>(getBundleBlacklistNames(player));
-        boolean added = current.add(name);
-        if (added) {
-            setBundleBlacklistNames(player, current);
-        }
-        return added;
-    }
+    public boolean addToBundleBlacklistName(Player player, String name) { return bundleBlacklistNames.add(player, name); }
 
     /**
      * Removes a display name from the player's bundle name blacklist.
      *
      * @return {@code true} if the name was removed, {@code false} if it was not present
      */
-    public boolean removeFromBundleBlacklistName(Player player, String name) {
-        Set<String> current = new LinkedHashSet<>(getBundleBlacklistNames(player));
-        boolean removed = current.remove(name);
-        if (removed) {
-            setBundleBlacklistNames(player, current);
-        }
-        return removed;
-    }
+    public boolean removeFromBundleBlacklistName(Player player, String name) { return bundleBlacklistNames.remove(player, name); }
 
-    private void setBundleBlacklistNames(Player player, Set<String> names) {
-        if (names.isEmpty()) {
-            player.getPersistentDataContainer().remove(bundleBlacklistNamesKey);
-        } else {
-            String value = String.join("\n", names);
-            player.getPersistentDataContainer().set(bundleBlacklistNamesKey, PersistentDataType.STRING, value);
+    /** A PDC-backed set of {@code T} serialized as a delimited string under one {@link NamespacedKey}. */
+    private static final class PdcStringSet<T> {
+        private final NamespacedKey key;
+        private final String delimiter;
+        private final Function<String, T> parse;   // returns null to skip an unparseable token
+        private final Function<T, String> format;
+        private final Supplier<Set<T>> newSet;     // factory for the mutable working set
+
+        PdcStringSet(NamespacedKey key, String delimiter,
+                     Function<String, T> parse, Function<T, String> format,
+                     Supplier<Set<T>> newSet) {
+            this.key = key;
+            this.delimiter = delimiter;
+            this.parse = parse;
+            this.format = format;
+            this.newSet = newSet;
+        }
+
+        Set<T> get(Player player) {
+            String stored = player.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+            if (stored == null || stored.isBlank()) return Set.of();
+            Set<T> result = newSet.get();
+            for (String token : stored.split(delimiter)) {
+                T v = parse.apply(token);
+                if (v != null) result.add(v);
+            }
+            return result.isEmpty() ? Set.of() : Set.copyOf(result);
+        }
+
+        boolean add(Player player, T value) {
+            Set<T> current = newSet.get();
+            current.addAll(get(player));
+            if (!current.add(value)) return false;
+            store(player, current);
+            return true;
+        }
+
+        boolean remove(Player player, T value) {
+            Set<T> current = newSet.get();
+            current.addAll(get(player));
+            if (!current.remove(value)) return false;
+            store(player, current);
+            return true;
+        }
+
+        void clear(Player player) {
+            player.getPersistentDataContainer().remove(key);
+        }
+
+        private void store(Player player, Set<T> values) {
+            if (values.isEmpty()) {
+                player.getPersistentDataContainer().remove(key);
+            } else {
+                String joined = values.stream().map(format).collect(Collectors.joining(delimiter));
+                player.getPersistentDataContainer().set(key, PersistentDataType.STRING, joined);
+            }
         }
     }
 
