@@ -26,6 +26,8 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -221,6 +223,11 @@ public class ClickSortedCommands {
      */
     static final java.util.function.Predicate<Material> SUGGESTABLE_MATERIAL =
             mat -> !mat.isLegacy() && mat.isItem();
+
+    private static final List<String> SUGGESTABLE_MATERIAL_NAMES = java.util.Arrays.stream(Material.values())
+            .filter(SUGGESTABLE_MATERIAL)
+            .map(m -> m.name().toLowerCase(Locale.ROOT))
+            .toList();
 
     /**
      * Suggests the lower-cased names of {@code values} that pass {@code include} and prefix-match the
@@ -433,8 +440,9 @@ public class ClickSortedCommands {
                     if (player == null || throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
-                    boolean inv = plugin.getSortingPrefs().getBundlePackInInventory(player);
-                    boolean cont = plugin.getSortingPrefs().getBundlePackInContainers(player);
+                    var prefs = plugin.getSortingPrefs();
+                    boolean inv = prefs.getBundlePackInInventory(player);
+                    boolean cont = prefs.getBundlePackInContainers(player);
                     // "On unless both already on" — mixed state (one on, one off) → both on.
                     boolean target = !(inv && cont);
                     applyBundleEnabled(plugin, player, target);
@@ -587,7 +595,13 @@ public class ClickSortedCommands {
                 .then(Commands.literal("add")
                         .then(Commands.literal("material")
                                 .then(Commands.argument("material", StringArgumentType.word())
-                                        .suggests((ctx, b) -> suggestEnum(b, Material.values(), SUGGESTABLE_MATERIAL))
+                                        .suggests((ctx, b) -> {
+                                            String prefix = b.getRemaining().toLowerCase(Locale.ROOT);
+                                            SUGGESTABLE_MATERIAL_NAMES.forEach(name -> {
+                                                if (name.startsWith(prefix)) b.suggest(name);
+                                            });
+                                            return b.buildFuture();
+                                        })
                                         .executes(ctx -> {
                                             Player player = requirePlayer(plugin, ctx);
                                             if (player == null || throttled(plugin, ctx.getSource())) {

@@ -14,7 +14,6 @@ package net.kccricket.clicksorted.gui;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
-import net.kccricket.clicksorted.sort.ProtectedSlots;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -44,7 +43,7 @@ public class LockGuiListener implements Listener {
         // getView().getTopInventory(): invoking methods on InventoryView from our own
         // bytecode breaks across versions where InventoryView is a class (≤1.20.6) vs an
         // interface (1.21+), throwing IncompatibleClassChangeError.
-        if (!(event.getInventory().getHolder() instanceof LockGuiHolder)) {
+        if (!(event.getInventory().getHolder() instanceof LockGuiHolder holder)) {
             return;
         }
 
@@ -67,7 +66,7 @@ public class LockGuiListener implements Listener {
         if (invSlot < 0) {
             return;
         }
-        if (ProtectedSlots.forSort(player, plugin.getConfigManager().main()).blocks(invSlot)) {
+        if (holder.isAdminLocked(invSlot)) {
             return;
         }
 

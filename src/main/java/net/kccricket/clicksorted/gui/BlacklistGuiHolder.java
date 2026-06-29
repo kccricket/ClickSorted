@@ -25,7 +25,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
@@ -79,8 +78,6 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
     private List<Entry> entries;
     // Current page index (0-based).
     private int page;
-    // Slot-to-entry mapping for the active page (null = empty slot).
-    private final Entry[] pageEntries = new Entry[PAGE_SIZE];
 
     public BlacklistGuiHolder(ClickSortedPlugin plugin, Player player) {
         this.plugin = plugin;
@@ -129,7 +126,8 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         if (guiSlot < 0 || guiSlot >= PAGE_SIZE) {
             return null;
         }
-        return pageEntries[guiSlot];
+        int idx = page * PAGE_SIZE + guiSlot;
+        return idx < entries.size() ? entries.get(idx) : null;
     }
 
     // --- Static helpers (exposed for tests) ---
@@ -172,7 +170,6 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         LangConfig lang = plugin.getConfigManager().lang();
 
         // Clear top slots.
-        Arrays.fill(pageEntries, null);
         for (int i = 0; i < PAGE_SIZE; i++) {
             inventory.setItem(i, null);
         }
@@ -180,9 +177,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         // Populate top slots with the current page's entries.
         int start = page * PAGE_SIZE;
         for (int i = 0; i < PAGE_SIZE && start + i < entries.size(); i++) {
-            Entry entry = entries.get(start + i);
-            pageEntries[i] = entry;
-            inventory.setItem(i, buildEntryItem(lang, entry));
+            inventory.setItem(i, buildEntryItem(lang, entries.get(start + i)));
         }
 
         // Bottom row: fill all with filler, then overlay controls.

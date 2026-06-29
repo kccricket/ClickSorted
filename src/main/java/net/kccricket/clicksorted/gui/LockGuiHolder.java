@@ -53,6 +53,7 @@ public class LockGuiHolder implements ClickSortedHolder {
     public static final int GUI_SIZE = 45;
 
     private final Inventory inventory;
+    private final ProtectedSlots admin;
 
     public LockGuiHolder(ClickSortedPlugin plugin, Player player) {
         LangConfig lang = plugin.getConfigManager().lang();
@@ -60,7 +61,7 @@ public class LockGuiHolder implements ClickSortedHolder {
                 lang.getColoredMessage("lockGuiTitle"));
 
         // Build admin-slot snapshot covering both config and permission channels for this player.
-        ProtectedSlots admin = ProtectedSlots.forSort(player, plugin.getConfigManager().main());
+        this.admin = ProtectedSlots.forSort(player, plugin.getConfigManager().main());
         Set<Integer> locked = plugin.getSortingPrefs().getLockedSlots(player);
 
         // Rows 1-3: main storage slots 9-35 → chest slots 0-26
@@ -141,6 +142,11 @@ public class LockGuiHolder implements ClickSortedHolder {
                 lang.getColoredMessage("lockPaneAdminLore")));
         pane.setItemMeta(meta);
         return pane;
+    }
+
+    /** Returns true if the given player inventory slot is admin-locked for this player. */
+    public boolean isAdminLocked(int invSlot) {
+        return admin.blocks(invSlot);
     }
 
     /**

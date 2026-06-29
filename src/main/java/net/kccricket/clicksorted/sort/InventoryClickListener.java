@@ -66,8 +66,9 @@ public class InventoryClickListener implements Listener {
 
         ClickMethod clickMethod = prefs.getClickMethod(player);
 
-        if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
-            if (!sortService.hasWork(event, player)) {
+        if (clickMethod.matchesSortTrigger(event)) {
+            InventorySortService.Target target = sortService.checkWork(event, player);
+            if (target == null) {
                 return;
             }
             // "Sort over items" gate: unless enabled, sorting only fires on an empty slot. Some click
@@ -96,7 +97,7 @@ public class InventoryClickListener implements Listener {
                 }
                 return;
             }
-            if (sortService.sortInventory(event, prefs.getSortingMethod(player)) && cancelVanilla) {
+            if (sortService.sortInventory(target, event, prefs.getSortingMethod(player)) && cancelVanilla) {
                 // Cancelling the event is sufficient to suppress the vanilla side-effect on all tested
                 // server versions (Paper 1.20.6 and 1.26.1.2); no explicit offhand resync is required.
                 event.setCancelled(true);
