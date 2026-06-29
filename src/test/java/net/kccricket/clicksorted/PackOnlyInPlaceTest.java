@@ -19,12 +19,15 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>Key invariants:
  * <ul>
- *   <li>Items never move to a slot that was empty before the trigger click.</li>
+ *   <li>Loose stacks are anchored to their lane; they consolidate within their own slots but
+ *       never move to an unrelated slot.</li>
  *   <li>Visible order of slots is unchanged (no re-layout).</li>
  *   <li>Same-material stacks consolidate within their existing slots (full stacks first,
  *       remainder last, trailing lane slots cleared).</li>
  *   <li>Bundle-eligible remainders pack into bundles already in the inventory;
  *       bundles stay in their original slots.</li>
+ *   <li>Items displaced from bundles or exceeding lane capacity fill free/freed slots
+ *       in ascending slot order; drops occur only when no free slot remains.</li>
  *   <li>When both sorting and packing are off, the trigger click is a complete no-op.</li>
  * </ul>
  */
@@ -71,6 +74,26 @@ class PackOnlyInPlaceTest extends AbstractClickSortedTest {
             if (is != null && is.getType() == mat) return true;
         }
         return false;
+    }
+
+    /** Total count of {@code mat} inside the given bundle's {@link BundleMeta}. */
+    private static int bundleCount(ItemStack bundleItem, Material mat) {
+        BundleMeta meta = (BundleMeta) bundleItem.getItemMeta();
+        int total = 0;
+        for (ItemStack is : meta.getItems()) {
+            if (is != null && is.getType() == mat) total += is.getAmount();
+        }
+        return total;
+    }
+
+    /** Total loose amount (sum of stack amounts, not slot count) of {@code mat} in slots [from, to). */
+    private static int looseCount(Inventory inv, int from, int to, Material mat) {
+        int total = 0;
+        for (int i = from; i < to; i++) {
+            ItemStack is = inv.getItem(i);
+            if (is != null && is.getType() == mat) total += is.getAmount();
+        }
+        return total;
     }
 
     private static int looseSlots(Inventory inv, int from, int to, Material mat) {
@@ -242,6 +265,159 @@ class PackOnlyInPlaceTest extends AbstractClickSortedTest {
         assertEquals(Material.BUNDLE, slot9.getType(), "Item at slot 9 should still be a bundle");
         assertTrue(bundleHas(slot9, Material.COBBLESTONE),
                 "Bundle should still contain its original cobblestone");
+    }
+
+    @Test
+    void fullBundleNoLoose_displacesToEmptySlot() {
+        // Bundle holds cobblestone x64 (full stack weight = 64 > MAX_PACK_WEIGHT = 32 → cannot
+        // repack into bundle). The packer leaves it as leftover → must land in the next free slot,
+        // not be dropped.
+        PlayerMock player = addOpPlayer("Ingrid");
+        plugin.getSortingPrefs().setEnabled(player, false);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
+
+        ItemStack bundle = new ItemStack(Material.BUNDLE, 1);
+        BundleMeta meta = (BundleMeta) bundle.getItemMeta();
+        meta.addItem(new ItemStack(Material.COBBLESTONE, 64));
+        bundle.setItemMeta(meta);
+        player.getInventory().setItem(9, bundle);
+        // Slots 10-35 are empty.
+
+        triggerMainStorage(player);
+
+        Inventory inv = player.getInventory();
+        // Bundle stays at slot 9 but is now empty (its contents were pooled and couldn't repack).
+        ItemStack slot9 = inv.getItem(9);
+        assertNotNull(slot9, "Bundle should remain at slot 9");
+        assertEquals(Material.BUNDLE, slot9.getType());
+        assertEquals(0, bundleCount(slot9, Material.COBBLESTONE), "Bundle should be empty after displacement");
+
+        // Displaced full stack lands in slot 10 (first free slot).
+        ItemStack slot10 = inv.getItem(10);
+        assertNotNull(slot10, "Displaced cobblestone should be at slot 10");
+        assertEquals(Material.COBBLESTONE, slot10.getType());
+        assertEquals(64, slot10.getAmount());
+
+        // Total loose cobblestone in main storage = 64, nothing dropped.
+        assertEquals(64, looseCount(inv, 9, 36, Material.COBBLESTONE), "Total loose cobblestone should be 64");
+        assertNull(inv.getItem(11), "Slot 11 should remain empty");
+    }
+
+    @Test
+    void bundleWithLooseCounterpart_conserves() {
+        // Bundle holds cobblestone x10; slot 10 has loose cobblestone x60.
+        // Pool total = 70 → 1 full stack (64) stays loose, remainder (6) repacks into bundle.
+        PlayerMock player = addOpPlayer("James");
+        plugin.getSortingPrefs().setEnabled(player, false);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
+
+        ItemStack bundle = new ItemStack(Material.BUNDLE, 1);
+        BundleMeta meta = (BundleMeta) bundle.getItemMeta();
+        meta.addItem(new ItemStack(Material.COBBLESTONE, 10));
+        bundle.setItemMeta(meta);
+        player.getInventory().setItem(9, bundle);
+        player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 60));
+
+        triggerMainStorage(player);
+
+        Inventory inv = player.getInventory();
+        // Loose slot (10) holds the full stack.
+        ItemStack slot10 = inv.getItem(10);
+        assertNotNull(slot10);
+        assertEquals(Material.COBBLESTONE, slot10.getType());
+        assertEquals(64, slot10.getAmount(), "Loose slot should hold full stack (64)");
+
+        // Bundle at slot 9 holds the remainder (6).
+        ItemStack slot9 = inv.getItem(9);
+        assertNotNull(slot9);
+        assertEquals(Material.BUNDLE, slot9.getType());
+        assertEquals(6, bundleCount(slot9, Material.COBBLESTONE), "Bundle should hold remainder (6)");
+
+        // Total conserved: 64 + 6 = 70.
+        assertEquals(70, looseCount(inv, 10, 11, Material.COBBLESTONE) + bundleCount(slot9, Material.COBBLESTONE));
+
+        // No previously-empty slot was used.
+        for (int s = 11; s < 36; s++) {
+            assertNull(inv.getItem(s), "Slot " + s + " was empty and must stay empty");
+        }
+    }
+
+    @Test
+    void bundleOnly_isIdempotent() {
+        // After a first pass, the full stack displaced from the bundle is now loose.
+        // A second pass should produce an identical result (no oscillation).
+        PlayerMock player = addOpPlayer("Kim");
+        plugin.getSortingPrefs().setEnabled(player, false);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
+
+        ItemStack bundle = new ItemStack(Material.BUNDLE, 1);
+        BundleMeta meta = (BundleMeta) bundle.getItemMeta();
+        meta.addItem(new ItemStack(Material.COBBLESTONE, 64));
+        bundle.setItemMeta(meta);
+        player.getInventory().setItem(9, bundle);
+
+        // First pass.
+        triggerMainStorage(player);
+
+        // Snapshot after first pass.
+        ItemStack[] afterFirst = player.getInventory().getContents().clone();
+
+        // Second pass.
+        triggerMainStorage(player);
+
+        assertArrayEquals(afterFirst, player.getInventory().getContents(),
+                "Second pass should leave inventory byte-identical (idempotent)");
+    }
+
+    @Test
+    void laneExcessDisplacesToFreeSlot() {
+        // Two bundles each holding cobblestone x64, plus loose cobblestone x10 at slot 11.
+        // Pool total = 138 → 2 full stacks (128) loose + remainder (10) repacked into a bundle.
+        // The lane at slot 11 can hold at most 64; the extra 64 displaces to the next free slot.
+        PlayerMock player = addOpPlayer("Leo");
+        plugin.getSortingPrefs().setEnabled(player, false);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
+
+        ItemStack bundle1 = new ItemStack(Material.BUNDLE, 1);
+        BundleMeta m1 = (BundleMeta) bundle1.getItemMeta();
+        m1.addItem(new ItemStack(Material.COBBLESTONE, 64));
+        bundle1.setItemMeta(m1);
+
+        ItemStack bundle2 = new ItemStack(Material.BUNDLE, 1);
+        BundleMeta m2 = (BundleMeta) bundle2.getItemMeta();
+        m2.addItem(new ItemStack(Material.COBBLESTONE, 64));
+        bundle2.setItemMeta(m2);
+
+        player.getInventory().setItem(9, bundle1);
+        player.getInventory().setItem(10, bundle2);
+        player.getInventory().setItem(11, new ItemStack(Material.COBBLESTONE, 10));
+        // Slots 12-35 are empty.
+
+        triggerMainStorage(player);
+
+        Inventory inv = player.getInventory();
+
+        // Original loose slot holds 64 (anchored).
+        ItemStack slot11 = inv.getItem(11);
+        assertNotNull(slot11, "Slot 11 should hold cobblestone");
+        assertEquals(Material.COBBLESTONE, slot11.getType());
+        assertEquals(64, slot11.getAmount(), "Lane slot 11 should hold a full stack (64)");
+
+        // Displaced stack landed in slot 12 (first free slot).
+        ItemStack slot12 = inv.getItem(12);
+        assertNotNull(slot12, "Displaced cobblestone should be at slot 12");
+        assertEquals(Material.COBBLESTONE, slot12.getType());
+        assertEquals(64, slot12.getAmount(), "Displaced stack should be 64");
+
+        // Total cobblestone conserved: 128 loose + 10 bundled = 138.
+        int looseTotal = looseCount(inv, 9, 36, Material.COBBLESTONE);
+        int bundled = bundleCount(inv.getItem(9), Material.COBBLESTONE)
+                + bundleCount(inv.getItem(10), Material.COBBLESTONE);
+        assertEquals(128, looseTotal, "Total loose cobblestone should be 128");
+        assertEquals(10, bundled, "Total bundled cobblestone should be 10");
+
+        // Nothing dropped; slot 13 and beyond remain empty.
+        assertNull(inv.getItem(13), "Slot 13 should remain empty");
     }
 
     // =========================================================================

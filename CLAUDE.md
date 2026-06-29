@@ -30,7 +30,7 @@ net.kccricket.clicksorted
 ├── events/                  InventorySortEvent
 ├── gui/                     ClickSortedHolder, LockGuiHolder, LockGuiListener
 ├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
-│                            BundlePacker, BundleBenchmark, GridGeometry, SlotOrder,
+│                            BundlePacker, InPlacePacker, BundleBenchmark, GridGeometry, SlotOrder,
 │                            TreemapPacker, PrefsCycleHandler, ProtectedItems, ProtectedSlots
 ├── migration/               ValueMigration, Migration, Store, Migrations,
 │                            PlayerMigrationListener, PreferenceRepair
@@ -86,15 +86,16 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 ### Core Flow
 
 1. `InventoryClickEvent` fires when a player clicks inside an inventory.
-2. `InventoryClickListener` checks the player's `PlayerSortingPrefs` (stored in Bukkit's Persistent Data Container): first the `enabled` flag (sorting disabled → early exit), then whether the click matches their configured `ClickMethod`, then the "sort over items" gate, then the shared `ActionThrottle` rate-limiter.
-3. If it matches, `InventorySortService` delegates to `SortEngine`: fungible items are collapsed into a `HashMap<SortKey, Integer>` (material → quantity) and non-fungible items (bundles, non-stackables) are kept discrete, then everything is reconstructed into stacks and written back to the inventory.
-4. When bundle packing is enabled for the target (`defaults.bundle_inventory` / `defaults.bundle_others`, toggled per-player), `InventorySortService` first runs `BundlePacker` to repack partial stacks into bundles before the sort.
-5. A custom `InventorySortEvent` fires after sorting so third-party plugins can intervene.
-6. For player inventories, any slots the player has locked (via `/clicksorted set lock`) are excluded from the sortable set before `SortEngine` runs — locked slots are neither read nor overwritten.
-7. For player inventories, admin-enforced slot locks are also excluded from the sortable set, immediately after per-player locks. A slot is excluded if it appears in `config.yml`'s `locked_slots.player` list or if the player has the `clicksorted.lock.player.slot.<n>` permission node explicitly set (see `ProtectedSlots`). Admin-locked slots cannot be toggled by the player in the lock GUI — they render as a distinct IRON_BARS pane.
-8. Item-blacklisted slots are also excluded from the sortable set (for all inventory types, not just player), immediately after slot locks. A slot is excluded if its item matches the admin `ProtectedItems` list — checked against `config.yml`'s `blacklist.materials`/`blacklist.names` and the sorting player's explicit `clicksorted.blacklist.*` permission nodes.
-9. On startup (and after `/clicksorted reload`), `UpdateChecker` runs an async best-effort Modrinth API call and logs a console notice if a newer release exists (`check_for_updates: true`).
-10. On `PlayerJoinEvent`, `PreferenceRepair` validates the player's PDC preferences and resets any that hold unrecognised values, notifying the player in chat.
+2. `InventoryClickListener` first checks the master kill-switch `clicksorted` permission (default on). Then it checks whether the click matches their configured `ClickMethod` and whether the target is sortable. If it matches, it calls `InventorySortService.hasWork()` to pre-screen: work exists when **sorting or bundle packing** is enabled for the player and target region (the per-player `enabled` flag gates sorting only, not packing). If `hasWork` is false, the event is a complete no-op. Otherwise the "sort over items" gate and `ActionThrottle` rate-limiter apply.
+3. **Sorting on:** `InventorySortService` delegates to `SortEngine`: fungible items are collapsed into a `HashMap<SortKey, Integer>` (material → quantity) and non-fungible items (bundles, non-stackables) are kept discrete, then everything is reconstructed into stacks and written back across the inventory (items may move to any sortable slot).
+4. **Sorting off, packing on:** `InventorySortService` delegates to `InPlacePacker`: same-material stacks consolidate within their *own* slots (full stacks first, remainder last, trailing empties cleared). Loose stacks stay anchored to their lane; items displaced from bundles (or exceeding their lane's slot capacity) fill free/freed slots in ascending order; drops occur only when the region is genuinely full.
+5. When bundle packing is enabled for the target (`defaults.bundle_in_inventory` / `defaults.bundle_in_containers`, toggled per-player), `BundlePacker` runs either as part of `packAndSort` (sorting on) or inside `InPlacePacker` (sorting off). In both cases eligible remainders are repacked into the bundles already present in the sortable region.
+6. A custom `InventorySortEvent` fires after the trigger matches and before any writes, so third-party plugins can intervene. It applies to both the sort-with-layout and in-place consolidation paths.
+7. For player inventories, any slots the player has locked (via `/clicksorted set lock`) are excluded from the sortable set — locked slots are neither read nor overwritten.
+8. For player inventories, admin-enforced slot locks are also excluded from the sortable set, immediately after per-player locks. A slot is excluded if it appears in `config.yml`'s `locked_slots.player` list or if the player has the `clicksorted.lock.player.slot.<n>` permission node explicitly set (see `ProtectedSlots`). Admin-locked slots cannot be toggled by the player in the lock GUI — they render as a distinct IRON_BARS pane.
+9. Item-blacklisted slots are also excluded from the sortable set (for all inventory types, not just player), immediately after slot locks. A slot is excluded if its item matches the admin `ProtectedItems` list — checked against `config.yml`'s `blacklist.materials`/`blacklist.names` and the sorting player's explicit `clicksorted.blacklist.*` permission nodes.
+10. On startup (and after `/clicksorted reload`), `UpdateChecker` runs an async best-effort Modrinth API call and logs a console notice if a newer release exists (`check_for_updates: true`).
+11. On `PlayerJoinEvent`, `PreferenceRepair` validates the player's PDC preferences and resets any that hold unrecognised values, notifying the player in chat.
 
 ### Key Classes
 
@@ -112,9 +113,10 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `StartCorner` | model | Enum (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT) — which corner the sort grid begins from |
 | `FillAxis` | model | Enum (HORIZONTAL, VERTICAL) — whether rows or columns fill first from the start corner |
 | `EnumParse` | model | Case-insensitive enum parse helper used by StartCorner, FillAxis, and others |
-| `InventoryClickListener` | sort | Dispatches click events: trigger match, sort-over-items gate, throttle, then hand off to the sort service |
-| `InventorySortService` | sort | Target resolution, permissions, event lifecycle, optional bundle packing, write-back |
+| `InventoryClickListener` | sort | Dispatches click events: master-perm check, trigger match, `hasWork` pre-screen, sort-over-items gate, throttle, then hand off to the sort service |
+| `InventorySortService` | sort | Target resolution (via private `Region`/`Target`), permissions, event lifecycle, mode dispatch (sort-with-layout vs. in-place consolidation), write-back. `hasWork()` is the public pre-screen gate for the listener. |
 | `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) — fungible merge + discrete passthrough |
+| `InPlacePacker` | sort | Pure in-place consolidator (no plugin state): collapses same-material stacks within their own slots and optionally packs eligible remainders into existing bundles — used when sorting is off but packing is on. Loose stacks stay anchored; items displaced from bundles or exceeding lane capacity fill free/freed slots; drops only when region is full. |
 | `GridGeometry` | sort | Maps an inventory's slot indices to a 2-D grid; computes row/column counts and the mount-slot offset |
 | `SlotOrder` | sort | Produces a write-back slot sequence from a `GridGeometry` given a `StartCorner` and `FillAxis` |
 | `TreemapPacker` | sort | Implements the `TREEMAP` sort method: assigns each item type a contiguous near-square block sized to its stack count; respects `StartCorner` and `FillAxis`; falls back to gap-free fill when rectangles no longer fit |
@@ -161,6 +163,17 @@ Commands are implemented as a Brigadier tree in `ClickSortedCommands` and regist
 Player-facing command handlers resolve the executor via the shared `requirePlayer(plugin, ctx)` helper and gate on `ActionThrottle.throttled(player)`; both return early on failure. Boolean on/off arguments are parsed via `parseState` (the sole consumer of the `ON_WORDS`/`OFF_WORDS` vocabularies).
 
 Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs no longer applies — the codebase uses Paper's native Brigadier API.
+
+### Master kill-switch permission
+
+`clicksorted` (default `true`) is the top-level player-facing kill-switch. Denying it disables:
+- Click-triggered sorting (both modes)
+- Click-triggered bundle packing (both modes)
+- All player-facing commands (`/clicksorted`, `/clicksorted sort`, `/clicksorted click`, `/clicksorted lock-slots`, `/clicksorted bundle`, `/clicksorted status`)
+
+It has **no effect on admin access**: `clicksorted.admin.commands.*` is gated separately and is not a child of `clicksorted`. Admins can still run `reload`, `getcfg`, `debug`, and `benchmark` regardless of the master switch.
+
+The constant `Permissions.PERM_MASTER = "clicksorted"` is used at all check sites.
 
 ### Admin "do not touch" blacklist (item-based)
 
