@@ -241,7 +241,7 @@ public class InventorySortService {
                 : writeLinear(inv, sortableSlots, sortedItems, grid.base(), grid.width(), prefs.getStartCorner(p), prefs.getFillAxis(p));
 
         dropOverflow(p, overflow);
-        refreshViewers(event);
+        refreshViewers(event.getViewers());
         return true;
     }
 
@@ -271,12 +271,7 @@ public class InventorySortService {
         }
 
         dropOverflow(p, result.overflow());
-        // Refresh viewers (same pattern as the sort-with-layout path).
-        for (HumanEntity he : inv.getViewers()) {
-            if (he instanceof Player viewer) {
-                viewer.updateInventory();
-            }
-        }
+        refreshViewers(inv.getViewers());
         return true;
     }
 
@@ -453,8 +448,8 @@ public class InventorySortService {
         }
     }
 
-    private static void refreshViewers(InventoryClickEvent event) {
-        for (HumanEntity he : event.getViewers()) {
+    private static void refreshViewers(List<HumanEntity> viewers) {
+        for (HumanEntity he : viewers) {
             if (he instanceof Player viewer) {
                 viewer.updateInventory();
             }

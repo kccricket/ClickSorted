@@ -101,7 +101,9 @@ public final class InPlacePacker {
             if (BundlePacker.isBundle(is.getType())) {
                 bundleSlots.put(slot, is.clone());
             } else {
-                // Non-stackables use a unique key per slot so they are never merged across slots.
+                // Non-stackables key by item identity; only genuinely identical items (same
+                // material, durability, and meta) share a lane, and distributeLanes re-emits one
+                // max-size-1 stack per slot, so they are never collapsed or corrupted.
                 SortKey key = SortKey.poolKey(is);
                 lanes.computeIfAbsent(key, k -> new Lane(is)).addSlot(slot, is.getAmount());
             }
