@@ -12,26 +12,26 @@ package net.kccricket.clicksorted.sort;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import net.kccricket.clicksorted.text.ItemNames;
-import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
-
-import java.util.Set;
 
 /**
  * Immutable snapshot of a player's bundle blacklist: materials and display names that must not be
  * packed into or unpacked from bundles during sorting.
  *
  * <p>A material entry blocks any item of that type regardless of its name. A name entry blocks
- * any item whose resolved name (plain-text, color-stripped) exactly matches, following the precedence
- * custom name → item name (data-pack/plugin base name) → vanilla / {@code items.yml} name (see
- * {@link ItemNames#lookup}), so a name entry can target renamed items, data-pack-named items, and
- * plain vanilla ones.
+ * any item whose resolved name (plain-text, color-stripped) matches case-insensitively, following
+ * the precedence custom name → item name (data-pack/plugin base name) → vanilla / {@code items.yml}
+ * name (see {@link net.kccricket.clicksorted.text.ItemNames#lookup}), so a name entry can target
+ * renamed items, data-pack-named items, and plain vanilla ones.
+ *
+ * <p>Name matching is case-insensitive. The {@link MaterialNameSet} backing this record stores names
+ * pre-lowercased; callers must lowercase names before construction (see the construction sites in
+ * {@code InventorySortService}).
  */
-public record BundleBlacklist(Set<Material> materials, Set<String> names) {
+public record BundleBlacklist(MaterialNameSet set) {
 
     /** A blacklist that blocks nothing. Use instead of {@code null} when no blacklist is configured. */
-    public static final BundleBlacklist EMPTY = new BundleBlacklist(Set.of(), Set.of());
+    public static final BundleBlacklist EMPTY = new BundleBlacklist(MaterialNameSet.EMPTY);
 
     /**
      * Returns {@code true} if {@code is} is blocked by this blacklist and should not be packed into
@@ -40,13 +40,6 @@ public record BundleBlacklist(Set<Material> materials, Set<String> names) {
      * @param is the item to test; must not be null
      */
     public boolean blocks(ItemStack is) {
-        if (materials.contains(is.getType())) {
-            return true;
-        }
-        if (!names.isEmpty()) {
-            String name = ItemNames.lookup(is);
-            return name != null && names.contains(name);
-        }
-        return false;
+        return set.contains(is);
     }
 }

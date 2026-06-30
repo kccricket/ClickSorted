@@ -39,8 +39,10 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Handles target-inventory resolution, permission checks, the {@link InventorySortEvent}
@@ -84,7 +86,7 @@ public class InventorySortService {
      * Resolved target for a click event: the inventory, its type, the sortable slot range, and
      * which {@link Region} the click landed in.
      */
-    private record Target(Inventory inv, InventoryType type, int min, int max, Region region) {}
+    record Target(Inventory inv, InventoryType type, int min, int max, Region region) {}
 
     // -------------------------------------------------------------------------
 
@@ -99,45 +101,33 @@ public class InventorySortService {
     // -------------------------------------------------------------------------
 
     /**
-     * @return true if the clicked inventory in this event is one that should be considered for
-     *         sorting or packing (independent of per-player preferences or permissions)
-     */
-    public boolean isSortableTarget(InventoryClickEvent event) {
-        return shouldSort(event.getClickedInventory());
-    }
-
-    /**
-     * Returns {@code true} when there is actual work to do for this click: the target resolves to
-     * a valid sortable region AND at least one of sorting or bundle packing is both enabled for
-     * the player and permitted for the region.
+     * Resolves the click target and checks whether there is work to do for this player.
+     * Returns the resolved {@link Target} if at least one of sorting or bundle packing is enabled
+     * and permitted, or {@code null} if the click should be ignored entirely.
      *
-     * <p>This is a lightweight pre-screen for {@link InventoryClickListener} that avoids entering
-     * the throttle / cancel path when neither sorting nor packing is active.
+     * <p>The returned target is passed directly to {@link #sortInventory} to avoid re-resolving.
      */
-    public boolean hasWork(InventoryClickEvent event, Player player) {
+    Target checkWork(InventoryClickEvent event, Player player) {
         Target target = resolve(event);
-        if (target == null) return false;
+        if (target == null) return null;
         var prefs = plugin.getSortingPrefs();
         return (prefs.getEnabled(player) && sortAllowed(target.region(), player))
-                || packAllowed(target.region(), player, prefs);
+                || packAllowed(target.region(), player, prefs) ? target : null;
     }
 
     /**
      * Perform a sort (or in-place consolidation) on the inventory targeted by the click event.
+     * The {@code target} must be the value returned by a prior {@link #checkWork} call for the
+     * same event.
      *
      * @return true if the operation completed and the caller should cancel the originating event
      */
-    public boolean sortInventory(final InventoryClickEvent event, final SortingMethod sortMethod) {
+    public boolean sortInventory(Target target, final InventoryClickEvent event, final SortingMethod sortMethod) {
         // No cursor-state guard here: the only cursor-empty requirement belongs to SINGLE_CLICK (so a
         // held item can still be placed), and ClickMethod.matchesSortTrigger already enforces that before
         // we are ever called. Other methods may sort with a held cursor item — the event is cancelled and
         // the cursor stack is left untouched.
         Player p = (Player) event.getWhoClicked();
-
-        Target target = resolve(event);
-        if (target == null) {
-            return false;
-        }
 
         Log.debug("clicked inventory window " + target.type() + ", slot " + event.getSlot());
 
@@ -224,7 +214,10 @@ public class InventorySortService {
                                    Target target, Set<Integer> sortableSlots, SortingMethod sortMethod,
                                    boolean packEnabled, PlayerSortingPrefs prefs) {
         BundleBlacklist blacklist = packEnabled
-                ? new BundleBlacklist(prefs.getBundleBlacklist(p), prefs.getBundleBlacklistNames(p))
+                ? new BundleBlacklist(new MaterialNameSet(prefs.getBundleBlacklist(p),
+                        prefs.getBundleBlacklistNames(p).stream()
+                                .map(n -> n.toLowerCase(Locale.ROOT))
+                                .collect(Collectors.toUnmodifiableSet())))
                 : BundleBlacklist.EMPTY;
         List<ItemStack> sortedItems = packEnabled
                 ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p), blacklist)
@@ -256,8 +249,10 @@ public class InventorySortService {
      */
     private boolean consolidateInPlace(Player p, Inventory inv, Set<Integer> sortableSlots,
                                        PlayerSortingPrefs prefs) {
-        BundleBlacklist blacklist = new BundleBlacklist(
-                prefs.getBundleBlacklist(p), prefs.getBundleBlacklistNames(p));
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(prefs.getBundleBlacklist(p),
+                prefs.getBundleBlacklistNames(p).stream()
+                        .map(n -> n.toLowerCase(Locale.ROOT))
+                        .collect(Collectors.toUnmodifiableSet())));
         InPlacePacker.Result result = InPlacePacker.consolidate(
                 inv.getContents(), sortableSlots, true, prefs.getBundleStackLimit(p), blacklist);
 
@@ -292,7 +287,6 @@ public class InventorySortService {
 
         int slot = event.getSlot();
         InventoryType type = inv.getType();
-        var mainCfg = plugin.getConfigManager().main();
 
         if (type == InventoryType.PLAYER) {
             if (slot < 9) {
@@ -303,12 +297,11 @@ public class InventorySortService {
                 // Armor / offhand slots — never sort or pack
                 return null;
             }
-        } else if (mainCfg.getSortableInventories().contains(type)) {
+        } else {
             int min = GridGeometry.storageOffset(inv.getHolder());
             int max = inv.getSize();
             return new Target(inv, type, min, max, Region.CONTAINER);
         }
-        return null;
     }
 
     /**
