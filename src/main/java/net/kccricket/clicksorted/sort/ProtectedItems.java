@@ -15,12 +15,10 @@ package net.kccricket.clicksorted.sort;
 import net.kccricket.clicksorted.config.MainConfig;
 import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.text.ItemNames;
-import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.permissions.Permissible;
 
 import java.util.Locale;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -49,21 +47,21 @@ import java.util.regex.Pattern;
  * @see #nameToken(String)
  * @see #forSort(Permissible, MainConfig)
  */
-public record ProtectedItems(Set<Material> materials, Set<String> namesLower, Permissible permissible) {
+public record ProtectedItems(MaterialNameSet config, Permissible permissible) {
 
     private static final Pattern STRIP_COLOR = Pattern.compile("§.");
     private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]+");
     private static final Pattern TRIM_UNDERSCORE = Pattern.compile("^_+|_+$");
 
     /** A list that blocks nothing; use when the feature is unconfigured. */
-    public static final ProtectedItems EMPTY = new ProtectedItems(Set.of(), Set.of(), null);
+    public static final ProtectedItems EMPTY = new ProtectedItems(MaterialNameSet.EMPTY, null);
 
     /**
      * Returns {@code true} when all channels are empty/absent, allowing the sort service to skip
      * the per-slot exclusion scan entirely.
      */
     public boolean isEmpty() {
-        return materials.isEmpty() && namesLower.isEmpty() && permissible == null;
+        return config.isEmpty() && permissible == null;
     }
 
     /**
@@ -73,18 +71,8 @@ public record ProtectedItems(Set<Material> materials, Set<String> namesLower, Pe
      * @param is the item to test; must not be null
      */
     public boolean blocks(ItemStack is) {
-        if (materials.contains(is.getType())) {
-            return true;
-        }
-
-        // Resolve the plain-text display name lazily — only when a name-based check is needed.
-        String name = null;
-        if (!namesLower.isEmpty()) {
-            name = ItemNames.lookup(is);
-            if (name != null && namesLower.contains(name.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
+        String name = ItemNames.lookup(is);
+        if (config.contains(is.getType(), name)) return true;
 
         if (permissible != null) {
             // Use isPermissionSet + hasPermission rather than hasPermission alone: undeclared
@@ -93,19 +81,12 @@ public record ProtectedItems(Set<Material> materials, Set<String> namesLower, Pe
             // node has been granted. isPermissionSet is true only when the node was explicitly
             // attached to the player, avoiding the OP-default false-positive.
             String materialNode = Permissions.PERM_BLACKLIST_MATERIAL + is.getType().name().toLowerCase(Locale.ROOT);
-            if (Permissions.isExplicitlyGranted(permissible, materialNode)) {
-                return true;
-            }
-            if (name == null) {
-                name = ItemNames.lookup(is);
-            }
+            if (Permissions.isExplicitlyGranted(permissible, materialNode)) return true;
             if (name != null) {
                 String token = nameToken(name);
                 if (!token.isEmpty()) {
                     String nameNode = Permissions.PERM_BLACKLIST_NAME + token;
-                    if (Permissions.isExplicitlyGranted(permissible, nameNode)) {
-                        return true;
-                    }
+                    if (Permissions.isExplicitlyGranted(permissible, nameNode)) return true;
                 }
             }
         }
@@ -142,6 +123,8 @@ public record ProtectedItems(Set<Material> materials, Set<String> namesLower, Pe
      * @param cfg the loaded main config (provides the cached material and name sets)
      */
     public static ProtectedItems forSort(Permissible who, MainConfig cfg) {
-        return new ProtectedItems(cfg.getBlacklistMaterials(), cfg.getBlacklistNamesLower(), who);
+        return new ProtectedItems(
+                new MaterialNameSet(cfg.getBlacklistMaterials(), cfg.getBlacklistNamesLower()),
+                who);
     }
 }

@@ -39,8 +39,10 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Handles target-inventory resolution, permission checks, the {@link InventorySortEvent}
@@ -212,7 +214,10 @@ public class InventorySortService {
                                    Target target, Set<Integer> sortableSlots, SortingMethod sortMethod,
                                    boolean packEnabled, PlayerSortingPrefs prefs) {
         BundleBlacklist blacklist = packEnabled
-                ? new BundleBlacklist(prefs.getBundleBlacklist(p), prefs.getBundleBlacklistNames(p))
+                ? new BundleBlacklist(new MaterialNameSet(prefs.getBundleBlacklist(p),
+                        prefs.getBundleBlacklistNames(p).stream()
+                                .map(n -> n.toLowerCase(Locale.ROOT))
+                                .collect(Collectors.toUnmodifiableSet())))
                 : BundleBlacklist.EMPTY;
         List<ItemStack> sortedItems = packEnabled
                 ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p), blacklist)
@@ -244,8 +249,10 @@ public class InventorySortService {
      */
     private boolean consolidateInPlace(Player p, Inventory inv, Set<Integer> sortableSlots,
                                        PlayerSortingPrefs prefs) {
-        BundleBlacklist blacklist = new BundleBlacklist(
-                prefs.getBundleBlacklist(p), prefs.getBundleBlacklistNames(p));
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(prefs.getBundleBlacklist(p),
+                prefs.getBundleBlacklistNames(p).stream()
+                        .map(n -> n.toLowerCase(Locale.ROOT))
+                        .collect(Collectors.toUnmodifiableSet())));
         InPlacePacker.Result result = InPlacePacker.consolidate(
                 inv.getContents(), sortableSlots, true, prefs.getBundleStackLimit(p), blacklist);
 
@@ -280,7 +287,6 @@ public class InventorySortService {
 
         int slot = event.getSlot();
         InventoryType type = inv.getType();
-        var mainCfg = plugin.getConfigManager().main();
 
         if (type == InventoryType.PLAYER) {
             if (slot < 9) {

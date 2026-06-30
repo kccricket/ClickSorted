@@ -6,6 +6,7 @@ import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.sort.BundleBlacklist;
 import net.kccricket.clicksorted.sort.BundlePacker;
+import net.kccricket.clicksorted.sort.MaterialNameSet;
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
@@ -235,7 +236,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         // items never enter packIntoBundles at all — they don't appear in the leftover list either.
         // What we verify here is that the bundle never receives blacklisted dirt.
         pack(List.of(new ItemStack(Material.DIRT, 16)), bundles, 0,
-                new BundleBlacklist(Set.of(Material.DIRT), Set.of()));
+                new BundleBlacklist(new MaterialNameSet(Set.of(Material.DIRT), Set.of())));
 
         assertFalse(bundleHas(b, Material.DIRT),
                 "Blacklisted dirt must not be packed into the bundle");
@@ -248,7 +249,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         assertTrue(BundlePacker.canBundle(dirt),
                 "Dirt should be bundleable without a blacklist");
         // With blacklist containing DIRT: must return false.
-        assertFalse(BundlePacker.canBundle(dirt, new BundleBlacklist(Set.of(Material.DIRT), Set.of())),
+        assertFalse(BundlePacker.canBundle(dirt, new BundleBlacklist(new MaterialNameSet(Set.of(Material.DIRT), Set.of()))),
                 "canBundle with blacklist must return false for blacklisted material");
     }
 
@@ -261,7 +262,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 List.of(new ItemStack(Material.COBBLESTONE, 16)),
                 bundles,
                 0,
-                new BundleBlacklist(Set.of(Material.DIRT), Set.of())); // COBBLESTONE is NOT blacklisted
+                new BundleBlacklist(new MaterialNameSet(Set.of(Material.DIRT), Set.of()))); // COBBLESTONE is NOT blacklisted
 
         assertFalse(leftover.stream().anyMatch(is -> is != null && is.getType() == Material.COBBLESTONE),
                 "Non-blacklisted cobblestone should be packed away");
@@ -280,7 +281,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         List<ItemStack> bundles = new ArrayList<>(List.of(b));
 
         // Pack with no loose items; only the existing bundle's contents matter.
-        pack(List.of(), bundles, 0, new BundleBlacklist(Set.of(Material.DIRT), Set.of()));
+        pack(List.of(), bundles, 0, new BundleBlacklist(new MaterialNameSet(Set.of(Material.DIRT), Set.of())));
 
         assertTrue(bundleHas(b, Material.DIRT),
                 "Blacklisted dirt already in the bundle must stay there (not unpacked)");
@@ -293,7 +294,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         ItemStack b = bundle(new ItemStack(Material.COBBLESTONE, 64));
         List<ItemStack> bundles = new ArrayList<>(List.of(b));
 
-        List<ItemStack> leftover = pack(List.of(), bundles, 0, new BundleBlacklist(Set.of(Material.DIRT), Set.of()));
+        List<ItemStack> leftover = pack(List.of(), bundles, 0, new BundleBlacklist(new MaterialNameSet(Set.of(Material.DIRT), Set.of())));
 
         boolean fullStackLoose = leftover.stream().anyMatch(
                 is -> is != null && is.getType() == Material.COBBLESTONE && is.getAmount() == 64);
@@ -308,7 +309,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 new ItemStack(Material.COBBLESTONE, 64));
         List<ItemStack> bundles = new ArrayList<>(List.of(b));
 
-        List<ItemStack> leftover = pack(List.of(), bundles, 0, new BundleBlacklist(Set.of(Material.DIRT), Set.of()));
+        List<ItemStack> leftover = pack(List.of(), bundles, 0, new BundleBlacklist(new MaterialNameSet(Set.of(Material.DIRT), Set.of())));
 
         // Dirt stays in bundle; cobblestone (full stack) is pooled out and returned loose.
         assertTrue(bundleHas(b, Material.DIRT),
@@ -413,7 +414,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void blocksReturnsTrueForCustomNamedItem() {
         ItemStack sword = customNamed(Material.DIAMOND_SWORD, "Magic Sword");
-        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(Set.of(), Set.of("magic sword")));
         assertTrue(blacklist.blocks(sword),
                 "blocks() must return true for an item whose display name is in the name set");
     }
@@ -423,7 +424,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         // item_name (data-pack/plugin base name) is resolved like a name via ItemsConfig.getItemName
         // → ItemNames.explicitName, so a name entry blocks an item_name-only item too.
         ItemStack sword = itemNamed(Material.DIAMOND_SWORD, "Magic Sword");
-        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(Set.of(), Set.of("magic sword")));
         assertTrue(blacklist.blocks(sword),
                 "blocks() must return true for an item whose item_name is in the name set");
     }
@@ -431,7 +432,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void blocksReturnsFalseForSameMaterialDifferentName() {
         ItemStack plain = new ItemStack(Material.DIAMOND_SWORD, 1); // no custom name
-        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(Set.of(), Set.of("magic sword")));
         assertFalse(blacklist.blocks(plain),
                 "blocks() must return false for a same-material item without that display name");
     }
@@ -439,7 +440,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void blocksReturnsFalseForWrongName() {
         ItemStack sword = customNamed(Material.DIAMOND_SWORD, "Other Sword");
-        BundleBlacklist blacklist = new BundleBlacklist(Set.of(), Set.of("Magic Sword"));
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(Set.of(), Set.of("magic sword")));
         assertFalse(blacklist.blocks(sword),
                 "blocks() must return false when the item's name does not match");
     }
@@ -448,12 +449,36 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     void canBundleReturnsFalseForBlacklistedName() {
         // Use a stackable item; DIAMOND_SWORD is non-stackable so canBundle(is) is already false.
         ItemStack namedDirt = customNamed(Material.DIRT, "Special Dirt");
-        BundleBlacklist bl = new BundleBlacklist(Set.of(), Set.of("Special Dirt"));
+        BundleBlacklist bl = new BundleBlacklist(new MaterialNameSet(Set.of(), Set.of("special dirt")));
         assertFalse(BundlePacker.canBundle(namedDirt, bl),
                 "canBundle must return false for an item whose resolved name is blacklisted");
         // A plain dirt's resolved name ("Dirt" / "DIRT") does not match "Special Dirt".
         assertTrue(BundlePacker.canBundle(new ItemStack(Material.DIRT, 1), bl),
                 "canBundle must return true for a same-material item whose name does not match");
+    }
+
+    // -------------------------------------------------------------------------
+    // BundleBlacklist.blocks — case-insensitive name matching
+    // -------------------------------------------------------------------------
+
+    @Test
+    void blocksIsCaseInsensitive_lowerBlacklistUpperItem() {
+        // Blacklist stores lowercase; item has mixed-case display name → must still block.
+        ItemStack sword = customNamed(Material.DIAMOND_SWORD, "Magic Sword");
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(Set.of(), Set.of("magic sword")));
+        assertTrue(blacklist.blocks(sword),
+                "blocks() must match case-insensitively (stored lowercase, item mixed-case)");
+    }
+
+    @Test
+    void blocksIsCaseInsensitive_upperBlacklistLowerItem() {
+        // Even if the blacklist was built with uppercase (e.g. from prefs stored as-is before
+        // lowercasing at construction time), the lookup lowercases the resolved name.
+        // Here we simulate a pre-lowered blacklist vs. an item whose name happens to be all caps.
+        ItemStack sword = customNamed(Material.DIAMOND_SWORD, "MAGIC SWORD");
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(Set.of(), Set.of("magic sword")));
+        assertTrue(blacklist.blocks(sword),
+                "blocks() must match case-insensitively (stored lowercase, item uppercase)");
     }
 
     // -------------------------------------------------------------------------
@@ -559,7 +584,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 List.of(new ItemStack(Material.COBBLESTONE, 8)),
                 bundles,
                 0,
-                new BundleBlacklist(Set.of(Material.BUNDLE), Set.of()));
+                new BundleBlacklist(new MaterialNameSet(Set.of(Material.BUNDLE), Set.of())));
 
         assertFalse(bundleHas(b, Material.COBBLESTONE),
                 "A bundle blacklisted by material must not receive packed items");
@@ -578,7 +603,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 List.of(),
                 bundles,
                 0,
-                new BundleBlacklist(Set.of(Material.BUNDLE), Set.of()));
+                new BundleBlacklist(new MaterialNameSet(Set.of(Material.BUNDLE), Set.of())));
 
         assertTrue(bundleHas(b, Material.COBBLESTONE),
                 "Contents of a blacklisted bundle must not be unpacked");
@@ -601,7 +626,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 List.of(new ItemStack(Material.DIRT, 8)),
                 bundles,
                 0,
-                new BundleBlacklist(Set.of(), Set.of("Keepsake")));
+                new BundleBlacklist(new MaterialNameSet(Set.of(), Set.of("keepsake"))));
 
         // Cobblestone must still be inside (not unpacked).
         assertTrue(bundleHas(b, Material.COBBLESTONE),
@@ -625,7 +650,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
                 List.of(new ItemStack(Material.COBBLESTONE, 8)),
                 bundles,
                 0,
-                new BundleBlacklist(Set.of(Material.DIRT), Set.of())); // BUNDLE is not blacklisted
+                new BundleBlacklist(new MaterialNameSet(Set.of(Material.DIRT), Set.of()))); // BUNDLE is not blacklisted
 
         assertTrue(bundleHas(b, Material.COBBLESTONE),
                 "A non-blacklisted bundle must still accept packed items");
