@@ -1,0 +1,25 @@
+site_name: ClickSorted
+site_description: A Minecraft Paper server plugin to sort any inventory — and pack your bundles — with a mouse click.
+theme:
+  name: shadcn
+  icon: pixelarticons:reload-sharp
+markdown_extensions:
+  - codehilite
+nav:
+  - Home: index.md
+  - Player Guide:
+    - Getting Started: player-guide/getting-started.md
+    - Sort Methods: player-guide/sort-methods.md
+    - Sort Direction: player-guide/sort-direction.md
+    - Slot Locking: player-guide/slot-locking.md
+    - Bundle Packing: player-guide/bundle-packing.md
+    - Commands: player-guide/commands.md
+  - Admin Guide:
+    - Commands: admin/commands.md
+    - Configuration: admin/configuration.md
+    - Permissions: admin/permissions.md
+    - Sort Configuration : admin/sort-configuration.md
+    - Item Blacklist: admin/item-blacklist.md
+    - Slot Locks: admin/slot-locks.md
+    - Language: admin/lang.md
+  - Development: development.md

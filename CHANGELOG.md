@@ -1,3 +1,128 @@
+# ClickSorted 2.0.0
+
+Release date: 2026-06-29
+
+ClickSorted 2.0.0 introduces a per-player bundle blacklist, server-wide admin item and slot locks, a dedicated enabled toggle, and a reorganised command tree.
+
+## Highlights
+
+- **Per-player bundle blacklist** — exclude specific item types or display names from bundle packing via a GUI or commands; blacklisted bundle colors are also skipped as packing bins.
+- **Admin item blacklist** — server admins can declare materials and display names that ClickSorted will never sort, move, or pack, via `config.yml` and per-player permission nodes.
+- **Admin slot locks** — server admins can lock specific player inventory slots server-wide via `config.yml` (`locked_slots.player`) or `clicksorted.lock.player.slot.<n>` permission nodes. Admin-locked slots appear as non-toggleable iron-bars panes in the lock GUI.
+- **Dedicated `enabled` preference** — click-sorting can now be toggled on/off independently of the click method (`/clicksorted sort enabled`). `ClickMethod.NONE` is removed.
+- **Command tree reorganised by domain** — per-player preferences grouped under `sort`, `click`, `bundle`, and `lock-slots`; admin diagnostics under `admin`.
+
+## Breaking Changes
+
+- **Command tree restructured.** The `set` subcommand group is removed. Old paths → new paths:
+  - `/clicksorted set sort-method` → `/clicksorted sort method`
+  - `/clicksorted set click-method` → `/clicksorted click method`
+  - `/clicksorted set hover` → `/clicksorted click allow-on-hover`
+  - `/clicksorted set lock` → `/clicksorted lock-slots`
+  - `/clicksorted set bundle inventory|others` → `/clicksorted bundle in-inventory|in-containers`
+  - `/clicksorted set bundle stacklimit` → `/clicksorted bundle stack-limit`
+  - `/clicksorted set start-corner` → `/clicksorted sort start-corner`
+  - `/clicksorted set fill-axis` → `/clicksorted sort fill-axis`
+  - `/clicksorted set enabled` → `/clicksorted sort enabled`
+  - Admin commands moved under `admin`: `reload` → `admin reload`, `getcfg` → `admin config`, `debug` → `admin debug`, `benchmark` → `admin benchmark`.
+  Update macros, command blocks, and aliases.
+- **`ClickMethod.NONE` removed.** Players who had `NONE` stored are automatically migrated: their click method is set to `SWAP` and `enabled` is set to `false`. Use `/clicksorted sort enabled no` (or the bare `/clicksorted` toggle) to disable click-sorting going forward.
+- **Config keys renamed** (auto-migrated on first startup):
+  - `defaults.bundle_inventory` → `defaults.bundle_in_inventory`
+  - `defaults.bundle_others` → `defaults.bundle_in_containers`
+- **Permission nodes restructured.** Key renames:
+  - `clicksorted.commands.reload` → `clicksorted.admin.commands.reload`
+  - `clicksorted.commands.getcfg` → `clicksorted.admin.commands.config`
+  - `clicksorted.commands.debug` → `clicksorted.admin.commands.debug`
+  - `clicksorted.commands.benchmark` → `clicksorted.admin.commands.benchmark`
+  New sort-time bundle gates added: `clicksorted.bundle`, `clicksorted.bundle.inventory`, `clicksorted.bundle.container`.
+  Update any permission-plugin configurations that reference the old nodes.
+
+## New Features
+
+### Per-player bundle blacklist
+
+`/clicksorted bundle blacklist` opens a 54-slot GUI: click an item in your real inventory to add it to the blacklist by material (for vanilla items) or by display name (for custom-named items); click a listed entry to remove it; pagination arrows navigate large lists. Text-command alternatives:
+
+- `bundle blacklist add|remove <material>`, `bundle blacklist list`, `bundle blacklist clear` — material entries.
+- `bundle blacklist name add|remove <text>`, `bundle blacklist name list` — display-name entries.
+
+Material entries block any item of that type; name entries match case-insensitively against the item's resolved display name (custom name → `item_name` data component → vanilla / `items.yml` name). Blacklisted items are never packed into or unpacked from bundles; blacklisted bundle colors are also skipped as packing bins.
+
+### Admin item blacklist
+
+Admins can prevent ClickSorted from ever touching specific items — never sorted, moved, or packed/unpacked regardless of player preferences. Two enforcement channels (unioned):
+
+- `blacklist.materials: []` / `blacklist.names: []` in `config.yml` — server-wide; reloads with `/clicksorted admin reload`.
+- `clicksorted.blacklist.material.<material>` / `clicksorted.blacklist.name.<slug>` permission nodes — per-player or group-based via a permissions plugin.
+
+Name slug rule: strip legacy color codes → lowercase → collapse non-`[a-z0-9]` runs to `_` → strip edge underscores. E.g. `"Creative Menu"` → `creative_menu`.
+
+### Admin slot locks
+
+Admins can lock specific player inventory slots (0–35) server-wide so they are always excluded from sorting and cannot be toggled by the player in the lock GUI. Two enforcement channels (unioned):
+
+- `locked_slots.player: []` in `config.yml` — server-wide; reloads with `/clicksorted admin reload`.
+- `clicksorted.lock.player.slot.<n>` permission nodes — per-player or group-based.
+
+Admin-locked slots render as non-toggleable iron-bars panes in the lock GUI.
+
+### Dedicated `enabled` preference
+
+Click-sorting can now be enabled or disabled independently of which click method is configured. Toggle with the bare `/clicksorted`, with `/clicksorted sort enabled`, or with `/clicksorted sort enabled yes|no`. The enabled state appears in `/clicksorted status`. Server default: `defaults.enabled: true` in `config.yml`.
+
+### `item_name` data component resolution
+
+Name-based matching (admin name blacklist, bundle name blacklist) now resolves the `item_name` data component — the base name set by data packs or plugins before any custom rename — in addition to custom display names. Lookup priority: custom name → `item_name` → vanilla / `items.yml` name.
+
+### Graceful reload failure
+
+Config reload failures are now caught and reported to the admin via the `configReloadFailed` lang key (`lang.yml`), with the previous configuration remaining active. The server console receives the full stack trace.
+
+## Bug Fixes
+
+- **Bundle-displaced items dropped instead of placed** — items displaced from bundles during a sort now fill free slots in the region rather than being dropped on the ground.
+- **NPE when bundle contains items with no loose counterpart** — `BundlePacker` now handles the case where a bundle's contents have no corresponding loose stack instead of throwing a `NullPointerException`.
+
+## Other Improvements
+
+- `MaterialNameSet` extracted as a shared record for material + display-name matching, used by both `BundleBlacklist` and `ProtectedItems`.
+- Shared GUI helpers consolidated into `ClickSortedHolder` base class (`BlacklistGuiHolder`, `LockGuiHolder`).
+- Integration test coverage expanded: crafting exclusion, item conservation, fuzz testing, held-cursor state, and more.
+
+## Compatibility
+
+✔️ Paper/Folia 1.21.5 – 26.1.x
+✔️ Java 21+
+
+## Upgrading
+
+1. Stop your server.
+2. Replace the old jar in `plugins/` with this release.
+3. Start your server — config keys and stored preferences migrate automatically on first load.
+
+> **Migration notes:**
+> - `defaults.bundle_inventory` and `defaults.bundle_others` in `config.yml` are rewritten to `defaults.bundle_in_inventory` / `defaults.bundle_in_containers` automatically.
+> - Players who had `ClickMethod.NONE` stored will have their preference migrated to `SWAP` + `enabled: false` automatically.
+> - Permission-plugin configurations referencing `clicksorted.commands.reload|getcfg|debug|benchmark` should be updated to `clicksorted.admin.commands.reload|config|debug|benchmark`.
+
+## What's Changed
+
+- Add per-player bundle blacklist (GUI + commands) by @kccricket
+- Add admin item blacklist via config and permission nodes by @kccricket
+- Add admin slot locks via config and permission nodes by @kccricket
+- Replace ClickMethod.NONE with dedicated enabled preference by @kccricket
+- Resolve item_name data component in name-based operations by @kccricket
+- Enforce master kill-switch on all player-facing commands by @kccricket
+- Add MigrationException for graceful config reload failure by @kccricket
+- Fix: place bundle-displaced items into free slots instead of dropping by @kccricket
+- Fix: guard against NPE when bundle contains items with no loose counterpart by @kccricket
+- Reorganize command tree by domain by @kccricket
+- Integration test sweep by @kccricket in #55
+- Simplify pass: extract MaterialNameSet and PdcStringSet by @kccricket in #56
+
+---
+
 # ClickSorted 1.2.1
 
 Release date: 2026-06-23
