@@ -7,7 +7,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import java.util.Optional;
 
 public enum ClickMethod {
-    DOUBLE_CLICK, SINGLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK, NONE;
+    DOUBLE_CLICK, SINGLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK;
 
     public static final ClickMethod DEFAULT = SWAP;
 
@@ -18,6 +18,11 @@ public enum ClickMethod {
             case CONTROL_DROP -> Optional.of(true);  // ctrl-drop only fires on occupied slots → needs hover
             default -> Optional.empty();
         };
+    }
+
+    /** Returns true when this method forces a specific hover setting, hiding the allow-on-hover command. */
+    public boolean governsHover() {
+        return this == SINGLE_CLICK || this == CONTROL_DROP;
     }
 
     /**
@@ -58,7 +63,6 @@ public enum ClickMethod {
             case CONTROL_DROP -> lang.getMessage("instructionControlDrop");
             case SHIFT_LEFT_CLICK -> lang.getMessage("instructionShiftLeftClick");
             case SHIFT_RIGHT_CLICK -> lang.getMessage("instructionShiftRightClick");
-            default -> lang.getMessage("instructionDisabled");
         };
     }
 

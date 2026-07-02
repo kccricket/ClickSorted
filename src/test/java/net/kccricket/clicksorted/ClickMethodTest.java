@@ -17,7 +17,6 @@ class ClickMethodTest {
         assertTrue(ClickMethod.SHIFT_RIGHT_CLICK.shouldCancelEvent());
         assertTrue(ClickMethod.DOUBLE_CLICK.shouldCancelEvent());
         assertFalse(ClickMethod.SINGLE_CLICK.shouldCancelEvent());
-        assertFalse(ClickMethod.NONE.shouldCancelEvent());
     }
 
     @Test
@@ -41,6 +40,5 @@ class ClickMethodTest {
         assertTrue(ClickMethod.DOUBLE_CLICK.requiredSortOverItems().isEmpty());
         assertTrue(ClickMethod.SHIFT_LEFT_CLICK.requiredSortOverItems().isEmpty());
         assertTrue(ClickMethod.SHIFT_RIGHT_CLICK.requiredSortOverItems().isEmpty());
-        assertTrue(ClickMethod.NONE.requiredSortOverItems().isEmpty());
     }
 }

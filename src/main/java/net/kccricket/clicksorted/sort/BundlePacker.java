@@ -38,6 +38,8 @@ import java.util.*;
  *   <li>Remainders heavier than {@link #MAX_PACK_WEIGHT} are never bundled (inefficient trade).</li>
  *   <li>Ineligible bundle contents (non-stackable, nested shulkers) are never pooled or moved.</li>
  *   <li>Bundles (policy) and shulker boxes (hard limit) are never packed into bundles.</li>
+ *   <li>A bundle whose own material or display name is blocked by the blacklist is never used as a
+ *       bin: its contents are not unpacked and no new items are packed into it.</li>
  * </ul>
  */
 public final class BundlePacker {
@@ -56,34 +58,47 @@ public final class BundlePacker {
     private BundlePacker() {}
 
     /**
+     * Convenience overload with no blacklist; preserves existing callers (tests included).
+     *
+     * @see #packIntoBundles(Map, Map, List, int, BundleBlacklist)
+     */
+    public static List<ItemStack> packIntoBundles(Map<SortKey, Long> loosePool,
+                                                  Map<SortKey, ItemStack> samples,
+                                                  List<ItemStack> bundles, int entryCap) {
+        return packIntoBundles(loosePool, samples, bundles, entryCap, BundleBlacklist.EMPTY);
+    }
+
+    /**
      * Pack the bundleable remainders of a pooled item multiset into the given bundles, returning the
      * loose stacks that should stay out in the inventory. Mutates the bundle {@link ItemStack}s in
      * {@code bundles} in place; layout of the returned loose stacks is left to the caller (the sort).
      *
-     * <p>Each bundle's eligible contents are pooled into {@code loosePool}/{@code samples} as well, so
-     * the caller only needs to pre-pool the loose (non-bundle) eligible items. For each pooled type the
-     * total is split into full stacks plus a single remainder; a remainder whose weight is at or below
-     * {@link #MAX_PACK_WEIGHT} is placed into the fullest bundle with room (origin bundles preferred),
-     * otherwise it stays loose. Ineligible bundle contents are retained and never moved.
+     * <p>Entries in {@code blacklist} are treated as ineligible for bundling: loose blacklisted items
+     * are not pooled by the caller and blacklisted items already inside bundles are retained (not
+     * unpacked) by this method. Additionally, a bundle whose <em>own</em> material or display name is
+     * blocked by the blacklist is skipped entirely as a bin — its contents are left untouched and no
+     * new items are packed into it; it is still sorted normally by the caller.
      *
      * @param loosePool  pooled amounts per item type for the loose eligible items; bundle contents are
      *                   merged in by this method (mutated)
      * @param samples    a representative ItemStack per type (mutated: bundle-only types are added)
      * @param bundles    the bundle ItemStacks to use as bins; mutated in place ({@code null}/empty ok)
      * @param entryCap   maximum distinct entries per bundle; ≤ 0 means weight-only limit
+     * @param blacklist  materials and display names that must not be packed into or unpacked from bundles
      * @return the leftover loose stacks (full stacks plus any un-bundled remainder) for every type
      */
     public static List<ItemStack> packIntoBundles(Map<SortKey, Long> loosePool,
                                                   Map<SortKey, ItemStack> samples,
-                                                  List<ItemStack> bundles, int entryCap) {
+                                                  List<ItemStack> bundles, int entryCap,
+                                                  BundleBlacklist blacklist) {
         Map<SortKey, Set<Integer>> originBins = new HashMap<>();
 
         // Bins = each provided bundle; pool its eligible contents into the loose pool.
         List<Bin> bins = new ArrayList<>();
         if (bundles != null) {
             for (ItemStack b : bundles) {
-                if (b != null && isBundle(b.getType())) {
-                    addBin(bins, b, loosePool, samples, originBins);
+                if (b != null && isBundle(b.getType()) && !blacklist.blocks(b)) {
+                    addBin(bins, b, loosePool, samples, originBins, blacklist);
                 }
             }
         }
@@ -140,8 +155,9 @@ public final class BundlePacker {
 
     /** Construct a {@link Bin} for {@code bundleItem}, pooling its eligible contents into the pool. */
     private static void addBin(List<Bin> bins, ItemStack bundleItem, Map<SortKey, Long> totals,
-                               Map<SortKey, ItemStack> samples, Map<SortKey, Set<Integer>> originBins) {
-        Bin bin = Bin.of(bins.size(), bundleItem);
+                               Map<SortKey, ItemStack> samples, Map<SortKey, Set<Integer>> originBins,
+                               BundleBlacklist blacklist) {
+        Bin bin = Bin.of(bins.size(), bundleItem, blacklist);
         if (bin == null) return;
         for (ItemStack is : bin.pooled) {
             SortKey key = SortKey.poolKey(is);
@@ -233,6 +249,15 @@ public final class BundlePacker {
     }
 
     /**
+     * Returns true if {@code is} may be placed into a bundle and is not blocked by the blacklist.
+     *
+     * @param blacklist materials and display names excluded from bundle packing/unpacking; not null
+     */
+    public static boolean canBundle(ItemStack is, BundleBlacklist blacklist) {
+        return canBundle(is) && !blacklist.blocks(is);
+    }
+
+    /**
      * Per-type repack plan: how a pooled total splits into inventory full stacks and a single
      * bundle-or-loose remainder.
      */
@@ -268,7 +293,7 @@ public final class BundlePacker {
         int distinct;
         boolean dirty;
 
-        private Bin(int id, ItemStack bundleItem, BundleMeta meta) {
+        private Bin(int id, ItemStack bundleItem, BundleMeta meta, BundleBlacklist blacklist) {
             this.id = id;
             this.bundleItem = bundleItem;
             this.meta = meta;
@@ -276,7 +301,7 @@ public final class BundlePacker {
             this.pooled = new ArrayList<>();
             for (ItemStack is : meta.getItems()) {
                 if (is == null) continue;
-                if (canBundle(is)) {
+                if (canBundle(is, blacklist)) {
                     pooled.add(is);
                 } else {
                     items.add(is);
@@ -289,9 +314,9 @@ public final class BundlePacker {
         }
 
         /** Wrap a bundle ItemStack, or {@code null} if it has no usable {@link BundleMeta}. */
-        static Bin of(int id, ItemStack bundleItem) {
+        static Bin of(int id, ItemStack bundleItem, BundleBlacklist blacklist) {
             if (!(bundleItem.getItemMeta() instanceof BundleMeta meta)) return null;
-            return new Bin(id, bundleItem, meta);
+            return new Bin(id, bundleItem, meta, blacklist);
         }
 
         /** Whether a remainder of {@code weight} fits within both the weight and entry-cap limits. */

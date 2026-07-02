@@ -57,7 +57,7 @@ public class InventoryClickListener implements Listener {
         if (event.getInventory().getHolder() instanceof ClickSortedHolder) {
             return;
         }
-        if (!Permissions.isAllowedTo(player, "clicksorted.sort")) {
+        if (!Permissions.isAllowedTo(player, Permissions.PERM_MASTER)) {
             return;
         }
 
@@ -66,7 +66,11 @@ public class InventoryClickListener implements Listener {
 
         ClickMethod clickMethod = prefs.getClickMethod(player);
 
-        if (clickMethod.matchesSortTrigger(event) && sortService.isSortableTarget(event)) {
+        if (clickMethod.matchesSortTrigger(event)) {
+            InventorySortService.Target target = sortService.checkWork(event, player);
+            if (target == null) {
+                return;
+            }
             // "Sort over items" gate: unless enabled, sorting only fires on an empty slot. Some click
             // methods override the player's preference via ClickMethod.requiredSortOverItems():
             // SINGLE_CLICK forces it off (with it on, every empty-cursor LEFT click on an occupied slot
@@ -93,7 +97,7 @@ public class InventoryClickListener implements Listener {
                 }
                 return;
             }
-            if (sortService.sortInventory(event, prefs.getSortingMethod(player)) && cancelVanilla) {
+            if (sortService.sortInventory(target, event, prefs.getSortingMethod(player)) && cancelVanilla) {
                 // Cancelling the event is sufficient to suppress the vanilla side-effect on all tested
                 // server versions (Paper 1.20.6 and 1.26.1.2); no explicit offhand resync is required.
                 event.setCancelled(true);

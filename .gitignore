@@ -28,3 +28,7 @@
 
 # run-server-plugin dev server (downloaded Paper jar, worlds, configs)
 /run
+
+# mkdocs
+/site
+.venv/

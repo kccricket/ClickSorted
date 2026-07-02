@@ -72,7 +72,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void inventoryPackingOn_packsPartialsAndSorts() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
         player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 10));
@@ -94,7 +94,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     void inventoryPackingOff_onlySortsLeavesBundleEmpty() {
         PlayerMock player = addOpPlayer("Alice");
         // packing disabled by default; be explicit
-        plugin.getSortingPrefs().setBundlePackInventory(player, false);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, false);
 
         player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
         player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 10));
@@ -112,7 +112,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void mergeHappensWithoutBundle() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         // No bundle present — the sort should still consolidate the two partials.
         player.getInventory().setItem(9, new ItemStack(Material.COBBLESTONE, 40));
@@ -127,7 +127,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void hotbarBundleNotUsedForMainStorageSort() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         // Bundle in the hotbar (region-scoped packing must not use it for a main-storage sort).
         player.getInventory().setItem(0, new ItemStack(Material.BUNDLE, 1));
@@ -147,7 +147,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void lockedBundleAndItemUntouched() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         player.getInventory().setItem(20, new ItemStack(Material.COBBLESTONE, 12));
         player.getInventory().setItem(21, new ItemStack(Material.BUNDLE, 1));
@@ -172,7 +172,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void combineThenPackFreesSlots() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
 
         // Empty bundle + five 32-count cobblestone (=160). Merge → 64+64+32; the 32 (weight 32)
         // packs into the bundle → two full loose stacks + a bundle = 3 occupied slots.
@@ -204,7 +204,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     void controlDropClickMethodTriggersSortAndCancels() {
         PlayerMock player = addOpPlayer("Alice");
         plugin.getSortingPrefs().setClickMethod(player, net.kccricket.clicksorted.model.ClickMethod.CONTROL_DROP);
-        plugin.getSortingPrefs().setBundlePackInventory(player, true);
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
         plugin.getSortingPrefs().setSortOverItems(player, true);
 
         player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
@@ -228,13 +228,64 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     }
 
     // -------------------------------------------------------------------------
+    // Bundle action permission gating
+    // -------------------------------------------------------------------------
+
+    @Test
+    void denyingBundleContainerPermissionBlocksChestPacking() {
+        PlayerMock player = server.addPlayer("PackDenied");
+        plugin.getSortingPrefs().setBundlePackInContainers(player, true);
+        plugin.getSortingPrefs().setSortOverItems(player, true);
+        // Revoke the container bundle-pack action node, keep inventory node intact.
+        player.addAttachment(plugin, "clicksorted.bundle.container", false);
+        player.recalculatePermissions();
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, new ItemStack(Material.BUNDLE, 1));
+        chest.setItem(1, new ItemStack(Material.COBBLESTONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        fireClick(view, ClickType.SWAP_OFFHAND, 0);
+
+        // Items are sorted (cobblestone is consolidated) but the bundle stays empty.
+        ItemStack bundle = findBundle(chest, 0, chest.getSize());
+        assertNotNull(bundle, "Bundle should still be in the chest");
+        assertTrue(((BundleMeta) bundle.getItemMeta()).getItems().isEmpty(),
+                "Bundle must stay empty when clicksorted.bundle.container is denied");
+        assertEquals(1, looseSlots(chest, 0, chest.getSize(), Material.COBBLESTONE),
+                "Cobblestone should remain loose");
+    }
+
+    @Test
+    void denyingBundleContainerPermissionDoesNotAffectInventoryPacking() {
+        PlayerMock player = addOpPlayer("PackInventoryOnly");
+        plugin.getSortingPrefs().setBundlePackInInventory(player, true);
+        // Revoke only the container bundle-pack node; inventory node stays granted (op has it via default).
+        player.addAttachment(plugin, "clicksorted.bundle.container", false);
+        player.recalculatePermissions();
+
+        player.getInventory().setItem(9, new ItemStack(Material.BUNDLE, 1));
+        player.getInventory().setItem(10, new ItemStack(Material.COBBLESTONE, 10));
+
+        sortMainStorage(player);
+
+        // Packing in the player's own inventory should still work.
+        assertEquals(0, looseSlots(player.getInventory(), 9, 36, Material.COBBLESTONE),
+                "Inventory packing must still work when only bundle.container is denied");
+        ItemStack bundle = findBundle(player.getInventory(), 9, 36);
+        assertNotNull(bundle);
+        assertTrue(bundleHas(bundle, Material.COBBLESTONE),
+                "Bundle should hold the packed partial");
+    }
+
+    // -------------------------------------------------------------------------
     // Container ("others") packing
     // -------------------------------------------------------------------------
 
     @Test
     void othersPackingOn_packsChestBundle() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackOthers(player, true);
+        plugin.getSortingPrefs().setBundlePackInContainers(player, true);
         plugin.getSortingPrefs().setSortOverItems(player, true);
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);
@@ -254,7 +305,7 @@ class BundleSortIntegrationTest extends AbstractClickSortedTest {
     @Test
     void othersPackingOff_leavesChestBundleEmpty() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getSortingPrefs().setBundlePackOthers(player, false);
+        plugin.getSortingPrefs().setBundlePackInContainers(player, false);
         plugin.getSortingPrefs().setSortOverItems(player, true);
 
         Inventory chest = server.createInventory(null, InventoryType.CHEST);

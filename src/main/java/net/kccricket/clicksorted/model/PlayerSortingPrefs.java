@@ -18,36 +18,53 @@ package net.kccricket.clicksorted.model;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class PlayerSortingPrefs {
     private final ClickSortedPlugin plugin;
     private final NamespacedKey sortKey;
     private final NamespacedKey clickKey;
+    private final NamespacedKey enabledKey;
     private final NamespacedKey sortOverItemsKey;
     private final NamespacedKey lockedSlotsKey;
-    private final NamespacedKey bundleInventoryKey;
-    private final NamespacedKey bundleOthersKey;
+    private final NamespacedKey bundleInInventoryKey;
+    private final NamespacedKey bundleInContainersKey;
     private final NamespacedKey bundleStackLimitKey;
+    private final PdcStringSet<Material> bundleBlacklist;
+    private final PdcStringSet<String> bundleBlacklistNames;
     private final NamespacedKey startCornerKey;
     private final NamespacedKey fillAxisKey;
 
     public PlayerSortingPrefs(ClickSortedPlugin plugin) {
         this.plugin = plugin;
-        this.sortKey = new NamespacedKey(plugin, "sort");
-        this.clickKey = new NamespacedKey(plugin, "click");
+        this.sortKey = new NamespacedKey(plugin, "sort_mode");
+        this.clickKey = new NamespacedKey(plugin, "click_mode");
+        this.enabledKey = new NamespacedKey(plugin, "enabled");
         this.sortOverItemsKey = new NamespacedKey(plugin, "sort_over_items");
         this.lockedSlotsKey = new NamespacedKey(plugin, "locked_slots");
-        this.bundleInventoryKey = new NamespacedKey(plugin, "bundle_inventory");
-        this.bundleOthersKey = new NamespacedKey(plugin, "bundle_others");
+        this.bundleInInventoryKey = new NamespacedKey(plugin, "bundle_in_inventory");
+        this.bundleInContainersKey = new NamespacedKey(plugin, "bundle_in_containers");
         this.bundleStackLimitKey = new NamespacedKey(plugin, "bundle_stack_limit");
+        this.bundleBlacklist = new PdcStringSet<>(
+                new NamespacedKey(plugin, "bundle_blacklist"), ",",
+                Material::matchMaterial, Material::name,
+                () -> EnumSet.noneOf(Material.class));
+        this.bundleBlacklistNames = new PdcStringSet<>(
+                new NamespacedKey(plugin, "bundle_blacklist_names"), "\n",
+                token -> token.isBlank() ? null : token, name -> name,
+                LinkedHashSet::new);
         this.startCornerKey = new NamespacedKey(plugin, "start_corner");
         this.fillAxisKey = new NamespacedKey(plugin, "fill_axis");
     }
@@ -59,6 +76,18 @@ public class PlayerSortingPrefs {
 
     public void setSortingMethod(Player player, SortingMethod sortMethod) {
         player.getPersistentDataContainer().set(sortKey, PersistentDataType.STRING, sortMethod.name());
+    }
+
+    /**
+     * Returns true if click-sorting is enabled for this player.
+     * Falls back to the server default when the player has no stored preference.
+     */
+    public boolean getEnabled(Player player) {
+        return getBool(player, enabledKey, plugin.getConfigManager().main()::getDefaultEnabled);
+    }
+
+    public void setEnabled(Player player, boolean enabled) {
+        setBool(player, enabledKey, enabled);
     }
 
     public ClickMethod getClickMethod(Player player) {
@@ -104,24 +133,24 @@ public class PlayerSortingPrefs {
      * Returns true if bundle packing is enabled for the player's own inventory.
      * Falls back to the server default when the player has no stored preference.
      */
-    public boolean getBundlePackInventory(Player player) {
-        return getBool(player, bundleInventoryKey, plugin.getConfigManager().main()::getDefaultBundlePackInventory);
+    public boolean getBundlePackInInventory(Player player) {
+        return getBool(player, bundleInInventoryKey, plugin.getConfigManager().main()::getDefaultBundlePackInInventory);
     }
 
-    public void setBundlePackInventory(Player player, boolean enabled) {
-        setBool(player, bundleInventoryKey, enabled);
+    public void setBundlePackInInventory(Player player, boolean enabled) {
+        setBool(player, bundleInInventoryKey, enabled);
     }
 
     /**
      * Returns true if bundle packing is enabled for other (container) inventories the player sorts.
      * Falls back to the server default when the player has no stored preference.
      */
-    public boolean getBundlePackOthers(Player player) {
-        return getBool(player, bundleOthersKey, plugin.getConfigManager().main()::getDefaultBundlePackOthers);
+    public boolean getBundlePackInContainers(Player player) {
+        return getBool(player, bundleInContainersKey, plugin.getConfigManager().main()::getDefaultBundlePackInContainers);
     }
 
-    public void setBundlePackOthers(Player player, boolean enabled) {
-        setBool(player, bundleOthersKey, enabled);
+    public void setBundlePackInContainers(Player player, boolean enabled) {
+        setBool(player, bundleInContainersKey, enabled);
     }
 
     /** Reads a boolean preference stored as a byte, falling back to {@code def} when unset. */
@@ -146,6 +175,113 @@ public class PlayerSortingPrefs {
 
     public void setBundleStackLimit(Player player, int limit) {
         player.getPersistentDataContainer().set(bundleStackLimitKey, PersistentDataType.INTEGER, Math.max(0, limit));
+    }
+
+    /**
+     * Returns the player's bundle blacklist: materials that will not be packed into or unpacked from
+     * bundles during sorting. Unknown tokens (e.g. from a removed material) are silently dropped.
+     * Returns an empty, unmodifiable set when no blacklist has been stored.
+     */
+    public Set<Material> getBundleBlacklist(Player player) { return bundleBlacklist.get(player); }
+
+    /**
+     * Adds a material to the player's bundle blacklist.
+     *
+     * @return {@code true} if the material was newly added, {@code false} if it was already present
+     */
+    public boolean addToBundleBlacklist(Player player, Material material) { return bundleBlacklist.add(player, material); }
+
+    /**
+     * Removes a material from the player's bundle blacklist.
+     *
+     * @return {@code true} if the material was removed, {@code false} if it was not present
+     */
+    public boolean removeFromBundleBlacklist(Player player, Material material) { return bundleBlacklist.remove(player, material); }
+
+    /** Clears all entries (materials and display names) from the player's bundle blacklist. */
+    public void clearBundleBlacklist(Player player) {
+        bundleBlacklist.clear(player);
+        bundleBlacklistNames.clear(player);
+    }
+
+    /**
+     * Returns the player's display-name bundle blacklist: plain-text display names that will not be
+     * packed into or unpacked from bundles during sorting. Blank tokens are silently dropped.
+     * Returns an empty, unmodifiable set when no name blacklist has been stored.
+     */
+    public Set<String> getBundleBlacklistNames(Player player) { return bundleBlacklistNames.get(player); }
+
+    /**
+     * Adds a display name to the player's bundle name blacklist.
+     *
+     * @return {@code true} if the name was newly added, {@code false} if it was already present
+     */
+    public boolean addToBundleBlacklistName(Player player, String name) { return bundleBlacklistNames.add(player, name); }
+
+    /**
+     * Removes a display name from the player's bundle name blacklist.
+     *
+     * @return {@code true} if the name was removed, {@code false} if it was not present
+     */
+    public boolean removeFromBundleBlacklistName(Player player, String name) { return bundleBlacklistNames.remove(player, name); }
+
+    /** A PDC-backed set of {@code T} serialized as a delimited string under one {@link NamespacedKey}. */
+    private static final class PdcStringSet<T> {
+        private final NamespacedKey key;
+        private final String delimiter;
+        private final Function<String, T> parse;   // returns null to skip an unparseable token
+        private final Function<T, String> format;
+        private final Supplier<Set<T>> newSet;     // factory for the mutable working set
+
+        PdcStringSet(NamespacedKey key, String delimiter,
+                     Function<String, T> parse, Function<T, String> format,
+                     Supplier<Set<T>> newSet) {
+            this.key = key;
+            this.delimiter = delimiter;
+            this.parse = parse;
+            this.format = format;
+            this.newSet = newSet;
+        }
+
+        Set<T> get(Player player) {
+            String stored = player.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+            if (stored == null || stored.isBlank()) return Set.of();
+            Set<T> result = newSet.get();
+            for (String token : stored.split(delimiter)) {
+                T v = parse.apply(token);
+                if (v != null) result.add(v);
+            }
+            return result.isEmpty() ? Set.of() : Set.copyOf(result);
+        }
+
+        boolean add(Player player, T value) {
+            Set<T> current = newSet.get();
+            current.addAll(get(player));
+            if (!current.add(value)) return false;
+            store(player, current);
+            return true;
+        }
+
+        boolean remove(Player player, T value) {
+            Set<T> current = newSet.get();
+            current.addAll(get(player));
+            if (!current.remove(value)) return false;
+            store(player, current);
+            return true;
+        }
+
+        void clear(Player player) {
+            player.getPersistentDataContainer().remove(key);
+        }
+
+        private void store(Player player, Set<T> values) {
+            if (values.isEmpty()) {
+                player.getPersistentDataContainer().remove(key);
+            } else {
+                String joined = values.stream().map(format).collect(Collectors.joining(delimiter));
+                player.getPersistentDataContainer().set(key, PersistentDataType.STRING, joined);
+            }
+        }
     }
 
     public Set<Integer> getLockedSlots(Player player) {

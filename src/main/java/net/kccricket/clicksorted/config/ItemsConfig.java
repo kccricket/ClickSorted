@@ -1,7 +1,7 @@
 package net.kccricket.clicksorted.config;
 
 import net.kccricket.clicksorted.logging.Log;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kccricket.clicksorted.text.ItemNames;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -54,10 +54,8 @@ public class ItemsConfig implements ManagedConfig {
     // -------------------------------------------------------------------------
 
     public String getItemName(ItemStack i) {
-        if (i.hasItemMeta() && i.getItemMeta().hasDisplayName()) {
-            return PlainTextComponentSerializer.plainText().serialize(i.getItemMeta().displayName());
-        }
-        return getItemName(getItemType(i));
+        String explicit = ItemNames.explicitName(i);
+        return explicit != null ? explicit : getItemName(getItemType(i));
     }
 
     public String getItemName(String iname) {

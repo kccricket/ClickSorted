@@ -14,6 +14,8 @@ package net.kccricket.clicksorted.gui;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.config.LangConfig;
+import net.kccricket.clicksorted.sort.ProtectedSlots;
+import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -22,7 +24,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -52,36 +53,42 @@ public class LockGuiHolder implements ClickSortedHolder {
     public static final int GUI_SIZE = 45;
 
     private final Inventory inventory;
+    private final ProtectedSlots admin;
 
     public LockGuiHolder(ClickSortedPlugin plugin, Player player) {
         LangConfig lang = plugin.getConfigManager().lang();
         this.inventory = Bukkit.createInventory(this, GUI_SIZE,
                 lang.getColoredMessage("lockGuiTitle"));
 
+        // Build admin-slot snapshot covering both config and permission channels for this player.
+        this.admin = ProtectedSlots.forSort(player, plugin.getConfigManager().main());
         Set<Integer> locked = plugin.getSortingPrefs().getLockedSlots(player);
-        ItemStack unsortable = buildUnsortablePane(lang);
 
         // Rows 1-3: main storage slots 9-35 → chest slots 0-26
         for (int chestSlot = 0; chestSlot < DIVIDER_START; chestSlot++) {
             int invSlot = chestSlotToInvSlot(chestSlot);
-            if (plugin.getConfigManager().main().isPlayerSlotSortable(invSlot)) {
-                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+            if (admin.blocks(invSlot)) {
+                inventory.setItem(chestSlot, buildAdminLockedPane(lang, chestSlot));
             } else {
-                inventory.setItem(chestSlot, unsortable.clone());
+                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
             }
         }
 
         // Row 4: divider panes, with the rightmost slot replaced by the help head
-        ItemStack divider = buildDividerPane(lang);
+        ItemStack divider = ClickSortedHolder.buildFiller(lang);
         for (int chestSlot = DIVIDER_START; chestSlot < DIVIDER_END - 1; chestSlot++) {
             inventory.setItem(chestSlot, divider.clone());
         }
-        inventory.setItem(DIVIDER_END - 1, buildHelpHead(lang));
+        inventory.setItem(DIVIDER_END - 1, ClickSortedHolder.buildHelpBook(lang, "lockHelpHeadLore"));
 
         // Row 5: hotbar slots 0-8 → chest slots 36-44
         for (int chestSlot = DIVIDER_END; chestSlot < GUI_SIZE; chestSlot++) {
             int invSlot = chestSlotToInvSlot(chestSlot);
-            inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+            if (admin.blocks(invSlot)) {
+                inventory.setItem(chestSlot, buildAdminLockedPane(lang, chestSlot));
+            } else {
+                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+            }
         }
     }
 
@@ -95,51 +102,51 @@ public class LockGuiHolder implements ClickSortedHolder {
      * line 1 — slot label ("Inventory slot N" or "Hotbar slot N");
      * line 2 — click-to-toggle instruction.
      */
+    private static String resolveSlotLangKey(int chestSlot) {
+        return chestSlot < DIVIDER_START ? "lockPaneSlotInventory" : "lockPaneSlotHotbar";
+    }
+
+    private static int resolveDisplayNumber(int chestSlot) {
+        return chestSlot < DIVIDER_START ? chestSlot + 1 : chestSlot - DIVIDER_END + 1;
+    }
+
     public static ItemStack buildPane(LangConfig lang, boolean locked, int chestSlot) {
-        String slotLangKey;
-        int displayNumber;
-        if (chestSlot < DIVIDER_START) {
-            slotLangKey = "lockPaneSlotInventory";
-            displayNumber = chestSlot + 1;
-        } else {
-            slotLangKey = "lockPaneSlotHotbar";
-            displayNumber = chestSlot - DIVIDER_END + 1;
-        }
+        String slotLangKey = resolveSlotLangKey(chestSlot);
+        int displayNumber = resolveDisplayNumber(chestSlot);
 
         ItemStack pane = new ItemStack(locked ? Material.BARRIER : Material.LIME_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
         meta.displayName(lang.getColoredMessage(locked ? "lockPaneLocked" : "lockPaneUnlocked"));
-        meta.lore(List.of(
+        meta.lore(MessageUtil.toLore(
                 lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
                 lang.getColoredMessage(locked ? "lockPaneLockedLore" : "lockPaneUnlockedLore")));
         pane.setItemMeta(meta);
         return pane;
     }
 
-    public static ItemStack buildUnsortablePane(LangConfig lang) {
-        ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+    /**
+     * Build an iron-bars pane indicating an admin-locked slot.  Uses the slot position to
+     * produce the same "Inventory slot N" / "Hotbar slot N" label as {@link #buildPane}.
+     * Players see this for slots locked via {@code locked_slots.player} config or the
+     * {@code clicksorted.lock.player.slot.<n>} permission node.
+     */
+    public static ItemStack buildAdminLockedPane(LangConfig lang, int chestSlot) {
+        String slotLangKey = resolveSlotLangKey(chestSlot);
+        int displayNumber = resolveDisplayNumber(chestSlot);
+
+        ItemStack pane = new ItemStack(Material.IRON_BARS);
         ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("lockPaneUnsortable"));
-        meta.lore(List.of(lang.getColoredMessage("lockPaneUnsortableLore")));
+        meta.displayName(lang.getColoredMessage("lockPaneAdmin"));
+        meta.lore(MessageUtil.toLore(
+                lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
+                lang.getColoredMessage("lockPaneAdminLore")));
         pane.setItemMeta(meta);
         return pane;
     }
 
-    private static ItemStack buildDividerPane(LangConfig lang) {
-        ItemStack pane = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("lockDividerName"));
-        pane.setItemMeta(meta);
-        return pane;
-    }
-
-    private static ItemStack buildHelpHead(LangConfig lang) {
-        ItemStack book = new ItemStack(Material.BOOK);
-        ItemMeta meta = book.getItemMeta();
-        meta.displayName(lang.getColoredMessage("lockHelpHeadName"));
-        meta.lore(List.of(lang.getColoredMessage("lockHelpHeadLore")));
-        book.setItemMeta(meta);
-        return book;
+    /** Returns true if the given player inventory slot is admin-locked for this player. */
+    public boolean isAdminLocked(int invSlot) {
+        return admin.blocks(invSlot);
     }
 
     /**

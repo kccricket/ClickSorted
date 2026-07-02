@@ -11,11 +11,11 @@ defaults:
   # Tests exercise sorting over occupied slots, so enable this by default here
   # (production config.yml ships with sort_over_items: false).
   sort_over_items: true
-  bundle_inventory: false
-  bundle_others: false
+  bundle_in_inventory: false
+  bundle_in_containers: false
   bundle_stack_limit: 12
-player_sort_min: 9
-player_sort_max: 36
+locked_slots:
+  player: []
 # Throttling disabled by default in tests; throttle tests set this explicitly.
 action_cooldown_ms: 0
 sortable_inventories:

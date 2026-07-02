@@ -14,31 +14,61 @@ package net.kccricket.clicksorted.migration;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.logging.Log;
-import org.bukkit.NamespacedKey;
+import net.kccricket.clicksorted.config.MainConfig;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataContainer;
-import org.bukkit.persistence.PersistentDataType;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+
+import static net.kccricket.clicksorted.migration.Migration.*;
 
 /**
- * Owns the full catalog of <em>what is stored where</em> and <em>which lineage applies</em>, and
- * exposes one entry point per store. Callers (config loader, join listener) pass only the store; the
- * loader/store has no knowledge of which settings get migrated.
- * <p>
- * The catalog has two kinds of rules per store: value-remap lineages ({@link ValueMigration}) keyed
- * by storage location (config path / PDC key name), and deprecated locations to drop outright. As a
- * setting's stored values are renamed, extend the matching lineage; as a setting is removed, add its
- * location to the deprecated list.
+ * Owns the full catalog of <em>what is stored where</em> and <em>which rules apply</em>, and
+ * exposes one entry point per store. Callers pass only the store; the loader/store has no
+ * knowledge of which settings get migrated.
+ *
+ * <h3>Rule hierarchy</h3>
+ * <ol>
+ *   <li><b>Config-only structural transforms</b> ({@link ConfigTransform}) — derive new config
+ *       state from old values in place before any removal pass. Adding a future transform is a
+ *       one-line append to {@link #CONFIG_TRANSFORMS}.</li>
+ *   <li><b>Config-only root-path removal</b> — drop root-level keys that have been removed
+ *       from the schema (e.g. {@code player_sort_min}). Source-key removal for structural
+ *       transforms belongs here, not inside the transform itself.</li>
+ *   <li><b>Shared rules</b> ({@link Migration}) — applied to both config (via {@link Store.ConfigStore},
+ *       namespace {@code defaults.*}) and player PDC (via {@link Store.PdcStore}). Key renames run
+ *       first so that value-remap and conditional rules see the renamed keys. Because PDC leaf names
+ *       now match config-default leaf names (both use e.g. {@code click_mode}), a single declared
+ *       rule covers both stores with no per-key mapping table.</li>
+ * </ol>
+ *
+ * <h3>NONE migration</h3>
+ * {@code ClickMethod.NONE} (disabled state) has been replaced by a dedicated boolean
+ * {@code enabled} preference. A player or admin with {@code click_mode=NONE} is migrated to
+ * {@code enabled=false} and {@code click_mode=SWAP}. This is expressed as a pure data rule in
+ * {@link #SHARED} and runs symmetrically on both stores.
  */
 public final class Migrations {
 
     /**
-     * {@code defaults.click_mode} in config and the per-player {@code click} PDC key.
-     * Renames the 1.0.0 {@code ClickMethod} constants to their current spellings. A future rename is
-     * a pure append, e.g. {@code .rename("SINGLE").to("SINGLE_CLICK").to("SINGLE_PUNCH")}.
+     * A self-contained structural config migration: derives new config state from old values,
+     * in place. Returns {@code true} if anything was changed.
+     *
+     * <p>Source-key removal is <strong>not</strong> the transform's responsibility — list the
+     * old paths in {@link #DEPRECATED_ROOT_PATHS} so the removal pass cleans them up after
+     * the transforms have already read them.
+     */
+    @FunctionalInterface
+    interface ConfigTransform {
+        boolean apply(ConfigurationSection config);
+    }
+
+    /**
+     * {@code defaults.click_mode} in config and the per-player {@code click_mode} PDC key.
+     * Renames the 1.0.0 {@code ClickMethod} constants to their current spellings.
      */
     public static final ValueMigration CLICK_METHOD = ValueMigration.builder()
             .rename("DOUBLE").to("DOUBLE_CLICK")
@@ -57,25 +87,44 @@ public final class Migrations {
      */
     public static final ValueMigration FILL_AXIS = ValueMigration.builder().build();
 
-    /** Config paths (value-remap): path → lineage. */
-    private static final Map<String, ValueMigration> CONFIG = Map.of(
-            "defaults.click_mode", CLICK_METHOD,
-            "defaults.start_corner", START_CORNER,
-            "defaults.fill_axis", FILL_AXIS);
+    /**
+     * Structural config transforms, applied in order before root-path removal and shared rules.
+     * To add a future structural migration, append here.
+     */
+    private static final List<ConfigTransform> CONFIG_TRANSFORMS = List.of(
+            Migrations::migrateSortBounds);
 
-    /** Per-player PDC keys (value-remap): key name → lineage. */
-    private static final Map<String, ValueMigration> PDC = Map.of(
-            "click", CLICK_METHOD,
-            "start_corner", START_CORNER,
-            "fill_axis", FILL_AXIS);
+    /**
+     * Root-level config paths to drop. These are not in {@code defaults.*} so they fall outside
+     * the {@link Store.ConfigStore} namespace and are handled separately.
+     */
+    private static final List<String> DEPRECATED_ROOT_PATHS = List.of(
+            "player_sort_min",
+            "player_sort_max");
 
-    /** Config paths for settings that have been removed entirely and should be dropped. */
-    private static final List<String> DEPRECATED_CONFIG_PATHS = List.of(
-            "defaults.shift_click");
-
-    /** Per-player PDC key names for settings that have been removed entirely and should be dropped. */
-    private static final List<String> DEPRECATED_PDC_KEYS = List.of(
-            "shift_click");
+    /**
+     * Shared migration rules, applied in order to both config ({@link Store.ConfigStore}) and PDC
+     * ({@link Store.PdcStore}). Order encodes the data dependency:
+     * <ol>
+     *   <li>Key renames first — so legacy PDC {@code click=DOUBLE} becomes {@code click_mode=DOUBLE}
+     *       before the remap turns it into {@code DOUBLE_CLICK}.</li>
+     *   <li>Value remaps — canonical-name enforcement for each renamed setting.</li>
+     *   <li>Conditional branch — {@code NONE} → {@code enabled=false, click_mode=SWAP}.
+     *       {@code NONE} is intentionally absent from the {@link #CLICK_METHOD} lineage so the remap
+     *       does not rewrite it before this condition can observe it.</li>
+     *   <li>Deprecated-key removal last.</li>
+     * </ol>
+     */
+    private static final List<Migration> SHARED = List.of(
+            renameKey("click",            "click_mode"),         // PDC-only in practice; no-op on config
+            renameKey("sort",             "sort_mode"),           // PDC-only in practice; no-op on config
+            renameBooleanKey("bundle_inventory", "bundle_in_inventory"), // PDC-only in practice; no-op on config
+            renameBooleanKey("bundle_others",    "bundle_in_containers"), // PDC-only in practice; no-op on config
+            remap("click_mode",      CLICK_METHOD),
+            remap("start_corner",    START_CORNER),
+            remap("fill_axis",       FILL_AXIS),
+            when("click_mode").is("NONE").then(set("enabled", false), set("click_mode", "SWAP")),
+            remove("shift_click"));
 
     private final ClickSortedPlugin plugin;
 
@@ -84,92 +133,90 @@ public final class Migrations {
     }
 
     /**
-     * Applies the config catalog to {@code config} in place: rewrites renamed values and drops
-     * deprecated paths. The caller is responsible for persisting the configuration afterward.
+     * Applies the full config catalog to {@code config} in place, in three passes:
+     * <ol>
+     *   <li>Structural transforms (read old keys before removal).</li>
+     *   <li>Deprecated root-path removal (source keys for structural transforms).</li>
+     *   <li>Shared rules over {@code defaults.*}.</li>
+     * </ol>
+     * The caller is responsible for persisting the configuration afterward.
      *
-     * @return true if any value was rewritten or any deprecated path was removed
+     * @return true if any value was rewritten, any deprecated path was removed, or any
+     *         structural transform made a change
      */
     public boolean migrate(ConfigurationSection config) {
-        boolean changed = false;
-        for (Map.Entry<String, ValueMigration> entry : CONFIG.entrySet()) {
-            changed |= apply(config, entry.getKey(), entry.getValue());
+        try {
+            boolean changed = false;
+            for (ConfigTransform transform : CONFIG_TRANSFORMS) {
+                changed |= transform.apply(config);
+            }
+            for (String path : DEPRECATED_ROOT_PATHS) {
+                changed |= removePath(config, path);
+            }
+            changed |= run(SHARED, new Store.ConfigStore(config));
+            return changed;
+        } catch (RuntimeException e) {
+            throw new MigrationException("Config migration failed", e);
         }
-        for (String path : DEPRECATED_CONFIG_PATHS) {
-            changed |= removePath(config, path);
+    }
+
+    /**
+     * Applies the shared catalog to {@code player}'s persistent data in place. Invoked once per
+     * session on join; a no-op when nothing needs migrating.
+     */
+    public void migrate(Player player) {
+        run(SHARED, new Store.PdcStore(player.getPersistentDataContainer(), plugin));
+    }
+
+    // -------------------------------------------------------------------------
+    // Structural transform implementations
+    // -------------------------------------------------------------------------
+
+    /**
+     * Translates legacy {@code player_sort_min} / {@code player_sort_max} into equivalent
+     * {@code locked_slots.player} entries so that any customised sort window is preserved.
+     */
+    private static boolean migrateSortBounds(ConfigurationSection config) {
+        boolean hasSortMin = config.contains("player_sort_min");
+        boolean hasSortMax = config.contains("player_sort_max");
+        if (!hasSortMin && !hasSortMax) {
+            return false;
+        }
+
+        int min = Math.max(0, Math.min(config.getInt("player_sort_min", 9), MainConfig.PLAYER_STORAGE_END));
+        int max = Math.max(0, Math.min(config.getInt("player_sort_max", MainConfig.PLAYER_STORAGE_END), MainConfig.PLAYER_STORAGE_END));
+
+        List<Integer> excluded = new ArrayList<>();
+        for (int i = 9; i < min; i++) excluded.add(i);
+        for (int i = max; i < MainConfig.PLAYER_STORAGE_END; i++) excluded.add(i);
+
+        if (excluded.isEmpty()) {
+            return false;
+        }
+
+        Set<Integer> merged = new LinkedHashSet<>(config.getIntegerList("locked_slots.player"));
+        merged.addAll(excluded);
+        List<Integer> sorted = new ArrayList<>(merged);
+        sorted.sort(Integer::compareTo);
+        config.set("locked_slots.player", sorted);
+
+        Log.debug("migrateSortBounds: player_sort_min=" + min + ", player_sort_max=" + max
+                + " → locked " + sorted);
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private boolean run(List<Migration> migrations, Store store) {
+        boolean changed = false;
+        for (Migration m : migrations) {
+            changed |= m.apply(store);
         }
         return changed;
     }
 
-    /**
-     * Applies the PDC catalog to {@code player}'s persistent data in place: rewrites renamed values
-     * and drops deprecated keys. Invoked once per session on join; a no-op when nothing needs
-     * migrating.
-     */
-    public void migrate(Player player) {
-        PersistentDataContainer pdc = player.getPersistentDataContainer();
-        for (Map.Entry<String, ValueMigration> entry : PDC.entrySet()) {
-            apply(pdc, new NamespacedKey(plugin, entry.getKey()), entry.getValue());
-        }
-        for (String name : DEPRECATED_PDC_KEYS) {
-            removeKey(pdc, new NamespacedKey(plugin, name));
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Per-location rewrite / removal helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Rewrites a legacy value stored under {@code key} in {@code pdc} to its canonical form.
-     *
-     * @return true if a value was present and rewritten
-     */
-    private boolean apply(PersistentDataContainer pdc, NamespacedKey key, ValueMigration migration) {
-        String current = pdc.get(key, PersistentDataType.STRING);
-        String migrated = migration.migrate(current);
-        if (migrated != null && !migrated.equals(current)) {
-            pdc.set(key, PersistentDataType.STRING, migrated);
-            Log.debug("migrated PDC " + key.getKey() + ": " + current + " -> " + migrated);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Rewrites a legacy value stored at {@code path} in {@code config} to its canonical form.
-     *
-     * @return true if a value was present and rewritten
-     */
-    private boolean apply(ConfigurationSection config, String path, ValueMigration migration) {
-        String current = config.getString(path);
-        String migrated = migration.migrate(current);
-        if (migrated != null && !migrated.equals(current)) {
-            config.set(path, migrated);
-            Log.debug("migrated config " + path + ": " + current + " -> " + migrated);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Drops a deprecated {@code key} from {@code pdc} if present.
-     *
-     * @return true if the key was present and removed
-     */
-    private boolean removeKey(PersistentDataContainer pdc, NamespacedKey key) {
-        if (pdc.getKeys().contains(key)) {
-            pdc.remove(key);
-            Log.debug("removed deprecated PDC key " + key.getKey());
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Drops a deprecated {@code path} from {@code config} if present.
-     *
-     * @return true if the path was present and removed
-     */
     private boolean removePath(ConfigurationSection config, String path) {
         if (config.contains(path)) {
             config.set(path, null);

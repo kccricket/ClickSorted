@@ -3,22 +3,33 @@ package net.kccricket.clicksorted.commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.config.LangConfig;
+import net.kccricket.clicksorted.gui.BlacklistGuiHolder;
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.logging.DebugLevel;
+import net.kccricket.clicksorted.migration.MigrationException;
 import net.kccricket.clicksorted.migration.PreferenceRepair;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
+import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ClickSortedCommands {
 
@@ -38,34 +49,120 @@ public class ClickSortedCommands {
 
     public static LiteralCommandNode<CommandSourceStack> build(ClickSortedPlugin plugin) {
         return Commands.literal("clicksorted")
-                .then(buildSet(plugin))
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands"))
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    if (!player.hasPermission(Permissions.PERM_MASTER)
+                            || !player.hasPermission("clicksorted.commands.sort.enabled")) {
+                        MessageUtil.errorMessage(player,
+                                plugin.getConfigManager().lang().getColoredMessage("noPermission"));
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    applyEnabledSetting(plugin, player, !plugin.getSortingPrefs().getEnabled(player));
+                    return Command.SINGLE_SUCCESS;
+                })
+                .then(buildAdmin(plugin))
+                .then(buildClick(plugin))
+                .then(buildSort(plugin))
+                .then(buildLockSlots(plugin))
+                .then(buildBundle(plugin))
                 .then(buildStatus(plugin))
-                .then(buildReload(plugin))
-                .then(buildGetcfg(plugin))
-                .then(buildDebug(plugin))
-                .then(buildBenchmark(plugin))
                 .build();
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSet(ClickSortedPlugin plugin) {
-        return Commands.literal("set")
-                .then(buildSortMethod(plugin))
-                .then(buildClickMethod(plugin))
-                .then(buildStartCorner(plugin))
-                .then(buildFillAxis(plugin))
-                .then(buildHover(plugin))
-                .then(buildBundle(plugin))
-                .then(buildLock(plugin));
+    // -------------------------------------------------------------------------
+    // /clicksorted admin — groups diagnostic/admin subcommands
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildAdmin(ClickSortedPlugin plugin) {
+        return Commands.literal("admin")
+                .then(buildDebug(plugin))
+                .then(buildGetcfg(plugin))
+                .then(buildReload(plugin))
+                .then(buildBenchmark(plugin));
     }
 
+    // -------------------------------------------------------------------------
+    // /clicksorted click — groups click-method and allow-on-hover
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildClick(ClickSortedPlugin plugin) {
+        return Commands.literal("click")
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.click"))
+                .then(buildClickMethod(plugin))
+                .then(buildHover(plugin));
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted sort — groups enabled, method, start-corner, fill-axis
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSort(ClickSortedPlugin plugin) {
+        return Commands.literal("sort")
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.sort"))
+                .then(buildEnabled(plugin))
+                .then(buildSortMethod(plugin))
+                .then(buildStartCorner(plugin))
+                .then(buildFillAxis(plugin));
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted sort enabled [yes|no]
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildEnabled(ClickSortedPlugin plugin) {
+        return Commands.literal("enabled")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort.enabled"))
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    applyEnabledSetting(plugin, player, !plugin.getSortingPrefs().getEnabled(player));
+                    return Command.SINGLE_SUCCESS;
+                })
+                .then(Commands.argument("state", StringArgumentType.word())
+                        .suggests((ctx, b) -> { b.suggest("yes"); b.suggest("no"); return b.buildFuture(); })
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            String raw = StringArgumentType.getString(ctx, "state");
+                            Boolean state = parseState(raw);
+                            if (state == null) {
+                                sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            applyEnabledSetting(plugin, player, state);
+                            return Command.SINGLE_SUCCESS;
+                        }));
+    }
+
+    private static void applyEnabledSetting(ClickSortedPlugin plugin, Player player, boolean enabled) {
+        plugin.getSortingPrefs().setEnabled(player, enabled);
+        MessageUtil.statusMessage(player,
+                plugin.getConfigManager().lang().getColoredMessage("setEnabledStatus",
+                        Placeholder.unparsed("status", enabledLabel(enabled))));
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted sort start-corner / fill-axis
+    // -------------------------------------------------------------------------
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStartCorner(ClickSortedPlugin plugin) {
-        return enumPref(plugin, "start-corner", "clicksorted.commands.sort", "corner",
+        return enumPref(plugin, "start-corner", "clicksorted.commands.sort.start-corner", "corner",
                 StartCorner.values(), "setStartCornerTo", "corner",
                 (player, corner) -> plugin.getSortingPrefs().setStartCorner(player, corner));
     }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildFillAxis(ClickSortedPlugin plugin) {
-        return enumPref(plugin, "fill-axis", "clicksorted.commands.sort", "axis",
+        return enumPref(plugin, "fill-axis", "clicksorted.commands.sort.fill-axis", "axis",
                 FillAxis.values(), "setFillAxisTo", "axis",
                 (player, axis) -> plugin.getSortingPrefs().setFillAxis(player, axis));
     }
@@ -84,14 +181,14 @@ public class ClickSortedCommands {
                         Placeholder.unparsed("valid", valid)));
     }
 
-    private static final String BOOLEAN_VALUES = "on, off";
+    private static final String BOOLEAN_VALUES = "yes, no";
 
     /**
-     * A {@code /clicksorted set <literal> <value>} subcommand that parses {@code value} (case-insensitive)
+     * A {@code /clicksorted <domain> <literal> <value>} subcommand that parses {@code value} (case-insensitive)
      * into one of {@code values} and persists it via {@code setter}, echoing {@code langKey} with the
      * chosen value under the {@code placeholder} tag. Unrecognised input sends an error message naming
      * the bad value and valid options. Suited to plain enum preferences with no extra validation;
-     * {@code sort-method} and {@code click-method} keep bespoke builders for their availability check and
+     * {@code sort method} and {@code click method} keep bespoke builders for their availability check and
      * instruction text.
      */
     private static <E extends Enum<E>> com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> enumPref(
@@ -121,10 +218,24 @@ public class ClickSortedCommands {
     }
 
     /**
+     * Materials offered as completions for the bundle-blacklist {@code add} argument: non-legacy
+     * materials that have an item form (so a bare block-only material such as {@code WATER}, which
+     * cannot be a bundle entry and has no {@link org.bukkit.inventory.meta.ItemMeta}, is excluded).
+     * Note that block materials with an item form (e.g. {@code DIRT}) still qualify.
+     */
+    static final java.util.function.Predicate<Material> SUGGESTABLE_MATERIAL =
+            mat -> !mat.isLegacy() && mat.isItem();
+
+    private static final List<String> SUGGESTABLE_MATERIAL_NAMES = java.util.Arrays.stream(Material.values())
+            .filter(SUGGESTABLE_MATERIAL)
+            .map(m -> m.name().toLowerCase(Locale.ROOT))
+            .toList();
+
+    /**
      * Suggests the lower-cased names of {@code values} that pass {@code include} and prefix-match the
      * current (case-insensitive) input. Shared by every enum-valued argument's {@code suggests} hook.
      */
-    private static <E extends Enum<E>> java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestEnum(
+    static <E extends Enum<E>> java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestEnum(
             com.mojang.brigadier.suggestion.SuggestionsBuilder builder, E[] values, java.util.function.Predicate<E> include) {
         String input = builder.getRemaining().toUpperCase();
         for (E value : values) {
@@ -145,9 +256,13 @@ public class ClickSortedCommands {
         return null;
     }
 
+    // -------------------------------------------------------------------------
+    // /clicksorted sort method <NAME|GROUP|TREEMAP>
+    // -------------------------------------------------------------------------
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSortMethod(ClickSortedPlugin plugin) {
-        return Commands.literal("sort-method")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort"))
+        return Commands.literal("method")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort.method"))
                 .then(Commands.argument("method", StringArgumentType.word())
                         .suggests((ctx, builder) -> suggestEnum(builder, SortingMethod.values(), SortingMethod::isAvailable))
                         .executes(ctx -> {
@@ -176,9 +291,13 @@ public class ClickSortedCommands {
                         }));
     }
 
+    // -------------------------------------------------------------------------
+    // /clicksorted click method <…>
+    // -------------------------------------------------------------------------
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildClickMethod(ClickSortedPlugin plugin) {
-        return Commands.literal("click-method")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.click"))
+        return Commands.literal("method")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.click.method"))
                 .then(Commands.argument("method", StringArgumentType.word())
                         .suggests((ctx, builder) -> suggestEnum(builder, ClickMethod.values(), m -> true))
                         .executes(ctx -> {
@@ -197,6 +316,8 @@ public class ClickSortedCommands {
                                 // Methods that govern hover (SINGLE_CLICK, CONTROL_DROP) force the player's
                                 // hover preference to the only usable value, messaging them on any change.
                                 PreferenceRepair.enforceHover(plugin, player, method);
+                                // Re-push the command tree so allow-on-hover visibility updates immediately.
+                                player.updateCommands();
                             } catch (IllegalArgumentException ignored) {
                                 sendInvalidValue(plugin, player, arg,
                                         validList(ClickMethod.values(), m -> true));
@@ -205,9 +326,16 @@ public class ClickSortedCommands {
                         }));
     }
 
+    // -------------------------------------------------------------------------
+    // /clicksorted click allow-on-hover [yes|no]
+    // -------------------------------------------------------------------------
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildHover(ClickSortedPlugin plugin) {
-        return Commands.literal("hover")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.hover"))
+        return Commands.literal("allow-on-hover")
+                .requires(src -> src.getSender().hasPermission("clicksorted.commands.click.hover")
+                        // Hide when the player's current click method governs hover automatically.
+                        && (!(src.getExecutor() instanceof Player p)
+                                || !plugin.getSortingPrefs().getClickMethod(p).governsHover()))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
                     if (player == null || throttled(plugin, ctx.getSource())) {
@@ -218,7 +346,7 @@ public class ClickSortedCommands {
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(Commands.argument("value", StringArgumentType.word())
-                        .suggests((ctx, b) -> { b.suggest("true"); b.suggest("false"); return b.buildFuture(); })
+                        .suggests((ctx, b) -> { b.suggest("yes"); b.suggest("no"); return b.buildFuture(); })
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -263,7 +391,7 @@ public class ClickSortedCommands {
 
     /** Resolve the executing player, or {@code null} (after sending the console notice) if not a player. */
     private static Player requirePlayer(ClickSortedPlugin plugin,
-                                        com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx) {
+                                        CommandContext<CommandSourceStack> ctx) {
         if (ctx.getSource().getExecutor() instanceof Player player) {
             return player;
         }
@@ -272,52 +400,111 @@ public class ClickSortedCommands {
         return null;
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundle(ClickSortedPlugin plugin) {
-        return Commands.literal("bundle")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.bundle"))
+    // -------------------------------------------------------------------------
+    // /clicksorted lock-slots
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildLockSlots(ClickSortedPlugin plugin) {
+        return Commands.literal("lock-slots")
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.lock"))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
                     if (player == null || throttled(plugin, ctx.getSource())) {
                         return Command.SINGLE_SUCCESS;
                     }
-                    sendBundleStatus(plugin, player);
+                    player.openInventory(new LockGuiHolder(plugin, player).getInventory());
                     return Command.SINGLE_SUCCESS;
-                })
-                .then(bundleToggle(plugin, "inventory", "setBundlePackInventoryStatus",
-                        (player, status) -> plugin.getSortingPrefs().setBundlePackInventory(player, status)))
-                .then(bundleToggle(plugin, "others", "setBundlePackOthersStatus",
-                        (player, status) -> plugin.getSortingPrefs().setBundlePackOthers(player, status)))
-                .then(buildBundleStackLimit(plugin));
+                });
     }
 
-    /** A {@code /clicksorted set bundle <literal> <on|off>} boolean toggle persisting via {@code setter}. */
+    // -------------------------------------------------------------------------
+    // /clicksorted bundle — groups all bundle-packing subcommands
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundle(ClickSortedPlugin plugin) {
+        return Commands.literal("bundle")
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.bundle"))
+                .then(buildBundleEnabled(plugin))
+                .then(buildBundleStackLimit(plugin))
+                .then(buildBundleBlacklist(plugin));
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted bundle enabled — combined toggle; in-inventory / in-containers below
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundleEnabled(ClickSortedPlugin plugin) {
+        return Commands.literal("enabled")
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    var prefs = plugin.getSortingPrefs();
+                    boolean inv = prefs.getBundlePackInInventory(player);
+                    boolean cont = prefs.getBundlePackInContainers(player);
+                    // "On unless both already on" — mixed state (one on, one off) → both on.
+                    boolean target = !(inv && cont);
+                    applyBundleEnabled(plugin, player, target);
+                    return Command.SINGLE_SUCCESS;
+                })
+                .then(boolStateArg(plugin, (player, state) -> applyBundleEnabled(plugin, player, state)))
+                .then(bundleToggle(plugin, "in-inventory", "setBundlePackInInventoryStatus",
+                        (player, status) -> plugin.getSortingPrefs().setBundlePackInInventory(player, status)))
+                .then(bundleToggle(plugin, "in-containers", "setBundlePackInContainersStatus",
+                        (player, status) -> plugin.getSortingPrefs().setBundlePackInContainers(player, status)));
+    }
+
+    private static void applyBundleEnabled(ClickSortedPlugin plugin, Player player, boolean enabled) {
+        plugin.getSortingPrefs().setBundlePackInInventory(player, enabled);
+        plugin.getSortingPrefs().setBundlePackInContainers(player, enabled);
+        MessageUtil.statusMessage(player,
+                plugin.getConfigManager().lang().getColoredMessage("setBundlePackEnabledStatus",
+                        Placeholder.unparsed("status", enabledLabel(enabled))));
+    }
+
+    /** A {@code /clicksorted bundle <literal> <yes|no>} boolean toggle persisting via {@code setter}. */
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> bundleToggle(
             ClickSortedPlugin plugin, String literal, String langKey,
             java.util.function.BiConsumer<Player, Boolean> setter) {
         return Commands.literal(literal)
-                .then(Commands.argument("state", StringArgumentType.word())
-                        .suggests((ctx, b) -> { b.suggest("on"); b.suggest("off"); return b.buildFuture(); })
-                        .executes(ctx -> {
-                            Player player = requirePlayer(plugin, ctx);
-                            if (player == null || throttled(plugin, ctx.getSource())) {
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            String raw = StringArgumentType.getString(ctx, "state");
-                            Boolean state = parseState(raw);
-                            if (state == null) {
-                                sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
-                                return Command.SINGLE_SUCCESS;
-                            }
-                            setter.accept(player, state);
-                            MessageUtil.statusMessage(player,
-                                    plugin.getConfigManager().lang().getColoredMessage(langKey,
-                                            Placeholder.unparsed("status", enabledLabel(state))));
-                            return Command.SINGLE_SUCCESS;
-                        }));
+                .then(boolStateArg(plugin, (player, state) -> {
+                    setter.accept(player, state);
+                    MessageUtil.statusMessage(player,
+                            plugin.getConfigManager().lang().getColoredMessage(langKey,
+                                    Placeholder.unparsed("status", enabledLabel(state))));
+                }));
     }
 
+    /** A {@code <yes|no>} argument node that parses and validates a boolean state, then calls {@code applyFn}. */
+    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String> boolStateArg(
+            ClickSortedPlugin plugin, java.util.function.BiConsumer<Player, Boolean> applyFn) {
+        return Commands.argument("state", StringArgumentType.word())
+                .suggests((ctx, b) -> { b.suggest("yes"); b.suggest("no"); return b.buildFuture(); })
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    String raw = StringArgumentType.getString(ctx, "state");
+                    Boolean state = parseState(raw);
+                    if (state == null) {
+                        sendInvalidValue(plugin, player, raw, BOOLEAN_VALUES);
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    applyFn.accept(player, state);
+                    return Command.SINGLE_SUCCESS;
+                });
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted bundle stack-limit <n|off>
+    // -------------------------------------------------------------------------
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundleStackLimit(ClickSortedPlugin plugin) {
-        return Commands.literal("stacklimit")
+        return Commands.literal("stack-limit")
                 .then(Commands.argument("value", StringArgumentType.word())
                         .suggests((ctx, b) -> { b.suggest("12"); b.suggest("32"); b.suggest("off"); return b.buildFuture(); })
                         .executes(ctx -> {
@@ -348,35 +535,213 @@ public class ClickSortedCommands {
                         }));
     }
 
-    /** Print the player's three current bundle-packing settings. */
-    private static void sendBundleStatus(ClickSortedPlugin plugin, Player player) {
+    /** Print the player's current bundle-packing settings, including the blacklist. */
+    static void sendBundleStatus(ClickSortedPlugin plugin, Player player) {
         var prefs = plugin.getSortingPrefs();
         var lang = plugin.getConfigManager().lang();
-        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundlePackInventoryStatus",
-                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInventory(player)))));
-        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundlePackOthersStatus",
-                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackOthers(player)))));
+        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleInInventory",
+                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInInventory(player)))));
+        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleInContainers",
+                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInContainers(player)))));
         int limit = prefs.getBundleStackLimit(player);
-        MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleStackLimitStatus",
+        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleStackLimit",
                 Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
+        printBlacklistSection(player, lang, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
+                "statusBundleBlacklistEmpty", "statusBundleBlacklistMaterials", "statusBundleBlacklistNames");
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildLock(ClickSortedPlugin plugin) {
-        return Commands.literal("lock")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.lock"))
-                .executes(ctx -> {
-                    Player player = requirePlayer(plugin, ctx);
-                    if (player == null || throttled(plugin, ctx.getSource())) {
-                        return Command.SINGLE_SUCCESS;
-                    }
-                    player.openInventory(new LockGuiHolder(plugin, player).getInventory());
-                    return Command.SINGLE_SUCCESS;
-                });
+    private static int openBlacklistGui(ClickSortedPlugin plugin, CommandContext<CommandSourceStack> ctx) {
+        Player player = requirePlayer(plugin, ctx);
+        if (player == null || throttled(plugin, ctx.getSource())) {
+            return Command.SINGLE_SUCCESS;
+        }
+        player.openInventory(new BlacklistGuiHolder(plugin, player).getInventory());
+        return Command.SINGLE_SUCCESS;
     }
+
+    static void sendBlacklistStatus(ClickSortedPlugin plugin, Player player) {
+        var lang = plugin.getConfigManager().lang();
+        var prefs = plugin.getSortingPrefs();
+        printBlacklistSection(player, lang, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
+                "setBundleBlacklistEmpty", "setBundleBlacklistMaterialsList", "setBundleBlacklistNamesList");
+    }
+
+    private static void printBlacklistSection(Player player, LangConfig lang,
+            Set<Material> materials, Set<String> names,
+            String emptyKey, String materialsKey, String namesKey) {
+        if (materials.isEmpty() && names.isEmpty()) {
+            MessageUtil.statusMessage(player, lang.getColoredMessage(emptyKey));
+            return;
+        }
+        if (!materials.isEmpty()) {
+            String list = materials.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
+            MessageUtil.statusMessage(player, lang.getColoredMessage(materialsKey,
+                    Placeholder.unparsed("list", list)));
+        }
+        if (!names.isEmpty()) {
+            String list = names.stream().sorted().collect(Collectors.joining(", "));
+            MessageUtil.statusMessage(player, lang.getColoredMessage(namesKey,
+                    Placeholder.unparsed("list", list)));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted bundle blacklist — GUI and text subcommands
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBundleBlacklist(ClickSortedPlugin plugin) {
+        return Commands.literal("blacklist")
+                .executes(ctx -> openBlacklistGui(plugin, ctx))
+                .then(Commands.literal("gui")
+                        .executes(ctx -> openBlacklistGui(plugin, ctx)))
+                .then(Commands.literal("add")
+                        .then(Commands.literal("material")
+                                .then(Commands.argument("material", StringArgumentType.word())
+                                        .suggests((ctx, b) -> {
+                                            String prefix = b.getRemaining().toLowerCase(Locale.ROOT);
+                                            SUGGESTABLE_MATERIAL_NAMES.forEach(name -> {
+                                                if (name.startsWith(prefix)) b.suggest(name);
+                                            });
+                                            return b.buildFuture();
+                                        })
+                                        .executes(ctx -> {
+                                            Player player = requirePlayer(plugin, ctx);
+                                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                                return Command.SINGLE_SUCCESS;
+                                            }
+                                            String raw = StringArgumentType.getString(ctx, "material");
+                                            Material mat = Material.matchMaterial(raw);
+                                            // Reject non-item materials (e.g. WATER): they can never be a bundle
+                                            // entry and yield a null ItemMeta that would NPE the blacklist GUI.
+                                            if (mat == null || mat.isLegacy() || !mat.isItem()) {
+                                                sendInvalidValue(plugin, player, raw, "a material name");
+                                                return Command.SINGLE_SUCCESS;
+                                            }
+                                            var lang = plugin.getConfigManager().lang();
+                                            boolean added = plugin.getSortingPrefs().addToBundleBlacklist(player, mat);
+                                            if (added) {
+                                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistAdded",
+                                                        Placeholder.unparsed("material", mat.name())));
+                                            } else {
+                                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistAlreadyPresent",
+                                                        Placeholder.unparsed("material", mat.name())));
+                                            }
+                                            return Command.SINGLE_SUCCESS;
+                                        })))
+                        .then(Commands.literal("item-name")
+                                .then(Commands.argument("name", StringArgumentType.greedyString())
+                                        .executes(ctx -> {
+                                            Player player = requirePlayer(plugin, ctx);
+                                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                                return Command.SINGLE_SUCCESS;
+                                            }
+                                            String name = StringArgumentType.getString(ctx, "name").trim();
+                                            if (name.isEmpty()) {
+                                                sendInvalidValue(plugin, player, name, "a display name");
+                                                return Command.SINGLE_SUCCESS;
+                                            }
+                                            var lang = plugin.getConfigManager().lang();
+                                            boolean added = plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
+                                            if (added) {
+                                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAdded",
+                                                        Placeholder.unparsed("name", name)));
+                                            } else {
+                                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAlreadyPresent",
+                                                        Placeholder.unparsed("name", name)));
+                                            }
+                                            return Command.SINGLE_SUCCESS;
+                                        }))))
+                .then(Commands.literal("remove")
+                        .then(Commands.literal("material")
+                                .then(Commands.argument("material", StringArgumentType.word())
+                                        .suggests((ctx, b) -> {
+                                            if (ctx.getSource().getExecutor() instanceof Player player) {
+                                                plugin.getSortingPrefs().getBundleBlacklist(player)
+                                                        .forEach(mat -> b.suggest(mat.name().toLowerCase()));
+                                            }
+                                            return b.buildFuture();
+                                        })
+                                        .executes(ctx -> {
+                                            Player player = requirePlayer(plugin, ctx);
+                                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                                return Command.SINGLE_SUCCESS;
+                                            }
+                                            String raw = StringArgumentType.getString(ctx, "material");
+                                            Material mat = Material.matchMaterial(raw);
+                                            if (mat == null || mat.isLegacy()) {
+                                                sendInvalidValue(plugin, player, raw, "a material name");
+                                                return Command.SINGLE_SUCCESS;
+                                            }
+                                            var lang = plugin.getConfigManager().lang();
+                                            boolean removed = plugin.getSortingPrefs().removeFromBundleBlacklist(player, mat);
+                                            if (removed) {
+                                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistRemoved",
+                                                        Placeholder.unparsed("material", mat.name())));
+                                            } else {
+                                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNotPresent",
+                                                        Placeholder.unparsed("material", mat.name())));
+                                            }
+                                            return Command.SINGLE_SUCCESS;
+                                        })))
+                        .then(Commands.literal("item-name")
+                                .then(Commands.argument("name", StringArgumentType.greedyString())
+                                        .suggests((ctx, b) -> {
+                                            if (ctx.getSource().getExecutor() instanceof Player player) {
+                                                String input = b.getRemaining().toLowerCase();
+                                                plugin.getSortingPrefs().getBundleBlacklistNames(player)
+                                                        .stream()
+                                                        .filter(n -> n.toLowerCase().startsWith(input))
+                                                        .forEach(b::suggest);
+                                            }
+                                            return b.buildFuture();
+                                        })
+                                        .executes(ctx -> {
+                                            Player player = requirePlayer(plugin, ctx);
+                                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                                return Command.SINGLE_SUCCESS;
+                                            }
+                                            String name = StringArgumentType.getString(ctx, "name").trim();
+                                            var lang = plugin.getConfigManager().lang();
+                                            boolean removed = plugin.getSortingPrefs().removeFromBundleBlacklistName(player, name);
+                                            if (removed) {
+                                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameRemoved",
+                                                        Placeholder.unparsed("name", name)));
+                                            } else {
+                                                MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameNotPresent",
+                                                        Placeholder.unparsed("name", name)));
+                                            }
+                                            return Command.SINGLE_SUCCESS;
+                                        }))))
+                .then(Commands.literal("list")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            sendBlacklistStatus(plugin, player);
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                .then(Commands.literal("clear")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            plugin.getSortingPrefs().clearBundleBlacklist(player);
+                            MessageUtil.statusMessage(player,
+                                    plugin.getConfigManager().lang().getColoredMessage("setBundleBlacklistCleared"));
+                            return Command.SINGLE_SUCCESS;
+                        }));
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted status
+    // -------------------------------------------------------------------------
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildStatus(ClickSortedPlugin plugin) {
         return Commands.literal("status")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.status"))
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.status"))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
                     if (player == null) {
@@ -384,11 +749,14 @@ public class ClickSortedCommands {
                     }
                     var prefs = plugin.getSortingPrefs();
                     var lang = plugin.getConfigManager().lang();
+                    boolean enabled = prefs.getEnabled(player);
                     ClickMethod clickMethod = prefs.getClickMethod(player);
                     SortingMethod sortMethod = prefs.getSortingMethod(player);
                     StartCorner startCorner = prefs.getStartCorner(player);
                     FillAxis fillAxis = prefs.getFillAxis(player);
                     boolean hover = prefs.getSortOverItems(player);
+                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusEnabled",
+                            Placeholder.unparsed("status", enabledLabel(enabled))));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusClickMethod",
                             Placeholder.unparsed("method", clickMethod.toString())));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusSortMethod",
@@ -399,15 +767,29 @@ public class ClickSortedCommands {
                             Placeholder.unparsed("axis", fillAxis.toString())));
                     MessageUtil.statusMessage(player, lang.getColoredMessage("statusHover",
                             Placeholder.unparsed("status", enabledLabel(hover))));
+                    sendBundleStatus(plugin, player);
                     return Command.SINGLE_SUCCESS;
                 });
     }
 
+    // -------------------------------------------------------------------------
+    // /clicksorted admin reload
+    // -------------------------------------------------------------------------
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildReload(ClickSortedPlugin plugin) {
         return Commands.literal("reload")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.reload"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.reload"))
                 .executes(ctx -> {
-                    plugin.getConfigManager().reloadAll();
+                    try {
+                        plugin.getConfigManager().reloadAll();
+                    } catch (MigrationException e) {
+                        Log.severe("Config migration failed on reload; keeping previous configuration.", e);
+                        Throwable root = e.getCause() != null ? e.getCause() : e;
+                        MessageUtil.statusMessage(ctx.getSource().getSender(),
+                                plugin.getConfigManager().lang().getColoredMessage("configReloadFailed",
+                                        Placeholder.unparsed("reason", String.valueOf(root.getMessage()))));
+                        return Command.SINGLE_SUCCESS;
+                    }
                     if (plugin.getConfigManager().main().getCheckForUpdates()) {
                         plugin.getUpdateChecker().check();
                     }
@@ -417,9 +799,13 @@ public class ClickSortedCommands {
                 });
     }
 
+    // -------------------------------------------------------------------------
+    // /clicksorted admin config  (was getcfg)
+    // -------------------------------------------------------------------------
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildGetcfg(ClickSortedPlugin plugin) {
-        return Commands.literal("getcfg")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.getcfg"))
+        return Commands.literal("config")
+                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.config"))
                 .executes(ctx -> {
                     for (String key : plugin.getConfig().getKeys(true)) {
                         if (!plugin.getConfig().isConfigurationSection(key)) {
@@ -431,9 +817,13 @@ public class ClickSortedCommands {
                 });
     }
 
+    // -------------------------------------------------------------------------
+    // /clicksorted admin debug [level]
+    // -------------------------------------------------------------------------
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildDebug(ClickSortedPlugin plugin) {
         return Commands.literal("debug")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.debug"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.debug"))
                 .executes(ctx -> {
                     DebugLevel next = Log.getDebugLevel() == DebugLevel.OFF ? DebugLevel.DEBUG : DebugLevel.OFF;
                     Log.setDebugLevel(next);
@@ -461,13 +851,17 @@ public class ClickSortedCommands {
                         }));
     }
 
+    // -------------------------------------------------------------------------
+    // /clicksorted admin benchmark [iterations]
+    // -------------------------------------------------------------------------
+
     private static final int BENCH_DEFAULT_ITERATIONS = 2000;
     private static final int BENCH_MIN_ITERATIONS = 100;
     private static final int BENCH_MAX_ITERATIONS = 50_000;
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBenchmark(ClickSortedPlugin plugin) {
         return Commands.literal("benchmark")
-                .requires(src -> src.getSender().hasPermission("clicksorted.commands.benchmark"))
+                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.benchmark"))
                 .executes(ctx -> runBenchmark(plugin, ctx.getSource(), BENCH_DEFAULT_ITERATIONS))
                 .then(Commands.argument("iterations", IntegerArgumentType.integer(BENCH_MIN_ITERATIONS, BENCH_MAX_ITERATIONS))
                         .executes(ctx -> runBenchmark(plugin, ctx.getSource(),

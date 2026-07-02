@@ -13,9 +13,11 @@ package net.kccricket.clicksorted.sort;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.config.MainConfig;
 import net.kccricket.clicksorted.events.InventorySortEvent;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.model.FillAxis;
+import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
@@ -37,15 +39,56 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Handles target-inventory resolution, permission checks, the {@link InventorySortEvent}
  * lifecycle, item write-back, overflow dropping, and viewer refresh. Delegates the pure
- * sort/merge algorithm to {@link SortEngine}.
+ * sort/merge algorithm to {@link SortEngine} and in-place consolidation to {@link InPlacePacker}.
+ *
+ * <h2>Modes</h2>
+ * <ul>
+ *   <li><b>Sorting on</b> – the full sort/pack pipeline: merge, optional bundle packing, sort,
+ *       re-layout. Items may move to any sortable slot.</li>
+ *   <li><b>Sorting off, packing on</b> – in-place consolidation via {@link InPlacePacker}:
+ *       same-material stacks consolidate within their own slots; bundle-eligible remainders pack
+ *       into the bundles already in the inventory. Items displaced from bundles or exceeding lane
+ *       capacity fill free/freed slots; drops occur only when the region is genuinely full.</li>
+ * </ul>
+ *
+ * <p>When both modes are disabled for the player and target, this service returns {@code false}
+ * immediately (a complete no-op). The caller ({@link InventoryClickListener}) pre-screens via
+ * {@link #hasWork} to avoid unnecessarily entering the throttle/cancel path.
  */
 public class InventorySortService {
+
+    // -------------------------------------------------------------------------
+    // Region — which inventory zone was clicked
+    // -------------------------------------------------------------------------
+
+    /**
+     * The logical region within an inventory that determines which permissions apply and whether
+     * bundle packing is allowed.
+     */
+    private enum Region {
+        /** Hotbar slots (0–8) of the player inventory. */
+        HOTBAR,
+        /** Main storage slots (9–{@link MainConfig#PLAYER_STORAGE_END}) of the player inventory. */
+        PLAYER_MAIN,
+        /** A sortable container (chest, barrel, shulker box, etc.). */
+        CONTAINER
+    }
+
+    /**
+     * Resolved target for a click event: the inventory, its type, the sortable slot range, and
+     * which {@link Region} the click landed in.
+     */
+    record Target(Inventory inv, InventoryType type, int min, int max, Region region) {}
+
+    // -------------------------------------------------------------------------
 
     private final ClickSortedPlugin plugin;
 
@@ -53,67 +96,50 @@ public class InventorySortService {
         this.plugin = plugin;
     }
 
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
     /**
-     * @return true if the clicked inventory in this event is one that should be sorted
+     * Resolves the click target and checks whether there is work to do for this player.
+     * Returns the resolved {@link Target} if at least one of sorting or bundle packing is enabled
+     * and permitted, or {@code null} if the click should be ignored entirely.
+     *
+     * <p>The returned target is passed directly to {@link #sortInventory} to avoid re-resolving.
      */
-    public boolean isSortableTarget(InventoryClickEvent event) {
-        return shouldSort(event.getClickedInventory());
+    Target checkWork(InventoryClickEvent event, Player player) {
+        Target target = resolve(event);
+        if (target == null) return null;
+        var prefs = plugin.getSortingPrefs();
+        return (prefs.getEnabled(player) && sortAllowed(target.region(), player))
+                || packAllowed(target.region(), player, prefs) ? target : null;
     }
 
     /**
-     * Perform a sort on the inventory targeted by the click event.
+     * Perform a sort (or in-place consolidation) on the inventory targeted by the click event.
+     * The {@code target} must be the value returned by a prior {@link #checkWork} call for the
+     * same event.
      *
-     * @return true if the sort completed and the caller should cancel the originating event
+     * @return true if the operation completed and the caller should cancel the originating event
      */
-    public boolean sortInventory(final InventoryClickEvent event, final SortingMethod sortMethod) {
+    public boolean sortInventory(Target target, final InventoryClickEvent event, final SortingMethod sortMethod) {
         // No cursor-state guard here: the only cursor-empty requirement belongs to SINGLE_CLICK (so a
         // held item can still be placed), and ClickMethod.matchesSortTrigger already enforces that before
         // we are ever called. Other methods may sort with a held cursor item — the event is cancelled and
         // the cursor stack is left untouched.
         Player p = (Player) event.getWhoClicked();
-        int slot = event.getSlot();
-        Inventory inv = event.getClickedInventory();
-        if (inv == null) {
+
+        Log.debug("clicked inventory window " + target.type() + ", slot " + event.getSlot());
+
+        var prefs = plugin.getSortingPrefs();
+        boolean sortEnabled = prefs.getEnabled(p) && sortAllowed(target.region(), p);
+        boolean packEnabled = packAllowed(target.region(), p, prefs);
+        if (!sortEnabled && !packEnabled) {
             return false;
         }
 
-        Log.debug("clicked inventory window " + inv.getType() + ", slot " + slot);
-        int min, max; // slot range to sort
-        InventoryType type = inv.getType();
-        var mainCfg = plugin.getConfigManager().main();
-        boolean playerMainStorage = false; // packing applies here (not the hotbar)
-        boolean container = false;
-        if (type == InventoryType.PLAYER) {
-            int playerSortMax = mainCfg.getPlayerSortMax();
-            if (slot < 9) {
-                // hotbar
-                if (!Permissions.isAllowedTo(p, "clicksorted.sort.hotbar")) {
-                    return false;
-                }
-                min = 0;
-                max = 9;
-            } else if (slot < playerSortMax) {
-                if (!Permissions.isAllowedTo(p, "clicksorted.sort.player")) {
-                    return false;
-                }
-                // main player inventory
-                min = mainCfg.getPlayerSortMin();
-                max = playerSortMax;
-                playerMainStorage = true;
-            } else {
-                // armor / offhand slots — never sort
-                return false;
-            }
-        } else if (mainCfg.getSortableInventories().contains(type)) {
-            if (!Permissions.isAllowedTo(p, "clicksorted.sort.container")) {
-                return false;
-            }
-            min = GridGeometry.storageOffset(inv.getHolder());
-            max = inv.getSize();
-            container = true;
-        } else {
-            return false;
-        }
+        Inventory inv = target.inv();
+        int slot = event.getSlot();
 
         // DOUBLE_CLICK gesture repair: the first click of the double-click already lifted the clicked
         // stack onto the cursor and emptied the slot; the listener cancels the event to suppress the
@@ -131,24 +157,70 @@ public class InventorySortService {
             }
         }
 
-        InventorySortEvent sortEvent = new InventorySortEvent(event.getView(), inv, min, max);
+        InventorySortEvent sortEvent = new InventorySortEvent(event.getView(), inv, target.min(), target.max());
         Bukkit.getPluginManager().callEvent(sortEvent);
         if (sortEvent.isCancelled()) {
             return false;
         }
 
         Set<Integer> sortableSlots = sortEvent.getSortableSlots();
-        if (type == InventoryType.PLAYER) {
-            for (int locked : plugin.getSortingPrefs().getLockedSlots(p)) {
+        var mainCfg = plugin.getConfigManager().main();
+        if (target.type() == InventoryType.PLAYER) {
+            // Per-player locked slots (player-controlled via /clicksorted set lock).
+            for (int locked : prefs.getLockedSlots(p)) {
                 sortEvent.excludeSlot(locked);
+            }
+            // Admin-enforced slot locks (config locked_slots.player and clicksorted.lock.player.slot.N).
+            ProtectedSlots protectedSlots = ProtectedSlots.forSort(p, mainCfg);
+            if (!protectedSlots.isEmpty()) {
+                for (int s : List.copyOf(sortableSlots)) {
+                    if (protectedSlots.blocks(s)) {
+                        sortEvent.excludeSlot(s);
+                    }
+                }
             }
         }
 
-        var prefs = plugin.getSortingPrefs();
-        boolean packEnabled = (playerMainStorage && prefs.getBundlePackInventory(p))
-                || (container && prefs.getBundlePackOthers(p));
+        // Exclude slots whose items are on the admin-enforced "do not touch" blacklist.
+        // Applies to player and container inventories alike. Uses the same excludeSlot mechanism as
+        // locked slots: excluded slots are never read, sorted, packed, or overwritten.
+        ProtectedItems protectedItems = ProtectedItems.forSort(p, mainCfg);
+        if (!protectedItems.isEmpty()) {
+            ItemStack[] slotContents = inv.getContents();
+            for (int s : List.copyOf(sortableSlots)) {
+                ItemStack is = slotContents[s];
+                if (is != null && is.getType() != Material.AIR && protectedItems.blocks(is)) {
+                    sortEvent.excludeSlot(s);
+                }
+            }
+        }
+
+        if (sortEnabled) {
+            return sortWithLayout(event, p, inv, target, sortableSlots, sortMethod, packEnabled, prefs);
+        } else {
+            return consolidateInPlace(p, inv, sortableSlots, prefs);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Sort-with-layout path (sorting on)
+    // -------------------------------------------------------------------------
+
+    /**
+     * The full sort/pack path: items are merged, optionally packed into bundles, sorted, and
+     * written back into the inventory according to start-corner / fill-axis preferences.
+     */
+    private boolean sortWithLayout(InventoryClickEvent event, Player p, Inventory inv,
+                                   Target target, Set<Integer> sortableSlots, SortingMethod sortMethod,
+                                   boolean packEnabled, PlayerSortingPrefs prefs) {
+        BundleBlacklist blacklist = packEnabled
+                ? new BundleBlacklist(new MaterialNameSet(prefs.getBundleBlacklist(p),
+                        prefs.getBundleBlacklistNames(p).stream()
+                                .map(n -> n.toLowerCase(Locale.ROOT))
+                                .collect(Collectors.toUnmodifiableSet())))
+                : BundleBlacklist.EMPTY;
         List<ItemStack> sortedItems = packEnabled
-                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p))
+                ? packAndSort(inv, sortableSlots, sortMethod, prefs.getBundleStackLimit(p), blacklist)
                 : SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
@@ -156,29 +228,112 @@ public class InventorySortService {
             return false;
         }
 
-        GridGeometry grid = GridGeometry.of(type, inv.getHolder(), min, max);
+        GridGeometry grid = GridGeometry.of(target.type(), inv.getHolder(), target.min(), target.max());
         List<ItemStack> overflow = sortMethod.isTreemap()
                 ? writeTreemap(inv, sortableSlots, sortedItems, grid.base(), grid.width(), grid.rows(), prefs.getStartCorner(p), prefs.getFillAxis(p))
                 : writeLinear(inv, sortableSlots, sortedItems, grid.base(), grid.width(), prefs.getStartCorner(p), prefs.getFillAxis(p));
 
-        if (!overflow.isEmpty()) {
-            // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
-            // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
-            MessageUtil.alertMessage(p, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
-            for (ItemStack item : overflow) {
-                Log.debug("dropping " + item + " by player " + p.getName());
-                p.getWorld().dropItemNaturally(p.getLocation(), item);
-            }
-        }
-
-        for (HumanEntity he : event.getViewers()) {
-            if (he instanceof Player viewer) {
-                viewer.updateInventory();
-            }
-        }
-
+        dropOverflow(p, overflow);
+        refreshViewers(event.getViewers());
         return true;
     }
+
+    // -------------------------------------------------------------------------
+    // In-place consolidation path (sorting off, packing on)
+    // -------------------------------------------------------------------------
+
+    /**
+     * The in-place path: consolidates same-material stacks within their existing slots and
+     * packs eligible remainders into bundles already in the inventory. Items displaced from
+     * bundles or exceeding lane capacity fill free/freed slots; drops only when region is full.
+     */
+    private boolean consolidateInPlace(Player p, Inventory inv, Set<Integer> sortableSlots,
+                                       PlayerSortingPrefs prefs) {
+        BundleBlacklist blacklist = new BundleBlacklist(new MaterialNameSet(prefs.getBundleBlacklist(p),
+                prefs.getBundleBlacklistNames(p).stream()
+                        .map(n -> n.toLowerCase(Locale.ROOT))
+                        .collect(Collectors.toUnmodifiableSet())));
+        InPlacePacker.Result result = InPlacePacker.consolidate(
+                inv.getContents(), sortableSlots, true, prefs.getBundleStackLimit(p), blacklist);
+
+        for (int s : sortableSlots) {
+            ItemStack it = result.placement().get(s);
+            if (it != null) {
+                inv.setItem(s, it);
+            } else {
+                inv.clear(s);
+            }
+        }
+
+        dropOverflow(p, result.overflow());
+        refreshViewers(inv.getViewers());
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Target resolution and permission helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resolves the clicked inventory and click slot to a {@link Target}, or returns {@code null}
+     * when the click is not in a sortable region (armor/offhand, non-sortable type, etc.).
+     *
+     * <p>This method does <em>not</em> check sort or bundle permissions — those are the caller's
+     * responsibility via {@link #sortAllowed} and {@link #packAllowed}.
+     */
+    private Target resolve(InventoryClickEvent event) {
+        Inventory inv = event.getClickedInventory();
+        if (inv == null || !shouldSort(inv)) return null;
+
+        int slot = event.getSlot();
+        InventoryType type = inv.getType();
+
+        if (type == InventoryType.PLAYER) {
+            if (slot < 9) {
+                return new Target(inv, type, 0, 9, Region.HOTBAR);
+            } else if (slot < MainConfig.PLAYER_STORAGE_END) {
+                return new Target(inv, type, 9, MainConfig.PLAYER_STORAGE_END, Region.PLAYER_MAIN);
+            } else {
+                // Armor / offhand slots — never sort or pack
+                return null;
+            }
+        } else {
+            int min = GridGeometry.storageOffset(inv.getHolder());
+            int max = inv.getSize();
+            return new Target(inv, type, min, max, Region.CONTAINER);
+        }
+    }
+
+    /**
+     * Returns {@code true} when sorting is permitted for the given {@link Region}: checks the
+     * umbrella {@code clicksorted.sort} node first, then the region-specific child.
+     */
+    private boolean sortAllowed(Region region, Player player) {
+        if (!Permissions.isAllowedTo(player, "clicksorted.sort")) return false;
+        return switch (region) {
+            case HOTBAR -> Permissions.isAllowedTo(player, "clicksorted.sort.hotbar");
+            case PLAYER_MAIN -> Permissions.isAllowedTo(player, "clicksorted.sort.player");
+            case CONTAINER -> Permissions.isAllowedTo(player, "clicksorted.sort.container");
+        };
+    }
+
+    /**
+     * Returns {@code true} when bundle packing is both preferred by the player and permitted
+     * for the given {@link Region}. Packing never applies to the hotbar.
+     */
+    private boolean packAllowed(Region region, Player player, PlayerSortingPrefs prefs) {
+        return switch (region) {
+            case HOTBAR -> false;
+            case PLAYER_MAIN -> prefs.getBundlePackInInventory(player)
+                    && Permissions.isAllowedTo(player, "clicksorted.bundle.inventory");
+            case CONTAINER -> prefs.getBundlePackInContainers(player)
+                    && Permissions.isAllowedTo(player, "clicksorted.bundle.container");
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Write-back helpers (sort-with-layout path)
+    // -------------------------------------------------------------------------
 
     /**
      * Writes the sorted sequence linearly: order the slots by start-corner/fill-axis, then write the
@@ -237,7 +392,8 @@ public class InventorySortService {
      * @return the sorted, stack-merged list ready to be written back into {@code sortableSlots}
      */
     private List<ItemStack> packAndSort(Inventory inv, Set<Integer> sortableSlots,
-                                        SortingMethod sortMethod, int stackLimit) {
+                                        SortingMethod sortMethod, int stackLimit,
+                                        BundleBlacklist blacklist) {
         Map<SortKey, Long> loosePool = new LinkedHashMap<>();
         Map<SortKey, ItemStack> samples = new LinkedHashMap<>();
         List<ItemStack> bundles = new ArrayList<>();       // bins (mutated by the packer)
@@ -251,7 +407,7 @@ public class InventorySortService {
             }
             if (BundlePacker.isBundle(is.getType())) {
                 bundles.add(is.clone());
-            } else if (BundlePacker.canBundle(is)) {
+            } else if (BundlePacker.canBundle(is, blacklist)) {
                 SortKey key = SortKey.poolKey(is);
                 // Lambda, not Long::sum: a method ref binds the boxed map values straight to
                 // primitive params, tripping JDT's "needs unchecked conversion" null warning.
@@ -262,11 +418,35 @@ public class InventorySortService {
             }
         }
 
-        List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, bundles, stackLimit);
+        List<ItemStack> leftover = BundlePacker.packIntoBundles(loosePool, samples, bundles, stackLimit, blacklist);
         toSort.addAll(leftover);
         toSort.addAll(bundles);
 
         return SortEngine.sortAndMerge(toSort, sortMethod);
+    }
+
+    // -------------------------------------------------------------------------
+    // Shared helpers
+    // -------------------------------------------------------------------------
+
+    private void dropOverflow(Player p, List<ItemStack> overflow) {
+        if (!overflow.isEmpty()) {
+            // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
+            // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
+            MessageUtil.alertMessage(p, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
+            for (ItemStack item : overflow) {
+                Log.debug("dropping " + item + " by player " + p.getName());
+                p.getWorld().dropItemNaturally(p.getLocation(), item);
+            }
+        }
+    }
+
+    private static void refreshViewers(List<HumanEntity> viewers) {
+        for (HumanEntity he : viewers) {
+            if (he instanceof Player viewer) {
+                viewer.updateInventory();
+            }
+        }
     }
 
     // -------------------------------------------------------------------------

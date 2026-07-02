@@ -2,6 +2,7 @@ package net.kccricket.clicksorted;
 
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import org.bukkit.Material;
+import java.util.List;
 import java.util.Set;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
@@ -150,31 +151,82 @@ class LockGuiListenerTest extends AbstractClickSortedTest {
                 "Hotbar slot 0 should be locked after clicking chest slot 36");
     }
 
-    // --- Out-of-range slots ---
+    // --- Admin-locked slots ---
 
-    @Test
-    void clickOutOfRangeSlotDoesNotLock() {
-        PlayerMock player = addOpPlayer("Alice");
-        // Narrow the sortable range so inv slots 27-35 are excluded (chest slots 18-26 map to those).
-        plugin.getConfig().set("player_sort_max", 27);
-        InventoryView view = openLockGui(player);
-
-        guiClick(view, 18);  // chest slot 18 → inv slot 27, outside [9,27)
-
-        assertTrue(plugin.getSortingPrefs().getLockedSlots(player).isEmpty(),
-                "Clicking an out-of-range slot should not lock it");
+    private void setAdminLockedSlots(List<Integer> slots) {
+        plugin.getConfig().set("locked_slots.player", slots);
+        plugin.getConfigManager().main().load();
     }
 
     @Test
-    void outOfRangeSlotRendersAsBlackPane() {
+    void adminConfigLockedSlotDoesNotToggle() {
         PlayerMock player = addOpPlayer("Alice");
-        plugin.getConfig().set("player_sort_max", 27);
+        setAdminLockedSlots(List.of(27)); // inv slot 27 → chest slot 18
         InventoryView view = openLockGui(player);
 
-        // Chest slot 18 maps to inv slot 27, which is outside [9,27).
-        assertEquals(Material.BLACK_STAINED_GLASS_PANE,
+        guiClick(view, 18);  // chest slot 18 → inv slot 27 (admin-locked)
+
+        assertTrue(plugin.getSortingPrefs().getLockedSlots(player).isEmpty(),
+                "Clicking an admin-locked slot must not modify the player's per-player locks");
+    }
+
+    @Test
+    void adminConfigLockedSlotRendersAsIronBars() {
+        PlayerMock player = addOpPlayer("Alice");
+        setAdminLockedSlots(List.of(27)); // inv slot 27 → chest slot 18
+        InventoryView view = openLockGui(player);
+
+        assertEquals(Material.IRON_BARS,
                 view.getTopInventory().getItem(18).getType(),
-                "Out-of-range slot should render as black stained glass pane");
+                "Admin-locked slot should render as IRON_BARS pane");
+    }
+
+    @Test
+    void adminPermissionLockedSlotDoesNotToggle() {
+        // Non-OP player with an explicit clicksorted.lock.player.slot.27 node.
+        PlayerMock player = server.addPlayer("Alice");
+        player.addAttachment(plugin, "clicksorted.lock.player.slot.27", true);
+        InventoryView view = openLockGui(player);
+
+        guiClick(view, 18);  // chest slot 18 → inv slot 27 (permission-locked for this player)
+
+        assertTrue(plugin.getSortingPrefs().getLockedSlots(player).isEmpty(),
+                "Clicking a permission-locked slot must not toggle per-player locks");
+    }
+
+    @Test
+    void adminPermissionLockedSlotRendersAsIronBars() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.addAttachment(plugin, "clicksorted.lock.player.slot.27", true);
+        InventoryView view = openLockGui(player);
+
+        assertEquals(Material.IRON_BARS,
+                view.getTopInventory().getItem(18).getType(),
+                "Permission-locked slot should render as IRON_BARS pane");
+    }
+
+    @Test
+    void adminLockedHotbarSlotRendersAsIronBars() {
+        // Hotbar slot 0 is also covered — chest slot 36 maps to inv slot 0.
+        PlayerMock player = addOpPlayer("Alice");
+        setAdminLockedSlots(List.of(0)); // inv slot 0 (hotbar slot 0) → chest slot 36
+        InventoryView view = openLockGui(player);
+
+        assertEquals(Material.IRON_BARS,
+                view.getTopInventory().getItem(36).getType(),
+                "Admin-locked hotbar slot 0 should render as IRON_BARS");
+    }
+
+    @Test
+    void adminLockedHotbarSlotDoesNotToggle() {
+        PlayerMock player = addOpPlayer("Alice");
+        setAdminLockedSlots(List.of(0)); // inv slot 0 (hotbar) → chest slot 36
+        InventoryView view = openLockGui(player);
+
+        guiClick(view, 36);
+
+        assertTrue(plugin.getSortingPrefs().getLockedSlots(player).isEmpty(),
+                "Clicking an admin-locked hotbar slot must not toggle per-player locks");
     }
 
     // --- Divider ---
@@ -191,14 +243,14 @@ class LockGuiListenerTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void dividerSlotsAreGrayPanesExceptLast() {
+    void dividerSlotsAreBlackPanesExceptLast() {
         PlayerMock player = addOpPlayer("Alice");
         InventoryView view = openLockGui(player);
 
         for (int slot = 27; slot < 35; slot++) {
-            assertEquals(Material.GRAY_STAINED_GLASS_PANE,
+            assertEquals(Material.BLACK_STAINED_GLASS_PANE,
                     view.getTopInventory().getItem(slot).getType(),
-                    "Divider slot " + slot + " should be a gray pane");
+                    "Divider slot " + slot + " should be a black pane");
         }
         // Slot 35 (rightmost divider) is the help head.
         assertEquals(Material.BOOK,

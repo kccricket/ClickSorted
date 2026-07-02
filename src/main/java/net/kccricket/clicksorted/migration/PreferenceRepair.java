@@ -55,9 +55,9 @@ public final class PreferenceRepair {
     }
 
     private static final List<EnumPref> ENUM_PREFS = List.of(
-            new EnumPref("click", ClickMethod.class, "click method",
+            new EnumPref("click_mode", ClickMethod.class, "click method",
                     p -> p.getSortingPrefs()::getClickMethod),
-            new EnumPref("sort", SortingMethod.class, "sort method",
+            new EnumPref("sort_mode", SortingMethod.class, "sort method",
                     p -> p.getSortingPrefs()::getSortingMethod),
             new EnumPref("start_corner", StartCorner.class, "start corner",
                     p -> p.getSortingPrefs()::getStartCorner),

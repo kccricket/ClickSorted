@@ -12,7 +12,12 @@ package net.kccricket.clicksorted.gui;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
+import net.kccricket.clicksorted.config.LangConfig;
+import net.kccricket.clicksorted.text.MessageUtil;
+import org.bukkit.Material;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 /**
  * Marker interface for every inventory ClickSorted itself opens (the lock GUI today, any future
@@ -23,4 +28,23 @@ import org.bukkit.inventory.InventoryHolder;
  * independent of that option, without enumerating each holder class.
  */
 public interface ClickSortedHolder extends InventoryHolder {
+
+    /** Black stained-glass pane used as inert filler in all ClickSorted GUIs. */
+    static ItemStack buildFiller(LangConfig lang) {
+        ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemMeta meta = pane.getItemMeta();
+        meta.displayName(lang.getColoredMessage("guiFillerName"));
+        pane.setItemMeta(meta);
+        return pane;
+    }
+
+    /** Book used as a help/instructions widget in all ClickSorted GUIs. */
+    static ItemStack buildHelpBook(LangConfig lang, String loreKey) {
+        ItemStack book = new ItemStack(Material.BOOK);
+        ItemMeta meta = book.getItemMeta();
+        meta.displayName(lang.getColoredMessage("guiHelpBookName"));
+        meta.lore(MessageUtil.toLore(lang.getColoredMessage(loreKey)));
+        book.setItemMeta(meta);
+        return book;
+    }
 }

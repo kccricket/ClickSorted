@@ -10,6 +10,10 @@
 # Prepended to every status/error/alert message sent to players. MiniMessage. Set to "" to disable.
 prefix: "<gray>[<aqua>ClickSorted<gray>] "
 
+# Command feedback — enabled toggle (/clicksorted set enabled, bare /clicksorted)
+# Placeholder: <status> (ENABLED or DISABLED)
+setEnabledStatus: "Click-sorting is now <aqua><status><white> for you."
+
 # Command feedback — sort mode
 # Placeholder: <method>
 setSortingMethodTo: "Your <aqua>sort mode<white> is now set to: <aqua><method><white>."
@@ -44,16 +48,53 @@ prefResetInvalid: "Your saved <aqua><pref><white> value, <aqua><value><white>, w
 # Placeholders: <value> (what the player typed), <valid> (comma-joined valid options)
 invalidValue: "<red>Invalid value '<value>'. Valid values: <valid>."
 
-# Command feedback — bundle packing toggles (/clicksorted bundle inventory|others on|off)
+# Command feedback — bundle packing toggles (/clicksorted bundle in-inventory|in-containers yes|no)
 # Placeholder: <status> (ENABLED or DISABLED)
-setBundlePackInventoryStatus: "Bundle packing in your inventory is now <aqua><status><white>."
-setBundlePackOthersStatus: "Bundle packing in other containers is now <aqua><status><white>."
+setBundlePackEnabledStatus: "Bundle packing is now <aqua><status><white> for you (inventory and containers)."
+setBundlePackInInventoryStatus: "Bundle packing in your inventory is now <aqua><status><white>."
+setBundlePackInContainersStatus: "Bundle packing in other containers is now <aqua><status><white>."
 
-# Command feedback — bundle stack limit (/clicksorted bundle stacklimit <n|off>)
+# Command feedback — bundle stack limit (/clicksorted bundle stack-limit <n|off>)
 # Placeholder: <limit> (max distinct entries per bundle, or "off" for weight-only)
 setBundleStackLimitStatus: "Your <aqua>bundle stack limit<white> is now <aqua><limit><white>."
 
+# Command feedback — bundle blacklist (/clicksorted set bundle blacklist add|remove|list|clear)
+# Placeholder: <material> (material name)
+setBundleBlacklistAdded: "<aqua><material><white> added to your bundle blacklist."
+setBundleBlacklistAlreadyPresent: "<aqua><material><white> is already in your bundle blacklist."
+setBundleBlacklistRemoved: "<aqua><material><white> removed from your bundle blacklist."
+setBundleBlacklistNotPresent: "<aqua><material><white> is not in your bundle blacklist."
+# Placeholder: <list> (comma-separated material names)
+setBundleBlacklistMaterialsList: "Blacklisted materials: <aqua><list><white>."
+setBundleBlacklistEmpty: "Your bundle blacklist is <aqua>empty<white>."
+setBundleBlacklistCleared: "Your bundle blacklist has been <aqua>cleared<white>."
+# Command feedback — bundle blacklist name sub-branch (/clicksorted set bundle blacklist name ...)
+# Placeholder: <name> (plain-text display name)
+setBundleBlacklistNameAdded: "Display name <aqua><name><white> added to your bundle blacklist."
+setBundleBlacklistNameAlreadyPresent: "Display name <aqua><name><white> is already in your bundle blacklist."
+setBundleBlacklistNameRemoved: "Display name <aqua><name><white> removed from your bundle blacklist."
+setBundleBlacklistNameNotPresent: "Display name <aqua><name><white> is not in your bundle blacklist."
+# Placeholder: <list> (comma-separated display names)
+setBundleBlacklistNamesList: "Blacklisted display names: <aqua><list><white>."
+
+# Shared GUI elements (used by all ClickSorted GUIs)
+# Display name for the inert black-pane filler slots.
+guiFillerName: "<!italic><dark_gray>--------"
+# Display name for all help/instructions book items.
+guiHelpBookName: "<!italic>Instructions"
+
+# Blacklist GUI (/clicksorted set bundle blacklist with no further arguments)
+blacklistGuiTitle: "<!italic>Bundle Blacklist"
+# Lore shown on every blacklist entry (both material and name entries).
+blacklistEntryLore: "<!italic><gray>Click to remove."
+blacklistHelpBookLore: "<!italic><gray>Click an item in your inventory to add it to<newline>the blacklist. Click a listed entry to remove it.<newline><newline>Blacklisted item types are never packed into<newline>bundles, and blacklisted bundles colors are<newline>never used for packing."
+# Pagination arrow controls.
+blacklistArrowPrev: "<!italic>Previous page"
+blacklistArrowNext: "<!italic>Next page"
+
 # Command feedback — status (/clicksorted status)
+# Placeholder: <status> (ENABLED or DISABLED)
+statusEnabled: "Click-sorting: <status>"
 # Placeholder: <method>
 statusClickMethod: "Click method: <method>"
 # Placeholder: <method>
@@ -64,6 +105,17 @@ statusStartCorner: "Start corner: <corner>"
 statusFillAxis: "Fill direction: <axis>"
 # Placeholder: <status> (ENABLED or DISABLED)
 statusHover: "Sort over items: <status>"
+# Placeholder: <status> (ENABLED or DISABLED)
+statusBundleInInventory: "Bundle (inventory): <status>"
+# Placeholder: <status> (ENABLED or DISABLED)
+statusBundleInContainers: "Bundle (containers): <status>"
+# Placeholder: <limit> (integer, or "off")
+statusBundleStackLimit: "Bundle stack limit: <limit>"
+# Placeholder: <list> (comma-separated material names)
+statusBundleBlacklistMaterials: "Bundle blacklist (materials): <list>"
+# Placeholder: <list> (comma-separated display-name entries)
+statusBundleBlacklistNames: "Bundle blacklist (names): <list>"
+statusBundleBlacklistEmpty: "Bundle blacklist: (empty)"
 
 # Command feedback — debug level
 # Placeholder: <level>
@@ -73,6 +125,8 @@ invalidDebugLevel: "Invalid debug level '<level>'. Valid values: OFF, DEBUG, TRA
 
 # Command feedback — reload
 configReloaded: "Configuration reloaded."
+# Placeholder: <reason>
+configReloadFailed: "<red>Configuration reload failed: <reason>. The previous configuration is still active — see the server console for the full stack trace."
 
 # Inventory overflow messages
 invOverFlow: "Inventory overflow — items were not sorted."
@@ -85,10 +139,12 @@ instructionSwap: "Press the offhand-swap key to sort."
 instructionControlDrop: "Press Ctrl+Q (drop key) over a slot to sort."
 instructionShiftLeftClick: "Shift-left-click a slot to sort."
 instructionShiftRightClick: "Shift-right-click a slot to sort."
-instructionDisabled: "Click-sorting has been disabled."
 
 # Error shown when a player-only command is run from the console
 notFromConsole: "This command can only be used by a player."
+
+# Error shown when a player lacks permission for an action
+noPermission: "<red>You don't have permission to do that."
 
 # Shown (rate-limited) when a player triggers actions faster than action_cooldown_ms allows
 actionTooFast: "<red>Slow down — you're acting too quickly."
@@ -97,14 +153,12 @@ actionTooFast: "<red>Slow down — you're acting too quickly."
 lockGuiTitle: "<!italic>Inventory Sorting Locks"
 lockPaneUnlocked: "<!italic><green>Unlocked"
 lockPaneLocked: "<!italic><red>Locked"
+lockPaneAdmin: "<!italic><dark_gray>Server Locked"
 # Placeholder: <number>
 lockPaneSlotInventory: "<!italic><gray>Inventory slot <number>"
 # Placeholder: <number>
 lockPaneSlotHotbar: "<!italic><gray>Hotbar slot <number>"
 lockPaneUnlockedLore: "<!italic><gray>Click to lock this slot."
 lockPaneLockedLore: "<!italic><gray>Click to unlock this slot."
-lockPaneUnsortable: "<!italic><dark_gray>Not sortable"
-lockPaneUnsortableLore: "<!italic><gray>This slot is always excluded from sorting."
-lockDividerName: "<!italic><dark_gray>--------"
-lockHelpHeadName: "<!italic>What is this?"
+lockPaneAdminLore: "<!italic><gray>This slot is locked by the server and cannot be changed."
 lockHelpHeadLore: "<!italic><gray>Locked inventory slots will not be sorted and<newline>bundles in a locked slot will not be packed."

@@ -56,7 +56,7 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
 
         assertEquals(SortingMethod.GROUP, prefs.getSortingMethod(player));
         // Verify raw PDC key holds the enum name.
-        NamespacedKey key = new NamespacedKey(plugin, "sort");
+        NamespacedKey key = new NamespacedKey(plugin, "sort_mode");
         assertEquals("GROUP", player.getPersistentDataContainer().get(key, PersistentDataType.STRING));
     }
 
@@ -68,7 +68,7 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
         prefs.setClickMethod(player, ClickMethod.DOUBLE_CLICK);
 
         assertEquals(ClickMethod.DOUBLE_CLICK, prefs.getClickMethod(player));
-        NamespacedKey key = new NamespacedKey(plugin, "click");
+        NamespacedKey key = new NamespacedKey(plugin, "click_mode");
         assertEquals("DOUBLE_CLICK", player.getPersistentDataContainer().get(key, PersistentDataType.STRING));
     }
 

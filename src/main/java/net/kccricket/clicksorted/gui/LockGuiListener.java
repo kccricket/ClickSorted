@@ -43,7 +43,7 @@ public class LockGuiListener implements Listener {
         // getView().getTopInventory(): invoking methods on InventoryView from our own
         // bytecode breaks across versions where InventoryView is a class (≤1.20.6) vs an
         // interface (1.21+), throwing IncompatibleClassChangeError.
-        if (!(event.getInventory().getHolder() instanceof LockGuiHolder)) {
+        if (!(event.getInventory().getHolder() instanceof LockGuiHolder holder)) {
             return;
         }
 
@@ -62,7 +62,11 @@ public class LockGuiListener implements Listener {
         }
 
         int invSlot = LockGuiHolder.chestSlotToInvSlot(rawSlot);
-        if (!plugin.getConfigManager().main().isPlayerSlotSortable(invSlot)) {
+        // Divider slots map to -1; admin-locked slots are non-toggleable.
+        if (invSlot < 0) {
+            return;
+        }
+        if (holder.isAdminLocked(invSlot)) {
             return;
         }
 
