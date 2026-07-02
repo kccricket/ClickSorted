@@ -622,7 +622,7 @@ public class ClickSortedCommands {
                                             if (added) {
                                                 MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistAdded",
                                                         Placeholder.unparsed("material", mat.name())));
-                                            } else {
+                                            } else if (plugin.getSortingPrefs().getBundleBlacklist(player).contains(mat)) {
                                                 MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistAlreadyPresent",
                                                         Placeholder.unparsed("material", mat.name())));
                                             }
@@ -645,7 +645,7 @@ public class ClickSortedCommands {
                                             if (added) {
                                                 MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAdded",
                                                         Placeholder.unparsed("name", name)));
-                                            } else {
+                                            } else if (plugin.getSortingPrefs().getBundleBlacklistNames(player).contains(name)) {
                                                 MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAlreadyPresent",
                                                         Placeholder.unparsed("name", name)));
                                             }
@@ -677,7 +677,7 @@ public class ClickSortedCommands {
                                             if (removed) {
                                                 MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistRemoved",
                                                         Placeholder.unparsed("material", mat.name())));
-                                            } else {
+                                            } else if (!plugin.getSortingPrefs().getBundleBlacklist(player).contains(mat)) {
                                                 MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNotPresent",
                                                         Placeholder.unparsed("material", mat.name())));
                                             }
@@ -706,7 +706,7 @@ public class ClickSortedCommands {
                                             if (removed) {
                                                 MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameRemoved",
                                                         Placeholder.unparsed("name", name)));
-                                            } else {
+                                            } else if (!plugin.getSortingPrefs().getBundleBlacklistNames(player).contains(name)) {
                                                 MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameNotPresent",
                                                         Placeholder.unparsed("name", name)));
                                             }

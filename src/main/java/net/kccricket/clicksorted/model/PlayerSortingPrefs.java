@@ -208,9 +208,10 @@ public class PlayerSortingPrefs {
      *         or the change was cancelled by a {@link PlayerPreferenceChangeEvent} listener
      */
     public boolean addToBundleBlacklist(Player player, Material material) {
-        if (bundleBlacklist.get(player).contains(material)) return false;
+        Set<Material> current = bundleBlacklist.mutableGet(player);
+        if (current.contains(material)) return false;
         if (!fire(player, Preference.BUNDLE_BLACKLIST_MATERIAL, null, material)) return false;
-        return bundleBlacklist.add(player, material);
+        return bundleBlacklist.addTo(player, current, material);
     }
 
     /**
@@ -220,9 +221,10 @@ public class PlayerSortingPrefs {
      *         or the change was cancelled by a {@link PlayerPreferenceChangeEvent} listener
      */
     public boolean removeFromBundleBlacklist(Player player, Material material) {
-        if (!bundleBlacklist.get(player).contains(material)) return false;
+        Set<Material> current = bundleBlacklist.mutableGet(player);
+        if (!current.contains(material)) return false;
         if (!fire(player, Preference.BUNDLE_BLACKLIST_MATERIAL, material, null)) return false;
-        return bundleBlacklist.remove(player, material);
+        return bundleBlacklist.removeFrom(player, current, material);
     }
 
     /** Clears all entries (materials and display names) from the player's bundle blacklist. */
@@ -247,9 +249,10 @@ public class PlayerSortingPrefs {
      *         or the change was cancelled by a {@link PlayerPreferenceChangeEvent} listener
      */
     public boolean addToBundleBlacklistName(Player player, String name) {
-        if (bundleBlacklistNames.get(player).contains(name)) return false;
+        Set<String> current = bundleBlacklistNames.mutableGet(player);
+        if (current.contains(name)) return false;
         if (!fire(player, Preference.BUNDLE_BLACKLIST_NAME, null, name)) return false;
-        return bundleBlacklistNames.add(player, name);
+        return bundleBlacklistNames.addTo(player, current, name);
     }
 
     /**
@@ -259,9 +262,10 @@ public class PlayerSortingPrefs {
      *         or the change was cancelled by a {@link PlayerPreferenceChangeEvent} listener
      */
     public boolean removeFromBundleBlacklistName(Player player, String name) {
-        if (!bundleBlacklistNames.get(player).contains(name)) return false;
+        Set<String> current = bundleBlacklistNames.mutableGet(player);
+        if (!current.contains(name)) return false;
         if (!fire(player, Preference.BUNDLE_BLACKLIST_NAME, name, null)) return false;
-        return bundleBlacklistNames.remove(player, name);
+        return bundleBlacklistNames.removeFrom(player, current, name);
     }
 
     /** A PDC-backed set of {@code T} serialized as a delimited string under one {@link NamespacedKey}. */
@@ -293,17 +297,22 @@ public class PlayerSortingPrefs {
             return result.isEmpty() ? Set.of() : Set.copyOf(result);
         }
 
-        boolean add(Player player, T value) {
+        /** Fetches a mutable working copy, for callers that need to inspect membership before mutating. */
+        Set<T> mutableGet(Player player) {
             Set<T> current = newSet.get();
             current.addAll(get(player));
+            return current;
+        }
+
+        /** Adds to an already-fetched working set (see {@link #mutableGet}), avoiding a redundant PDC re-read. */
+        boolean addTo(Player player, Set<T> current, T value) {
             if (!current.add(value)) return false;
             store(player, current);
             return true;
         }
 
-        boolean remove(Player player, T value) {
-            Set<T> current = newSet.get();
-            current.addAll(get(player));
+        /** Removes from an already-fetched working set (see {@link #mutableGet}), avoiding a redundant PDC re-read. */
+        boolean removeFrom(Player player, Set<T> current, T value) {
             if (!current.remove(value)) return false;
             store(player, current);
             return true;

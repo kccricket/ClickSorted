@@ -42,7 +42,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -159,7 +158,7 @@ public class InventorySortService {
         }
 
         var mainCfg = plugin.getConfigManager().main();
-        Set<Integer> regionSlots = rangeSet(target.min(), target.max());
+        Set<Integer> regionSlots = InventorySortEvent.rangeSet(target.min(), target.max());
         Set<Integer> userLockedSlots = Set.of();
         Set<Integer> adminLockedSlots = Set.of();
         if (target.type() == InventoryType.PLAYER) {
@@ -446,15 +445,6 @@ public class InventorySortService {
                 viewer.updateInventory();
             }
         }
-    }
-
-    /** Materializes the contiguous {@code [min, max)} slot range as a set, for the sort event's region. */
-    private static Set<Integer> rangeSet(int min, int max) {
-        Set<Integer> range = new TreeSet<>();
-        for (int i = min; i < max; i++) {
-            range.add(i);
-        }
-        return range;
     }
 
     // -------------------------------------------------------------------------

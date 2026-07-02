@@ -78,6 +78,7 @@ public class InventorySortEvent extends InventoryInteractEvent {
     private final ProtectedItems protectedItems;
     private final Set<Material> excludedMaterials = new LinkedHashSet<>();
     private final Set<String> excludedItemNames = new LinkedHashSet<>();
+    private MaterialNameSet excludedItemsCache;
 
     /**
      * Primary constructor: the region a click targets, the locks that already exclude slots from
@@ -119,7 +120,8 @@ public class InventorySortEvent extends InventoryInteractEvent {
         this(transaction, sortInv, rangeSet(min, max), Set.of(), Set.of(), ProtectedItems.EMPTY);
     }
 
-    private static Set<Integer> rangeSet(int min, int max) {
+    /** Materializes the contiguous {@code [min, max)} slot range as a set. */
+    public static Set<Integer> rangeSet(int min, int max) {
         Set<Integer> range = new TreeSet<>();
         for (int i = min; i < max; i++) {
             range.add(i);
@@ -200,6 +202,7 @@ public class InventorySortEvent extends InventoryInteractEvent {
      */
     public void excludeItem(Material material) {
         excludedMaterials.add(material);
+        excludedItemsCache = null;
     }
 
     /**
@@ -209,6 +212,7 @@ public class InventorySortEvent extends InventoryInteractEvent {
      */
     public void excludeItem(String name) {
         excludedItemNames.add(name.toLowerCase(Locale.ROOT));
+        excludedItemsCache = null;
     }
 
     /** Unmodifiable view of materials added via {@link #excludeItem(Material)} during this event. */
@@ -230,6 +234,9 @@ public class InventorySortEvent extends InventoryInteractEvent {
     public boolean matchesExcludedItem(ItemStack is) {
         if (protectedItems.blocks(is)) return true;
         if (excludedMaterials.isEmpty() && excludedItemNames.isEmpty()) return false;
-        return new MaterialNameSet(excludedMaterials, excludedItemNames).contains(is);
+        if (excludedItemsCache == null) {
+            excludedItemsCache = new MaterialNameSet(excludedMaterials, excludedItemNames);
+        }
+        return excludedItemsCache.contains(is);
     }
 }
