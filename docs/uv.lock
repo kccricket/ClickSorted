@@ -24,8 +24,8 @@ wheels = [
 ]
 
 [[package]]
-name = "clicksort"
-version = "0.1.0"
+name = "clicksorted"
+version = "1.0.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]

@@ -16,16 +16,16 @@ ClickSorted lets players sort their player inventory, chests, ender chests, shul
 
 ## Quick start
 
-Out of the box: open any inventory and press **F** (swap-offhand) over any slot to sort it. No configuration required.
+Out of the box: open any inventory and press **F** (swap-offhand) over any empty slot to sort the inventory. No configuration required.
 
 Tune it to taste with commands:
 
-- `/clicksorted click method <swap|single_click|double_click|control_drop|shift_left_click|shift_right_click>` — choose your sort trigger.
-- `/clicksorted sort method <name|group|treemap>` — choose the sort order (treemap packs each item type into its own near-square block).
-- `/clicksorted sort start-corner <…>` / `sort fill-axis <horizontal|vertical>` — choose which corner items fill from and which way.
-- `/clicksorted sort enabled [yes|no]` — enable or disable click-sorting without changing your trigger.
+- `/clicksorted click method <…>` — choose your sort trigger.
+- `/clicksorted sort method <…>` — choose the sort order.
+- `/clicksorted sort start-corner <…>` / `sort fill-axis <…>` — choose which corner items fill from and which way.
+- `/clicksorted sort enabled` — enable or disable sorting on click.
 - `/clicksorted lock-slots` — open a GUI to lock slots that should never be sorted.
-- `/clicksorted bundle in-inventory yes` / `bundle in-containers yes` — pack partial stacks into your bundles while sorting.
+- `/clicksorted bundle enabled` — enabled or disable packing stacks into your bundles on click.
 - `/clicksorted bundle blacklist` — open a GUI to exclude specific item types or display names from bundle packing.
 - `/clicksorted status` — see your current settings.
 

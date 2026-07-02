@@ -1,5 +1,6 @@
 site_name: ClickSorted
 site_description: A Minecraft Paper server plugin to sort any inventory — and pack your bundles — with a mouse click.
+site_url: https://kccricket.github.io/ClickSorted/
 theme:
   name: shadcn
   icon: pixelarticons:reload-sharp

@@ -3,7 +3,7 @@ import org.gradle.api.attributes.java.TargetJvmVersion
 plugins {
     java
     jacoco
-    id("com.gradleup.shadow") version "9.4.2"
+    id("com.gradleup.shadow") version "9.4.3"
     id("org.bxteam.runserver") version "1.2.2"
     id("com.modrinth.minotaur") version "2.9.0"
     id("io.papermc.hangar-publish-plugin") version "0.1.4"
@@ -142,7 +142,7 @@ tasks.build {
 // Usage: ./gradlew runServer
 tasks.runServer {
     serverType(org.bxteam.runserver.ServerType.PAPER)
-    serverVersion("26.1.2")
+    serverVersion("26.2")
     acceptMojangEula()
     // Use the Shadow JAR (bStats relocated) instead of the plain jar task output.
     inputTask(tasks.named("shadowJar"))
@@ -192,8 +192,8 @@ modrinth {
     gameVersions.set(gameVersionsList)
     loaders.set(listOf("paper", "folia"))
     changelog.set(providers.provider { latestChangelog() })
-    // Keep the Modrinth resource page body in sync with DESCRIPTION.md on each publish.
-    syncBodyFrom.set(providers.fileContents(layout.projectDirectory.file("DESCRIPTION.md")).asText)
+    // Keep the Modrinth resource page body in sync with README.md on each publish.
+    syncBodyFrom.set(providers.fileContents(layout.projectDirectory.file("README.md")).asText)
 }
 
 hangarPublish {
@@ -203,9 +203,9 @@ hangarPublish {
         channel.set("Release")
         changelog.set(latestChangelog())
         apiKey.set(providers.environmentVariable("HANGAR_API_TOKEN"))
-        // Keep the Hangar resource page body in sync with DESCRIPTION.md on each publish.
+        // Keep the Hangar resource page body in sync with README.md on each publish.
         pages {
-            resourcePage(project.file("DESCRIPTION.md").readText())
+            resourcePage(project.file("README.md").readText())
         }
         platforms {
             paper {
