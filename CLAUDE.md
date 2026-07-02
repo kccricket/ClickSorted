@@ -27,7 +27,7 @@ net.kccricket.clicksorted
 ├── commands/                ClickSortedCommands (Brigadier command tree)
 ├── config/                  ConfigManager, ManagedConfig, MainConfig, LangConfig,
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
-├── events/                  InventorySortEvent
+├── events/                  InventorySortEvent, PlayerPreferenceChangeEvent
 ├── gui/                     ClickSortedHolder, BlacklistGuiHolder, BlacklistGuiListener,
 │                            LockGuiHolder, LockGuiListener
 ├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
@@ -96,7 +96,8 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 7. For player inventories, any slots the player has locked (via `/clicksorted lock-slots`) are excluded from the sortable set — locked slots are neither read nor overwritten.
 8. For player inventories, admin-enforced slot locks are also excluded from the sortable set, immediately after per-player locks. A slot is excluded if it appears in `config.yml`'s `locked_slots.player` list or if the player has the `clicksorted.lock.player.slot.<n>` permission node explicitly set (see `ProtectedSlots`). Admin-locked slots cannot be toggled by the player in the lock GUI — they render as a distinct IRON_BARS pane.
 9. Item-blacklisted slots are also excluded from the sortable set (for all inventory types, not just player), immediately after slot locks. A slot is excluded if its item matches the admin `ProtectedItems` list — checked against `config.yml`'s `blacklist.materials`/`blacklist.names` and the sorting player's explicit `clicksorted.blacklist.*` permission nodes.
-10. On startup (and after `/clicksorted admin reload`), `UpdateChecker` runs an async best-effort Modrinth API call and logs a console notice if a newer release exists (`check_for_updates: true`).
+10. On startup (and after `/clicksorted admin reload`), `UpdateChecker` runs an async best-effort Modrinth API call and logs a console notice if a newer release exists (`check_for_updates: true`). The check then repeats on a recurring schedule (`check_for_updates_interval_hours`, default 24, clamped to a minimum of `MainConfig.MIN_UPDATE_CHECK_INTERVAL_HOURS`); the recurring task is re-armed via `UpdateChecker.reschedule()` on enable, on `admin reload`, and cancelled via `stop()` on disable.
+11. Every per-player preference change (click/sort method, start corner, fill axis, `enabled`, sort-over-items, bundle-packing toggles/stack limit, a locked-slot toggle, or a bundle blacklist add/remove/clear) fires a cancellable `PlayerPreferenceChangeEvent` from `PlayerSortingPrefs` before the change is applied; listeners can inspect `getKey()`/`getOldValue()`/`getNewValue()` and cancel to block the change from persisting.
 11. On `PlayerJoinEvent`, `PreferenceRepair` validates the player's PDC preferences and resets any that hold unrecognised values, notifying the player in chat.
 
 ### Key Classes
@@ -104,7 +105,8 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | Class | Package | Role |
 |---|---|---|
 | `ClickSortedPlugin` | root | `JavaPlugin` entry point, wires all components |
-| `PlayerSortingPrefs` | model | Per-player state (enabled flag, ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, bundle material blacklist, bundle display-name blacklist, locked slots) stored via PDC. PDC leaf names match config-default names (`click_mode`, `sort_mode`, `enabled`, etc.) |
+| `PlayerSortingPrefs` | model | Per-player state (enabled flag, ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, bundle material blacklist, bundle display-name blacklist, locked slots) stored via PDC. PDC leaf names match config-default names (`click_mode`, `sort_mode`, `enabled`, etc.). Every setter fires a cancellable `PlayerPreferenceChangeEvent` before applying the change (skipped when old == new). |
+| `PlayerPreferenceChangeEvent` | events | Cancellable event fired by `PlayerSortingPrefs` before any per-player preference is changed; carries a string `key` (e.g. `click_mode`, `locked_slot:9`, `bundle_blacklist_material`) plus old/new values |
 | `BlacklistGuiHolder` | gui | 54-slot chest GUI for the per-player bundle blacklist; lists blacklisted materials and display-name entries as item stacks with click-to-remove lore; pagination via arrow items |
 | `BlacklistGuiListener` | gui | Handles clicks in the blacklist GUI; adds items from the real inventory to the blacklist by material or display name, removes listed entries, handles pagination, and cancels all real-inventory interaction |
 | `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier/iron-bars panes and maps chest↔inventory slots; admin-locked slots (config or permission) render as IRON_BARS and are non-toggleable |
@@ -134,7 +136,7 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `BundleBenchmark` | sort | In-situ micro-benchmark of the sort and bundle-repack paths (`/clicksorted admin benchmark`) |
 | `ClickSortedHolder` | gui | Base `InventoryHolder` marker for all ClickSorted-owned GUIs (used to block self-sort) |
 | `PreferenceRepair` | migration | Validates and resets invalid per-player PDC preferences on login, notifying the player |
-| `UpdateChecker` | update | Best-effort async Modrinth API check; logs a console notice when a newer release exists |
+| `UpdateChecker` | update | Best-effort async Modrinth API check; logs a console notice when a newer release exists. `reschedule()` (re)arms a recurring check per `check_for_updates_interval_hours`; `stop()` cancels it. |
 | `ConfigManager` | config | Unified lifecycle for all four config files |
 | `ResourceUpdater` | config | Add-only merge of bundled resource into plugin data folder |
 | `Log`, `DebugLevel` | logging | Plugin logger wrapper with gated debug levels |
@@ -145,7 +147,7 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 
 ### Configuration Files (src/main/resources)
 
-- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag, per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
+- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag and `check_for_updates_interval_hours` cadence, per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
 - `groups.yml` — item groupings for GROUP sort method
 - `items.yml` — persistent store of material → display-name mappings
 - `lang.yml` — all user-facing messages (MiniMessage format)

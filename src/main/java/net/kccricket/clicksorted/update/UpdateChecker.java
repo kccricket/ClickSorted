@@ -15,6 +15,7 @@ package net.kccricket.clicksorted.update;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.logging.Log;
 
@@ -23,14 +24,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Best-effort check against the Modrinth API for a newer published release.
  * <p>
  * The lookup runs entirely off the main thread (Folia-safe via the async scheduler) and never
  * throws into its caller: any network or parse failure degrades to a quiet debug log, since a
- * missed update check must never disrupt startup or a reload. No plugin state is held beyond the
- * plugin handle, mirroring the other small helpers in this codebase.
+ * missed update check must never disrupt startup or a reload. Beyond the plugin handle, the only
+ * state held is the handle to the recurring check task ({@link #reschedule()}), mirroring the
+ * other small helpers in this codebase.
  */
 public class UpdateChecker {
 
@@ -38,6 +41,7 @@ public class UpdateChecker {
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
 
     private final ClickSortedPlugin plugin;
+    private ScheduledTask scheduledTask;
 
     public UpdateChecker(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -46,6 +50,38 @@ public class UpdateChecker {
     /** Fire the check asynchronously and log the outcome. Returns immediately. */
     public void check() {
         plugin.getServer().getAsyncScheduler().runNow(plugin, task -> run());
+    }
+
+    /**
+     * (Re)schedules the recurring update check per {@code check_for_updates}/
+     * {@code check_for_updates_interval_hours}, cancelling any previously scheduled task first.
+     * Safe to call repeatedly (on enable and after every {@code admin reload}). Does not itself
+     * fire an immediate check — callers that want one should call {@link #check()} separately.
+     */
+    public void reschedule() {
+        stop();
+        var main = plugin.getConfigManager().main();
+        if (!main.getCheckForUpdates()) {
+            return;
+        }
+        long periodHours = main.getUpdateCheckIntervalHours();
+        scheduledTask = plugin.getServer().getAsyncScheduler().runAtFixedRate(
+                plugin, task -> run(), periodHours, periodHours, TimeUnit.HOURS);
+    }
+
+    /** Cancels the recurring check task, if one is scheduled. Safe to call when none is running. */
+    public void stop() {
+        if (scheduledTask != null) {
+            try {
+                scheduledTask.cancel();
+            } catch (Exception e) {
+                // Best-effort: some scheduler implementations (e.g. test harnesses) don't support
+                // cancellation. Never let plugin shutdown fail over a missed update check.
+                Log.debug("Failed to cancel update check task: " + e.getClass().getSimpleName());
+            } finally {
+                scheduledTask = null;
+            }
+        }
     }
 
     private void run() {

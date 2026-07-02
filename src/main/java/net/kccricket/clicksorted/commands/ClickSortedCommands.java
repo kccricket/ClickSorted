@@ -793,6 +793,7 @@ public class ClickSortedCommands {
                     if (plugin.getConfigManager().main().getCheckForUpdates()) {
                         plugin.getUpdateChecker().check();
                     }
+                    plugin.getUpdateChecker().reschedule();
                     MessageUtil.statusMessage(ctx.getSource().getSender(),
                             plugin.getConfigManager().lang().getColoredMessage("configReloaded"));
                     return Command.SINGLE_SUCCESS;
