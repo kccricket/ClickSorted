@@ -19,6 +19,10 @@ package net.kccricket.clicksorted.model;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent;
+import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent.Change;
+import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent.LockedSlotChange;
+import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent.ValueChange;
+import net.kccricket.clicksorted.events.Preference;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -78,7 +82,7 @@ public class PlayerSortingPrefs {
     }
 
     public void setSortingMethod(Player player, SortingMethod sortMethod) {
-        if (!firePreferenceChange(player, "sort_mode", getSortingMethod(player), sortMethod)) return;
+        if (!fire(player, Preference.SORT_MODE, getSortingMethod(player), sortMethod)) return;
         player.getPersistentDataContainer().set(sortKey, PersistentDataType.STRING, sortMethod.name());
     }
 
@@ -91,7 +95,7 @@ public class PlayerSortingPrefs {
     }
 
     public void setEnabled(Player player, boolean enabled) {
-        if (!firePreferenceChange(player, "enabled", getEnabled(player), enabled)) return;
+        if (!fire(player, Preference.ENABLED, getEnabled(player), enabled)) return;
         setBool(player, enabledKey, enabled);
     }
 
@@ -101,7 +105,7 @@ public class PlayerSortingPrefs {
     }
 
     public void setClickMethod(Player player, ClickMethod clickMethod) {
-        if (!firePreferenceChange(player, "click_mode", getClickMethod(player), clickMethod)) return;
+        if (!fire(player, Preference.CLICK_MODE, getClickMethod(player), clickMethod)) return;
         player.getPersistentDataContainer().set(clickKey, PersistentDataType.STRING, clickMethod.name());
     }
 
@@ -111,7 +115,7 @@ public class PlayerSortingPrefs {
     }
 
     public void setStartCorner(Player player, StartCorner corner) {
-        if (!firePreferenceChange(player, "start_corner", getStartCorner(player), corner)) return;
+        if (!fire(player, Preference.START_CORNER, getStartCorner(player), corner)) return;
         player.getPersistentDataContainer().set(startCornerKey, PersistentDataType.STRING, corner.name());
     }
 
@@ -121,7 +125,7 @@ public class PlayerSortingPrefs {
     }
 
     public void setFillAxis(Player player, FillAxis axis) {
-        if (!firePreferenceChange(player, "fill_axis", getFillAxis(player), axis)) return;
+        if (!fire(player, Preference.FILL_AXIS, getFillAxis(player), axis)) return;
         player.getPersistentDataContainer().set(fillAxisKey, PersistentDataType.STRING, axis.name());
     }
 
@@ -134,7 +138,7 @@ public class PlayerSortingPrefs {
     }
 
     public void setSortOverItems(Player player, boolean enabled) {
-        if (!firePreferenceChange(player, "sort_over_items", getSortOverItems(player), enabled)) return;
+        if (!fire(player, Preference.SORT_OVER_ITEMS, getSortOverItems(player), enabled)) return;
         setBool(player, sortOverItemsKey, enabled);
     }
 
@@ -147,7 +151,7 @@ public class PlayerSortingPrefs {
     }
 
     public void setBundlePackInInventory(Player player, boolean enabled) {
-        if (!firePreferenceChange(player, "bundle_in_inventory", getBundlePackInInventory(player), enabled)) return;
+        if (!fire(player, Preference.BUNDLE_IN_INVENTORY, getBundlePackInInventory(player), enabled)) return;
         setBool(player, bundleInInventoryKey, enabled);
     }
 
@@ -160,7 +164,7 @@ public class PlayerSortingPrefs {
     }
 
     public void setBundlePackInContainers(Player player, boolean enabled) {
-        if (!firePreferenceChange(player, "bundle_in_containers", getBundlePackInContainers(player), enabled)) return;
+        if (!fire(player, Preference.BUNDLE_IN_CONTAINERS, getBundlePackInContainers(player), enabled)) return;
         setBool(player, bundleInContainersKey, enabled);
     }
 
@@ -186,7 +190,7 @@ public class PlayerSortingPrefs {
 
     public void setBundleStackLimit(Player player, int limit) {
         int clamped = Math.max(0, limit);
-        if (!firePreferenceChange(player, "bundle_stack_limit", getBundleStackLimit(player), clamped)) return;
+        if (!fire(player, Preference.BUNDLE_STACK_LIMIT, getBundleStackLimit(player), clamped)) return;
         player.getPersistentDataContainer().set(bundleStackLimitKey, PersistentDataType.INTEGER, clamped);
     }
 
@@ -205,7 +209,7 @@ public class PlayerSortingPrefs {
      */
     public boolean addToBundleBlacklist(Player player, Material material) {
         if (bundleBlacklist.get(player).contains(material)) return false;
-        if (!firePreferenceChange(player, "bundle_blacklist_material", null, material)) return false;
+        if (!fire(player, Preference.BUNDLE_BLACKLIST_MATERIAL, null, material)) return false;
         return bundleBlacklist.add(player, material);
     }
 
@@ -217,13 +221,14 @@ public class PlayerSortingPrefs {
      */
     public boolean removeFromBundleBlacklist(Player player, Material material) {
         if (!bundleBlacklist.get(player).contains(material)) return false;
-        if (!firePreferenceChange(player, "bundle_blacklist_material", material, null)) return false;
+        if (!fire(player, Preference.BUNDLE_BLACKLIST_MATERIAL, material, null)) return false;
         return bundleBlacklist.remove(player, material);
     }
 
     /** Clears all entries (materials and display names) from the player's bundle blacklist. */
     public void clearBundleBlacklist(Player player) {
-        if (!firePreferenceChange(player, "bundle_blacklist_clear", false, true)) return;
+        if (bundleBlacklist.get(player).isEmpty() && bundleBlacklistNames.get(player).isEmpty()) return;
+        if (!fire(player, new ValueChange<>(Preference.BUNDLE_BLACKLIST_CLEAR, null, null))) return;
         bundleBlacklist.clear(player);
         bundleBlacklistNames.clear(player);
     }
@@ -243,7 +248,7 @@ public class PlayerSortingPrefs {
      */
     public boolean addToBundleBlacklistName(Player player, String name) {
         if (bundleBlacklistNames.get(player).contains(name)) return false;
-        if (!firePreferenceChange(player, "bundle_blacklist_name", null, name)) return false;
+        if (!fire(player, Preference.BUNDLE_BLACKLIST_NAME, null, name)) return false;
         return bundleBlacklistNames.add(player, name);
     }
 
@@ -255,7 +260,7 @@ public class PlayerSortingPrefs {
      */
     public boolean removeFromBundleBlacklistName(Player player, String name) {
         if (!bundleBlacklistNames.get(player).contains(name)) return false;
-        if (!firePreferenceChange(player, "bundle_blacklist_name", name, null)) return false;
+        if (!fire(player, Preference.BUNDLE_BLACKLIST_NAME, name, null)) return false;
         return bundleBlacklistNames.remove(player, name);
     }
 
@@ -336,7 +341,7 @@ public class PlayerSortingPrefs {
         Set<Integer> slots = new HashSet<>(getLockedSlots(player));
         boolean currentlyLocked = slots.contains(slot);
         boolean nowLocked = !currentlyLocked;
-        if (!firePreferenceChange(player, "locked_slot:" + slot, currentlyLocked, nowLocked)) {
+        if (!fire(player, new LockedSlotChange(slot, currentlyLocked, nowLocked))) {
             return currentlyLocked;
         }
         if (nowLocked) slots.add(slot); else slots.remove(slot);
@@ -360,9 +365,20 @@ public class PlayerSortingPrefs {
      *
      * @return {@code true} if the change should be applied, {@code false} if a listener cancelled it
      */
-    private boolean firePreferenceChange(Player player, String key, Object oldValue, Object newValue) {
+    private <T> boolean fire(Player player, Preference<T> pref, T oldValue, T newValue) {
         if (Objects.equals(oldValue, newValue)) return true;
-        PlayerPreferenceChangeEvent event = new PlayerPreferenceChangeEvent(player, key, oldValue, newValue);
+        return fire(player, new ValueChange<>(pref, oldValue, newValue));
+    }
+
+    /**
+     * Fires a {@link PlayerPreferenceChangeEvent} for the given change payload and reports whether
+     * the caller should proceed. No equality guard — callers with their own no-op logic (a toggle,
+     * or a clear that's a null/null change) call this directly.
+     *
+     * @return {@code true} if the change should be applied, {@code false} if a listener cancelled it
+     */
+    private boolean fire(Player player, Change<?> change) {
+        PlayerPreferenceChangeEvent event = new PlayerPreferenceChangeEvent(player, change);
         Bukkit.getPluginManager().callEvent(event);
         return !event.isCancelled();
     }

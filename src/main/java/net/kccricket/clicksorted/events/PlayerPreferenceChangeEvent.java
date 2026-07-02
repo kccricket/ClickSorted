@@ -16,17 +16,17 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Fired before a per-player ClickSorted preference is changed — click/sort method, start corner,
  * fill axis, the {@code enabled} flag, sort-over-items, bundle-packing toggles and stack limit,
  * a locked-slot toggle, or a bundle blacklist add/remove/clear.
  * <p>
- * {@code key} identifies which preference changed (e.g. {@code "click_mode"}, {@code "enabled"},
- * {@code "locked_slot:9"}, {@code "bundle_blacklist_material"}); {@code oldValue}/{@code newValue}
- * carry the preference's before/after value (types vary by key: {@code Boolean}, {@code Integer},
- * enum constants, {@code Material}, or {@code String}). Only fired when the new value actually
- * differs from the old one.
+ * {@link #getChange()} carries which preference changed and its before/after values. Use
+ * {@link #getChange(Preference)} for a typed accessor scoped to one preference, or pattern-match
+ * on {@link Change} subtypes (e.g. {@link LockedSlotChange}) for shape-specific data. Only fired
+ * when the new value actually differs from the old one.
  * <p>
  * Cancelling prevents the preference from being applied or persisted; the caller that triggered
  * the change (command or GUI) still runs to completion and may report success regardless.
@@ -35,33 +35,30 @@ public class PlayerPreferenceChangeEvent extends Event implements Cancellable {
     private static final HandlerList HANDLERS = new HandlerList();
 
     private final Player player;
-    private final String key;
-    private final Object oldValue;
-    private final Object newValue;
+    private final Change<?> change;
     private boolean cancelled;
 
-    public PlayerPreferenceChangeEvent(Player player, String key, Object oldValue, Object newValue) {
+    public PlayerPreferenceChangeEvent(Player player, Change<?> change) {
         this.player = player;
-        this.key = key;
-        this.oldValue = oldValue;
-        this.newValue = newValue;
+        this.change = change;
     }
 
     public Player getPlayer() {
         return player;
     }
 
-    /** Which preference changed, e.g. {@code "click_mode"} or {@code "locked_slot:9"}. */
-    public String getKey() {
-        return key;
+    public Change<?> getChange() {
+        return change;
     }
 
-    public Object getOldValue() {
-        return oldValue;
-    }
-
-    public Object getNewValue() {
-        return newValue;
+    /**
+     * Typed filter-accessor: returns the change narrowed to {@code T} when this event is for
+     * {@code pref}, or {@code null} otherwise. Safe because {@link Preference} constants are the
+     * only instances of that class, so reference equality proves the type parameter.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> @Nullable Change<T> getChange(Preference<T> pref) {
+        return change.preference() == pref ? (Change<T>) change : null;
     }
 
     @Override
@@ -81,5 +78,53 @@ public class PlayerPreferenceChangeEvent extends Event implements Cancellable {
 
     public static HandlerList getHandlerList() {
         return HANDLERS;
+    }
+
+    /** Base payload: which preference changed and its before/after values. */
+    public abstract static sealed class Change<T> permits ValueChange, LockedSlotChange {
+        private final Preference<T> preference;
+        private final T oldValue;
+        private final T newValue;
+
+        private Change(Preference<T> preference, T oldValue, T newValue) {
+            this.preference = preference;
+            this.oldValue = oldValue;
+            this.newValue = newValue;
+        }
+
+        public Preference<T> preference() {
+            return preference;
+        }
+
+        /** Nullable: a blacklist add has no old value, a remove has no new value. */
+        public @Nullable T oldValue() {
+            return oldValue;
+        }
+
+        /** Nullable: a blacklist add has no old value, a remove has no new value. */
+        public @Nullable T newValue() {
+            return newValue;
+        }
+    }
+
+    /** The common case: a preference's value changed with no additional data. */
+    public static final class ValueChange<T> extends Change<T> {
+        public ValueChange(Preference<T> preference, T oldValue, T newValue) {
+            super(preference, oldValue, newValue);
+        }
+    }
+
+    /** A locked-slot toggle; carries the slot index in addition to the before/after locked state. */
+    public static final class LockedSlotChange extends Change<Boolean> {
+        private final int slot;
+
+        public LockedSlotChange(int slot, boolean oldValue, boolean newValue) {
+            super(Preference.LOCKED_SLOT, oldValue, newValue);
+            this.slot = slot;
+        }
+
+        public int slot() {
+            return slot;
+        }
     }
 }

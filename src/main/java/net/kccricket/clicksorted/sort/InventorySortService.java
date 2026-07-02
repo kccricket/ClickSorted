@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -157,41 +158,39 @@ public class InventorySortService {
             }
         }
 
-        InventorySortEvent sortEvent = new InventorySortEvent(event.getView(), inv, target.min(), target.max());
+        var mainCfg = plugin.getConfigManager().main();
+        Set<Integer> regionSlots = rangeSet(target.min(), target.max());
+        Set<Integer> userLockedSlots = Set.of();
+        Set<Integer> adminLockedSlots = Set.of();
+        if (target.type() == InventoryType.PLAYER) {
+            // Per-player locked slots (player-controlled via /clicksorted set lock).
+            userLockedSlots = prefs.getLockedSlots(p);
+            // Admin-enforced slot locks (config locked_slots.player and clicksorted.lock.player.slot.N).
+            ProtectedSlots protectedSlots = ProtectedSlots.forSort(p, mainCfg);
+            if (!protectedSlots.isEmpty()) {
+                adminLockedSlots = regionSlots.stream().filter(protectedSlots::blocks).collect(Collectors.toUnmodifiableSet());
+            }
+        }
+        ProtectedItems protectedItems = ProtectedItems.forSort(p, mainCfg);
+
+        InventorySortEvent sortEvent = new InventorySortEvent(event.getView(), inv, regionSlots,
+                userLockedSlots, adminLockedSlots, protectedItems);
         Bukkit.getPluginManager().callEvent(sortEvent);
         if (sortEvent.isCancelled()) {
             return false;
         }
 
         Set<Integer> sortableSlots = sortEvent.getSortableSlots();
-        var mainCfg = plugin.getConfigManager().main();
-        if (target.type() == InventoryType.PLAYER) {
-            // Per-player locked slots (player-controlled via /clicksorted set lock).
-            for (int locked : prefs.getLockedSlots(p)) {
-                sortEvent.excludeSlot(locked);
-            }
-            // Admin-enforced slot locks (config locked_slots.player and clicksorted.lock.player.slot.N).
-            ProtectedSlots protectedSlots = ProtectedSlots.forSort(p, mainCfg);
-            if (!protectedSlots.isEmpty()) {
-                for (int s : List.copyOf(sortableSlots)) {
-                    if (protectedSlots.blocks(s)) {
-                        sortEvent.excludeSlot(s);
-                    }
-                }
-            }
-        }
 
-        // Exclude slots whose items are on the admin-enforced "do not touch" blacklist.
-        // Applies to player and container inventories alike. Uses the same excludeSlot mechanism as
-        // locked slots: excluded slots are never read, sorted, packed, or overwritten.
-        ProtectedItems protectedItems = ProtectedItems.forSort(p, mainCfg);
-        if (!protectedItems.isEmpty()) {
-            ItemStack[] slotContents = inv.getContents();
-            for (int s : List.copyOf(sortableSlots)) {
-                ItemStack is = slotContents[s];
-                if (is != null && is.getType() != Material.AIR && protectedItems.blocks(is)) {
-                    sortEvent.excludeSlot(s);
-                }
+        // Exclude slots whose items match the admin "do not touch" blacklist or any exclusion a
+        // listener added via excludeItem. Applies to player and container inventories alike.
+        // Uses the same excludeSlot mechanism as locks: excluded slots are never read, sorted,
+        // packed, or overwritten.
+        ItemStack[] slotContents = inv.getContents();
+        for (int s : List.copyOf(sortableSlots)) {
+            ItemStack is = slotContents[s];
+            if (is != null && is.getType() != Material.AIR && sortEvent.matchesExcludedItem(is)) {
+                sortEvent.excludeSlot(s);
             }
         }
 
@@ -447,6 +446,15 @@ public class InventorySortService {
                 viewer.updateInventory();
             }
         }
+    }
+
+    /** Materializes the contiguous {@code [min, max)} slot range as a set, for the sort event's region. */
+    private static Set<Integer> rangeSet(int min, int max) {
+        Set<Integer> range = new TreeSet<>();
+        for (int i = min; i < max; i++) {
+            range.add(i);
+        }
+        return range;
     }
 
     // -------------------------------------------------------------------------
