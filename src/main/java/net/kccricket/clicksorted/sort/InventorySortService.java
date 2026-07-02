@@ -176,6 +176,14 @@ public class InventorySortService {
                 userLockedSlots, adminLockedSlots, protectedItems);
         Bukkit.getPluginManager().callEvent(sortEvent);
         if (sortEvent.isCancelled()) {
+            // Unlike PlayerPreferenceChangeEvent, this fires on every matching click, so there's no
+            // generic "blocked" fallback here — a per-click message with no listener-supplied reason
+            // would just be noise. A reason, if set, is still worth showing, but rate-limited so a
+            // cancelling listener can't spam chat on rapid clicking.
+            var reason = sortEvent.getCancelReason();
+            if (reason != null) {
+                plugin.getMessenger().message(p, "sortCancelReason", 3, reason);
+            }
             return false;
         }
 

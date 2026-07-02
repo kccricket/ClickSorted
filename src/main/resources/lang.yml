@@ -48,6 +48,10 @@ prefResetInvalid: "Your saved <aqua><pref><white> value, <aqua><value><white>, w
 # Placeholders: <value> (what the player typed), <valid> (comma-joined valid options)
 invalidValue: "<red>Invalid value '<value>'. Valid values: <valid>."
 
+# Generic fallback shown when a PlayerPreferenceChangeEvent listener cancels a preference change
+# without giving a reason (a listener-supplied reason is shown verbatim instead of this).
+preferenceChangeBlocked: "That change was blocked."
+
 # Command feedback — bundle packing toggles (/clicksorted bundle in-inventory|in-containers yes|no)
 # Placeholder: <status> (ENABLED or DISABLED)
 setBundlePackEnabledStatus: "Bundle packing is now <aqua><status><white> for you (inventory and containers)."

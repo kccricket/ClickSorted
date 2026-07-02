@@ -81,9 +81,8 @@ public class PlayerSortingPrefs {
         return SortingMethod.parse(stored, plugin.getConfigManager().main().getDefaultSortingMethod());
     }
 
-    public void setSortingMethod(Player player, SortingMethod sortMethod) {
-        if (!fire(player, Preference.SORT_MODE, getSortingMethod(player), sortMethod)) return;
-        player.getPersistentDataContainer().set(sortKey, PersistentDataType.STRING, sortMethod.name());
+    public PreferenceResult setSortingMethod(Player player, SortingMethod sortMethod) {
+        return setEnumPref(player, Preference.SORT_MODE, sortKey, getSortingMethod(player), sortMethod);
     }
 
     /**
@@ -94,9 +93,8 @@ public class PlayerSortingPrefs {
         return getBool(player, enabledKey, plugin.getConfigManager().main()::getDefaultEnabled);
     }
 
-    public void setEnabled(Player player, boolean enabled) {
-        if (!fire(player, Preference.ENABLED, getEnabled(player), enabled)) return;
-        setBool(player, enabledKey, enabled);
+    public PreferenceResult setEnabled(Player player, boolean enabled) {
+        return setBoolPref(player, Preference.ENABLED, enabledKey, getEnabled(player), enabled);
     }
 
     public ClickMethod getClickMethod(Player player) {
@@ -104,9 +102,8 @@ public class PlayerSortingPrefs {
         return ClickMethod.parse(stored, plugin.getConfigManager().main().getDefaultClickMethod());
     }
 
-    public void setClickMethod(Player player, ClickMethod clickMethod) {
-        if (!fire(player, Preference.CLICK_MODE, getClickMethod(player), clickMethod)) return;
-        player.getPersistentDataContainer().set(clickKey, PersistentDataType.STRING, clickMethod.name());
+    public PreferenceResult setClickMethod(Player player, ClickMethod clickMethod) {
+        return setEnumPref(player, Preference.CLICK_MODE, clickKey, getClickMethod(player), clickMethod);
     }
 
     public StartCorner getStartCorner(Player player) {
@@ -114,9 +111,8 @@ public class PlayerSortingPrefs {
         return StartCorner.parse(stored, plugin.getConfigManager().main().getDefaultStartCorner());
     }
 
-    public void setStartCorner(Player player, StartCorner corner) {
-        if (!fire(player, Preference.START_CORNER, getStartCorner(player), corner)) return;
-        player.getPersistentDataContainer().set(startCornerKey, PersistentDataType.STRING, corner.name());
+    public PreferenceResult setStartCorner(Player player, StartCorner corner) {
+        return setEnumPref(player, Preference.START_CORNER, startCornerKey, getStartCorner(player), corner);
     }
 
     public FillAxis getFillAxis(Player player) {
@@ -124,9 +120,8 @@ public class PlayerSortingPrefs {
         return FillAxis.parse(stored, plugin.getConfigManager().main().getDefaultFillAxis());
     }
 
-    public void setFillAxis(Player player, FillAxis axis) {
-        if (!fire(player, Preference.FILL_AXIS, getFillAxis(player), axis)) return;
-        player.getPersistentDataContainer().set(fillAxisKey, PersistentDataType.STRING, axis.name());
+    public PreferenceResult setFillAxis(Player player, FillAxis axis) {
+        return setEnumPref(player, Preference.FILL_AXIS, fillAxisKey, getFillAxis(player), axis);
     }
 
     /**
@@ -137,9 +132,8 @@ public class PlayerSortingPrefs {
         return getBool(player, sortOverItemsKey, plugin.getConfigManager().main()::getDefaultSortOverItems);
     }
 
-    public void setSortOverItems(Player player, boolean enabled) {
-        if (!fire(player, Preference.SORT_OVER_ITEMS, getSortOverItems(player), enabled)) return;
-        setBool(player, sortOverItemsKey, enabled);
+    public PreferenceResult setSortOverItems(Player player, boolean enabled) {
+        return setBoolPref(player, Preference.SORT_OVER_ITEMS, sortOverItemsKey, getSortOverItems(player), enabled);
     }
 
     /**
@@ -150,9 +144,9 @@ public class PlayerSortingPrefs {
         return getBool(player, bundleInInventoryKey, plugin.getConfigManager().main()::getDefaultBundlePackInInventory);
     }
 
-    public void setBundlePackInInventory(Player player, boolean enabled) {
-        if (!fire(player, Preference.BUNDLE_IN_INVENTORY, getBundlePackInInventory(player), enabled)) return;
-        setBool(player, bundleInInventoryKey, enabled);
+    public PreferenceResult setBundlePackInInventory(Player player, boolean enabled) {
+        return setBoolPref(player, Preference.BUNDLE_IN_INVENTORY, bundleInInventoryKey,
+                getBundlePackInInventory(player), enabled);
     }
 
     /**
@@ -163,9 +157,9 @@ public class PlayerSortingPrefs {
         return getBool(player, bundleInContainersKey, plugin.getConfigManager().main()::getDefaultBundlePackInContainers);
     }
 
-    public void setBundlePackInContainers(Player player, boolean enabled) {
-        if (!fire(player, Preference.BUNDLE_IN_CONTAINERS, getBundlePackInContainers(player), enabled)) return;
-        setBool(player, bundleInContainersKey, enabled);
+    public PreferenceResult setBundlePackInContainers(Player player, boolean enabled) {
+        return setBoolPref(player, Preference.BUNDLE_IN_CONTAINERS, bundleInContainersKey,
+                getBundlePackInContainers(player), enabled);
     }
 
     /** Reads a boolean preference stored as a byte, falling back to {@code def} when unset. */
@@ -188,10 +182,13 @@ public class PlayerSortingPrefs {
         return stored != null ? stored : plugin.getConfigManager().main().getDefaultBundleStackLimit();
     }
 
-    public void setBundleStackLimit(Player player, int limit) {
+    public PreferenceResult setBundleStackLimit(Player player, int limit) {
         int clamped = Math.max(0, limit);
-        if (!fire(player, Preference.BUNDLE_STACK_LIMIT, getBundleStackLimit(player), clamped)) return;
-        player.getPersistentDataContainer().set(bundleStackLimitKey, PersistentDataType.INTEGER, clamped);
+        PreferenceResult result = fire(player, Preference.BUNDLE_STACK_LIMIT, getBundleStackLimit(player), clamped);
+        if (result.applied()) {
+            player.getPersistentDataContainer().set(bundleStackLimitKey, PersistentDataType.INTEGER, clamped);
+        }
+        return result;
     }
 
     /**
@@ -204,35 +201,42 @@ public class PlayerSortingPrefs {
     /**
      * Adds a material to the player's bundle blacklist.
      *
-     * @return {@code true} if the material was newly added, {@code false} if it was already present
-     *         or the change was cancelled by a {@link PlayerPreferenceChangeEvent} listener
+     * @return {@link PreferenceResult#APPLIED} if newly added, {@link PreferenceResult#UNCHANGED}
+     *         if already present, or a cancelled result if a listener vetoed the change
      */
-    public boolean addToBundleBlacklist(Player player, Material material) {
+    public PreferenceResult addToBundleBlacklist(Player player, Material material) {
         Set<Material> current = bundleBlacklist.mutableGet(player);
-        if (current.contains(material)) return false;
-        if (!fire(player, Preference.BUNDLE_BLACKLIST_MATERIAL, null, material)) return false;
-        return bundleBlacklist.addTo(player, current, material);
+        if (current.contains(material)) return PreferenceResult.UNCHANGED;
+        PreferenceResult result = fire(player, Preference.BUNDLE_BLACKLIST_MATERIAL, null, material);
+        if (result.applied()) bundleBlacklist.addTo(player, current, material);
+        return result;
     }
 
     /**
      * Removes a material from the player's bundle blacklist.
      *
-     * @return {@code true} if the material was removed, {@code false} if it was not present
-     *         or the change was cancelled by a {@link PlayerPreferenceChangeEvent} listener
+     * @return {@link PreferenceResult#APPLIED} if removed, {@link PreferenceResult#UNCHANGED}
+     *         if not present, or a cancelled result if a listener vetoed the change
      */
-    public boolean removeFromBundleBlacklist(Player player, Material material) {
+    public PreferenceResult removeFromBundleBlacklist(Player player, Material material) {
         Set<Material> current = bundleBlacklist.mutableGet(player);
-        if (!current.contains(material)) return false;
-        if (!fire(player, Preference.BUNDLE_BLACKLIST_MATERIAL, material, null)) return false;
-        return bundleBlacklist.removeFrom(player, current, material);
+        if (!current.contains(material)) return PreferenceResult.UNCHANGED;
+        PreferenceResult result = fire(player, Preference.BUNDLE_BLACKLIST_MATERIAL, material, null);
+        if (result.applied()) bundleBlacklist.removeFrom(player, current, material);
+        return result;
     }
 
     /** Clears all entries (materials and display names) from the player's bundle blacklist. */
-    public void clearBundleBlacklist(Player player) {
-        if (bundleBlacklist.get(player).isEmpty() && bundleBlacklistNames.get(player).isEmpty()) return;
-        if (!fire(player, new ValueChange<>(Preference.BUNDLE_BLACKLIST_CLEAR, null, null))) return;
-        bundleBlacklist.clear(player);
-        bundleBlacklistNames.clear(player);
+    public PreferenceResult clearBundleBlacklist(Player player) {
+        if (bundleBlacklist.get(player).isEmpty() && bundleBlacklistNames.get(player).isEmpty()) {
+            return PreferenceResult.UNCHANGED;
+        }
+        PreferenceResult result = fire(player, new ValueChange<>(Preference.BUNDLE_BLACKLIST_CLEAR, null, null));
+        if (result.applied()) {
+            bundleBlacklist.clear(player);
+            bundleBlacklistNames.clear(player);
+        }
+        return result;
     }
 
     /**
@@ -245,27 +249,29 @@ public class PlayerSortingPrefs {
     /**
      * Adds a display name to the player's bundle name blacklist.
      *
-     * @return {@code true} if the name was newly added, {@code false} if it was already present
-     *         or the change was cancelled by a {@link PlayerPreferenceChangeEvent} listener
+     * @return {@link PreferenceResult#APPLIED} if newly added, {@link PreferenceResult#UNCHANGED}
+     *         if already present, or a cancelled result if a listener vetoed the change
      */
-    public boolean addToBundleBlacklistName(Player player, String name) {
+    public PreferenceResult addToBundleBlacklistName(Player player, String name) {
         Set<String> current = bundleBlacklistNames.mutableGet(player);
-        if (current.contains(name)) return false;
-        if (!fire(player, Preference.BUNDLE_BLACKLIST_NAME, null, name)) return false;
-        return bundleBlacklistNames.addTo(player, current, name);
+        if (current.contains(name)) return PreferenceResult.UNCHANGED;
+        PreferenceResult result = fire(player, Preference.BUNDLE_BLACKLIST_NAME, null, name);
+        if (result.applied()) bundleBlacklistNames.addTo(player, current, name);
+        return result;
     }
 
     /**
      * Removes a display name from the player's bundle name blacklist.
      *
-     * @return {@code true} if the name was removed, {@code false} if it was not present
-     *         or the change was cancelled by a {@link PlayerPreferenceChangeEvent} listener
+     * @return {@link PreferenceResult#APPLIED} if removed, {@link PreferenceResult#UNCHANGED}
+     *         if not present, or a cancelled result if a listener vetoed the change
      */
-    public boolean removeFromBundleBlacklistName(Player player, String name) {
+    public PreferenceResult removeFromBundleBlacklistName(Player player, String name) {
         Set<String> current = bundleBlacklistNames.mutableGet(player);
-        if (!current.contains(name)) return false;
-        if (!fire(player, Preference.BUNDLE_BLACKLIST_NAME, name, null)) return false;
-        return bundleBlacklistNames.removeFrom(player, current, name);
+        if (!current.contains(name)) return PreferenceResult.UNCHANGED;
+        PreferenceResult result = fire(player, Preference.BUNDLE_BLACKLIST_NAME, name, null);
+        if (result.applied()) bundleBlacklistNames.removeFrom(player, current, name);
+        return result;
     }
 
     /** A PDC-backed set of {@code T} serialized as a delimited string under one {@link NamespacedKey}. */
@@ -341,21 +347,20 @@ public class PlayerSortingPrefs {
     }
 
     /**
-     * Toggles whether {@code slot} is locked for the player.
-     *
-     * @return the slot's locked state after the toggle; if a {@link PlayerPreferenceChangeEvent}
-     *         listener cancels the change, the slot's prior (unchanged) locked state is returned
+     * Toggles whether {@code slot} is locked for the player. On a cancelled result, the slot's
+     * locked state is left unchanged — callers should re-read {@link #getLockedSlots(Player)}
+     * (or the toggle's known prior state) rather than assume the toggle applied.
      */
-    public boolean toggleSlotLocked(Player player, int slot) {
+    public PreferenceResult toggleSlotLocked(Player player, int slot) {
         Set<Integer> slots = new HashSet<>(getLockedSlots(player));
         boolean currentlyLocked = slots.contains(slot);
         boolean nowLocked = !currentlyLocked;
-        if (!fire(player, new LockedSlotChange(slot, currentlyLocked, nowLocked))) {
-            return currentlyLocked;
+        PreferenceResult result = fire(player, new LockedSlotChange(slot, currentlyLocked, nowLocked));
+        if (result.applied()) {
+            if (nowLocked) slots.add(slot); else slots.remove(slot);
+            setLockedSlots(player, slots);
         }
-        if (nowLocked) slots.add(slot); else slots.remove(slot);
-        setLockedSlots(player, slots);
-        return nowLocked;
+        return result;
     }
 
     public void setLockedSlots(Player player, Set<Integer> slots) {
@@ -370,12 +375,11 @@ public class PlayerSortingPrefs {
     /**
      * Fires a {@link PlayerPreferenceChangeEvent} for a would-be preference change and reports
      * whether the caller should proceed. A no-op (equal old/new values) is never fired and always
-     * proceeds, so idempotent setter calls don't spuriously invoke listeners.
-     *
-     * @return {@code true} if the change should be applied, {@code false} if a listener cancelled it
+     * reports {@link PreferenceResult#UNCHANGED}, so idempotent setter calls don't spuriously
+     * invoke listeners.
      */
-    private <T> boolean fire(Player player, Preference<T> pref, T oldValue, T newValue) {
-        if (Objects.equals(oldValue, newValue)) return true;
+    private <T> PreferenceResult fire(Player player, Preference<T> pref, T oldValue, T newValue) {
+        if (Objects.equals(oldValue, newValue)) return PreferenceResult.UNCHANGED;
         return fire(player, new ValueChange<>(pref, oldValue, newValue));
     }
 
@@ -383,13 +387,34 @@ public class PlayerSortingPrefs {
      * Fires a {@link PlayerPreferenceChangeEvent} for the given change payload and reports whether
      * the caller should proceed. No equality guard — callers with their own no-op logic (a toggle,
      * or a clear that's a null/null change) call this directly.
-     *
-     * @return {@code true} if the change should be applied, {@code false} if a listener cancelled it
      */
-    private boolean fire(Player player, Change<?> change) {
+    private PreferenceResult fire(Player player, Change<?> change) {
         PlayerPreferenceChangeEvent event = new PlayerPreferenceChangeEvent(player, change);
         Bukkit.getPluginManager().callEvent(event);
-        return !event.isCancelled();
+        if (event.isCancelled()) {
+            return PreferenceResult.cancelled(event.getCancelReason());
+        }
+        return PreferenceResult.APPLIED;
+    }
+
+    /** Fires an enum-valued preference change and, if applied, stores {@code val} under {@code key} as a string. */
+    private <E extends Enum<E>> PreferenceResult setEnumPref(Player player, Preference<E> pref,
+                                                              NamespacedKey key, E oldValue, E newValue) {
+        PreferenceResult result = fire(player, pref, oldValue, newValue);
+        if (result.applied()) {
+            player.getPersistentDataContainer().set(key, PersistentDataType.STRING, newValue.name());
+        }
+        return result;
+    }
+
+    /** Fires a boolean-valued preference change and, if applied, stores {@code val} under {@code key}. */
+    private PreferenceResult setBoolPref(Player player, Preference<Boolean> pref,
+                                          NamespacedKey key, boolean oldValue, boolean newValue) {
+        PreferenceResult result = fire(player, pref, oldValue, newValue);
+        if (result.applied()) {
+            setBool(player, key, newValue);
+        }
+        return result;
     }
 
 }

@@ -12,6 +12,7 @@ package net.kccricket.clicksorted.events;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
@@ -29,7 +30,10 @@ import org.jetbrains.annotations.Nullable;
  * when the new value actually differs from the old one.
  * <p>
  * Cancelling prevents the preference from being applied or persisted; the caller that triggered
- * the change (command or GUI) still runs to completion and may report success regardless.
+ * the change (command or GUI) reports the block to the player instead of a success message. A
+ * cancelling listener may call {@link #setCancelReason(Component)} to explain why — the caller
+ * shows that reason verbatim, falling back to a generic message when none is set. Setting a
+ * reason has no effect unless the event is also cancelled.
  */
 public class PlayerPreferenceChangeEvent extends Event implements Cancellable {
     private static final HandlerList HANDLERS = new HandlerList();
@@ -37,6 +41,7 @@ public class PlayerPreferenceChangeEvent extends Event implements Cancellable {
     private final Player player;
     private final Change<?> change;
     private boolean cancelled;
+    private @Nullable Component cancelReason;
 
     public PlayerPreferenceChangeEvent(Player player, Change<?> change) {
         this.player = player;
@@ -49,6 +54,23 @@ public class PlayerPreferenceChangeEvent extends Event implements Cancellable {
 
     public Change<?> getChange() {
         return change;
+    }
+
+    /**
+     * The reason a cancelling listener gave for blocking this change, or {@code null} if none was
+     * set (or the event wasn't cancelled). Callers reporting a cancellation to the player should
+     * fall back to a generic message when this is {@code null}.
+     */
+    public @Nullable Component getCancelReason() {
+        return cancelReason;
+    }
+
+    /**
+     * Lets a listener explain why it cancelled this change. Only meaningful alongside
+     * {@link #setCancelled(boolean) setCancelled(true)} — the reason is not surfaced otherwise.
+     */
+    public void setCancelReason(@Nullable Component reason) {
+        this.cancelReason = reason;
     }
 
     /**

@@ -2,6 +2,7 @@ package net.kccricket.clicksorted.text;
 
 import net.kccricket.clicksorted.config.ConfigManager;
 import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
@@ -44,6 +45,17 @@ public class MessageUtil {
 
     public static void alertMessage(Audience sender, Component component) {
         message(sender, component.colorIfAbsent(NamedTextColor.YELLOW), Level.INFO);
+    }
+
+    /**
+     * Reports a cancelled {@link PreferenceResult} to the player: the cancelling listener's
+     * {@link PreferenceResult#cancelReason()} if it set one, otherwise the generic
+     * {@code preferenceChangeBlocked} lang key. Callers should only invoke this when
+     * {@link PreferenceResult#cancelled()} is {@code true}.
+     */
+    public static void preferenceBlocked(Audience sender, PreferenceResult result) {
+        Component reason = result.cancelReason();
+        errorMessage(sender, reason != null ? reason : configManager.lang().getColoredMessage("preferenceChangeBlocked"));
     }
 
     public static void rawMessage(Audience sender, Component component) {

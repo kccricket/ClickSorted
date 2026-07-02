@@ -15,11 +15,13 @@ package net.kccricket.clicksorted.events;
 import net.kccricket.clicksorted.sort.MaterialNameSet;
 import net.kccricket.clicksorted.sort.ProtectedItems;
 import net.kccricket.clicksorted.text.ItemNames;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.event.inventory.InventoryInteractEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -34,7 +36,10 @@ import java.util.TreeSet;
  * sort trigger and before any writes to the inventory, so third-party plugins can inspect or
  * intervene. Cancelling the event aborts the sort entirely; {@link #excludeSlot(int)} and
  * {@link #excludeItem(Material)}/{@link #excludeItem(String)} narrow what gets touched without
- * aborting.
+ * aborting. A cancelling listener may call {@link #setCancelReason(Component)} to explain why —
+ * shown to the player rate-limited (this event fires on every matching click); a cancellation with
+ * no reason set is not reported to the player at all. Setting a reason has no effect unless the
+ * event is also cancelled.
  *
  * <p>{@link #getInventory()} returns the <strong>live</strong> target inventory, captured before
  * any write — at dispatch time its contents are the pre-sort state, but it is not a snapshot: a
@@ -79,6 +84,7 @@ public class InventorySortEvent extends InventoryInteractEvent {
     private final Set<Material> excludedMaterials = new LinkedHashSet<>();
     private final Set<String> excludedItemNames = new LinkedHashSet<>();
     private MaterialNameSet excludedItemsCache;
+    private @Nullable Component cancelReason;
 
     /**
      * Primary constructor: the region a click targets, the locks that already exclude slots from
@@ -132,6 +138,24 @@ public class InventorySortEvent extends InventoryInteractEvent {
     @Override
     public Inventory getInventory() {
         return sortInv;
+    }
+
+    /**
+     * The reason a cancelling listener gave for blocking this sort, or {@code null} if none was
+     * set (or the event wasn't cancelled).
+     */
+    public @Nullable Component getCancelReason() {
+        return cancelReason;
+    }
+
+    /**
+     * Lets a listener explain why it cancelled this sort. Only meaningful alongside
+     * {@link #setCancelled(boolean) setCancelled(true)} — the reason is not surfaced otherwise, and
+     * (since this event fires on every matching click) is shown to the player rate-limited rather
+     * than on every cancelled click.
+     */
+    public void setCancelReason(@Nullable Component reason) {
+        this.cancelReason = reason;
     }
 
     /**

@@ -14,6 +14,8 @@ package net.kccricket.clicksorted.gui;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
+import net.kccricket.clicksorted.model.PreferenceResult;
+import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -76,8 +78,13 @@ public class LockGuiListener implements Listener {
         }
 
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-        boolean nowLocked = prefs.toggleSlotLocked(player, invSlot);
-
+        PreferenceResult result = prefs.toggleSlotLocked(player, invSlot);
+        if (result.cancelled()) {
+            MessageUtil.preferenceBlocked(player, result);
+        }
+        // Re-read the real state rather than trust the toggle's "intended" direction — a cancelled
+        // toggle leaves the slot unchanged, and this redraws the pane to match either way.
+        boolean nowLocked = prefs.getLockedSlots(player).contains(invSlot);
         event.getInventory().setItem(rawSlot,
                 LockGuiHolder.buildPane(plugin.getConfigManager().lang(), nowLocked, rawSlot));
     }

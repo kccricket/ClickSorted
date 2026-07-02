@@ -15,6 +15,7 @@ package net.kccricket.clicksorted.migration;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
+import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.text.MessageUtil;
@@ -107,11 +108,17 @@ public final class PreferenceRepair {
         return false;
     }
 
-    /** Forces hover to the value the click method requires, messaging the player on change. */
+    /**
+     * Forces hover to the value the click method requires, messaging the player on change. Join-time
+     * enforcement, so a listener veto is simply not reported — the player wasn't asking for this.
+     */
     public static void enforceHover(ClickSortedPlugin plugin, Player player, ClickMethod method) {
         method.requiredSortOverItems().ifPresent(required -> {
             if (plugin.getSortingPrefs().getSortOverItems(player) != required) {
-                plugin.getSortingPrefs().setSortOverItems(player, required);
+                PreferenceResult result = plugin.getSortingPrefs().setSortOverItems(player, required);
+                if (!result.applied()) {
+                    return;
+                }
                 var lang = plugin.getConfigManager().lang();
                 MessageUtil.statusMessage(player, lang.getColoredMessage("hoverForcedByClickMethod",
                         Placeholder.unparsed("status", required ? "ENABLED" : "DISABLED"),

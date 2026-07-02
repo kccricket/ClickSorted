@@ -2,6 +2,7 @@ package net.kccricket.clicksorted;
 
 import net.kccricket.clicksorted.events.InventorySortEvent;
 import net.kccricket.clicksorted.events.InventorySortEvent.SlotStatus;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -38,6 +39,7 @@ class InventorySortEventTest extends AbstractClickSortedTest {
         Integer excludeSlot;
         Material excludeMaterial;
         String excludeName;
+        Component cancelReason;
 
         @EventHandler
         public void onSort(InventorySortEvent event) {
@@ -54,6 +56,9 @@ class InventorySortEventTest extends AbstractClickSortedTest {
             }
             if (cancel) {
                 event.setCancelled(true);
+                if (cancelReason != null) {
+                    event.setCancelReason(cancelReason);
+                }
             }
         }
     }
@@ -116,6 +121,43 @@ class InventorySortEventTest extends AbstractClickSortedTest {
 
         assertTrue(listener.fired, "event should still fire");
         assertEquals(2, stoneSlots(chest), "cancelled sort must leave the inventory untouched");
+    }
+
+    @Test
+    void cancellingWithReasonMessagesThePlayer() {
+        SortListener listener = new SortListener();
+        listener.cancel = true;
+        listener.cancelReason = Component.text("no sorting near the vault");
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = addOpPlayer("Dave");
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        InventoryView view = player.openInventory(chest);
+        drainMessages(player);
+
+        server.getPluginManager().callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+
+        assertTrue(anyMessageContains(player, "no sorting near the vault"),
+                "a listener-supplied cancel reason should be shown to the player");
+    }
+
+    @Test
+    void cancellingWithNoReasonSendsNoMessage() {
+        SortListener listener = new SortListener();
+        listener.cancel = true;
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = addOpPlayer("Erin");
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        InventoryView view = player.openInventory(chest);
+        drainMessages(player);
+
+        server.getPluginManager().callEvent(fireClick(view, ClickType.SWAP_OFFHAND, 0));
+
+        assertEquals(0, drainMessageList(player).size(),
+                "a cancellation with no reason should not message the player (this fires on every click)");
     }
 
     @Test
