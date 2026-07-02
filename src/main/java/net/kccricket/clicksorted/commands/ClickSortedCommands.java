@@ -91,7 +91,8 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildClick(ClickSortedPlugin plugin) {
         return Commands.literal("click")
-                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER))
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.click"))
                 .then(buildClickMethod(plugin))
                 .then(buildHover(plugin));
     }
@@ -102,7 +103,8 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSort(ClickSortedPlugin plugin) {
         return Commands.literal("sort")
-                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER))
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.sort"))
                 .then(buildEnabled(plugin))
                 .then(buildSortMethod(plugin))
                 .then(buildStartCorner(plugin))

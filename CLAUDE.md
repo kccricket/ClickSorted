@@ -170,15 +170,15 @@ Commands are implemented as a Brigadier tree in `ClickSortedCommands` and regist
   - `click method <SWAP|SINGLE_CLICK|DOUBLE_CLICK|CONTROL_DROP|SHIFT_LEFT_CLICK|SHIFT_RIGHT_CLICK>`. Requires `clicksorted.commands.click.method`.
   - `click allow-on-hover [yes|no]` — toggle or set sort-over-items. Some methods govern this automatically. Requires `clicksorted.commands.click.hover`.
 - **`lock-slots`** — opens the slot-lock GUI. Admin-locked slots (config or permission) render as IRON_BARS and are non-toggleable. Requires `clicksorted.commands.lock`.
-- **`bundle`** — bundle-packing preferences (requires `clicksorted.commands.bundle`):
-  - (bare) — print current bundle settings.
+- **`bundle`** — bundle-packing preferences (requires `clicksorted.commands.bundle`; bare `bundle` has no default action — a subcommand is required):
   - `bundle enabled [yes|no]` — toggle bundle packing for both inventory and containers.
-  - `bundle in-inventory <yes|no>` — toggle bundle packing in the player's own inventory.
-  - `bundle in-containers <yes|no>` — toggle bundle packing in containers.
+  - `bundle enabled in-inventory <yes|no>` — toggle bundle packing in the player's own inventory.
+  - `bundle enabled in-containers <yes|no>` — toggle bundle packing in containers.
   - `bundle stack-limit <n|off>` — max distinct item entries per bundle.
   - `bundle blacklist` / `bundle blacklist gui` — open the 54-slot blacklist GUI (click an item in the real inventory to add by material or display name; click a listed entry to remove; arrows paginate).
-  - `bundle blacklist add|remove <material>`, `bundle blacklist list`, `bundle blacklist clear` — material text-command alternatives.
-  - `bundle blacklist name add|remove <text>`, `bundle blacklist name list` — display-name text-command alternatives.
+  - `bundle blacklist add material|remove material <material>` — material text-command alternatives.
+  - `bundle blacklist add item-name|remove item-name <text>` — display-name text-command alternatives.
+  - `bundle blacklist list`, `bundle blacklist clear` — cover both material and display-name entries together.
 - **`status`** — print the player's current enabled state, click method, sort method, start corner, fill axis, sort-over-items, and bundle settings. Requires `clicksorted.commands.status`.
 - **`admin`** — admin/diagnostic commands (requires `clicksorted.admin.commands`):
   - `admin reload` — reload all config files. Requires `clicksorted.admin.commands.reload`.

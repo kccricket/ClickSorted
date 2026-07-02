@@ -19,7 +19,7 @@ ClickSorted 2.0.0 introduces a per-player bundle blacklist, server-wide admin it
   - `/clicksorted set click-method` → `/clicksorted click method`
   - `/clicksorted set hover` → `/clicksorted click allow-on-hover`
   - `/clicksorted set lock` → `/clicksorted lock-slots`
-  - `/clicksorted set bundle inventory|others` → `/clicksorted bundle in-inventory|in-containers`
+  - `/clicksorted set bundle inventory|others` → `/clicksorted bundle enabled in-inventory|in-containers`
   - `/clicksorted set bundle stacklimit` → `/clicksorted bundle stack-limit`
   - `/clicksorted set start-corner` → `/clicksorted sort start-corner`
   - `/clicksorted set fill-axis` → `/clicksorted sort fill-axis`
@@ -44,8 +44,8 @@ ClickSorted 2.0.0 introduces a per-player bundle blacklist, server-wide admin it
 
 `/clicksorted bundle blacklist` opens a 54-slot GUI: click an item in your real inventory to add it to the blacklist by material (for vanilla items) or by display name (for custom-named items); click a listed entry to remove it; pagination arrows navigate large lists. Text-command alternatives:
 
-- `bundle blacklist add|remove <material>`, `bundle blacklist list`, `bundle blacklist clear` — material entries.
-- `bundle blacklist name add|remove <text>`, `bundle blacklist name list` — display-name entries.
+- `bundle blacklist add material|remove material <material>`, `bundle blacklist list`, `bundle blacklist clear` — material entries.
+- `bundle blacklist add item-name|remove item-name <text>` — display-name entries. `list` and `clear` above cover both materials and names together.
 
 Material entries block any item of that type; name entries match case-insensitively against the item's resolved display name (custom name → `item_name` data component → vanilla / `items.yml` name). Blacklisted items are never packed into or unpacked from bundles; blacklisted bundle colors are also skipped as packing bins.
 

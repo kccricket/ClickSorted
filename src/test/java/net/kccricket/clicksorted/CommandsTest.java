@@ -313,4 +313,34 @@ class CommandsTest extends AbstractClickSortedTest {
                     "admin config (raw) lines must not be prefixed: " + msg);
         }
     }
+
+    // --- sort / click group permission gates ---
+
+    @Test
+    void sortGroupPermissionDeniedBlocksSortCommands() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        player.addAttachment(plugin, "clicksorted.commands.sort", false);
+        player.recalculatePermissions();
+        SortingMethod before = plugin.getSortingPrefs().getSortingMethod(player);
+
+        server.dispatchCommand(player, "clicksorted sort method NAME");
+
+        assertEquals(before, plugin.getSortingPrefs().getSortingMethod(player),
+                "sort method should not change when clicksorted.commands.sort is denied");
+    }
+
+    @Test
+    void clickGroupPermissionDeniedBlocksClickCommands() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        player.addAttachment(plugin, "clicksorted.commands.click", false);
+        player.recalculatePermissions();
+        ClickMethod before = plugin.getSortingPrefs().getClickMethod(player);
+
+        server.dispatchCommand(player, "clicksorted click method SWAP");
+
+        assertEquals(before, plugin.getSortingPrefs().getClickMethod(player),
+                "click method should not change when clicksorted.commands.click is denied");
+    }
 }
