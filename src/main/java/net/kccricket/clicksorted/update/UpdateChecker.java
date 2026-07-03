@@ -141,8 +141,8 @@ public class UpdateChecker {
             }
 
             if (compareVersions(latest, current) > 0) {
-                updateAvailable = true;
                 latestVersion = latest;
+                updateAvailable = true;
                 Log.log(java.util.logging.Level.INFO, "A new version of ClickSorted is available: "
                         + latest + " (you are running " + current + ").");
                 Log.log(java.util.logging.Level.INFO, "Download: "
