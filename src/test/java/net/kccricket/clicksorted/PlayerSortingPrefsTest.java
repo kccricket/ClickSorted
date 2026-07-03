@@ -1,9 +1,17 @@
 package net.kccricket.clicksorted;
 
+import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent;
+import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent.Change;
+import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent.LockedSlotChange;
+import net.kccricket.clicksorted.events.Preference;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
+import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kyori.adventure.text.Component;
 import org.bukkit.NamespacedKey;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
@@ -146,21 +154,21 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
     }
 
     @Test
-    void toggleSlotLockedReturnsTrueWhenLocking() {
+    void toggleSlotLockedAppliesAndLocksWhenUnlocked() {
         PlayerMock player = server.addPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-        assertTrue(prefs.toggleSlotLocked(player, 5),
-                "toggleSlotLocked should return true when the slot was not previously locked");
+        assertTrue(prefs.toggleSlotLocked(player, 5).applied(),
+                "toggleSlotLocked should apply when the slot was not previously locked");
         assertTrue(prefs.getLockedSlots(player).contains(5));
     }
 
     @Test
-    void toggleSlotLockedReturnsFalseWhenUnlocking() {
+    void toggleSlotLockedAppliesAndUnlocksWhenLocked() {
         PlayerMock player = server.addPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
         prefs.toggleSlotLocked(player, 5);
-        assertFalse(prefs.toggleSlotLocked(player, 5),
-                "toggleSlotLocked should return false when the slot was already locked");
+        assertTrue(prefs.toggleSlotLocked(player, 5).applied(),
+                "toggleSlotLocked should apply when unlocking an already-locked slot");
         assertFalse(prefs.getLockedSlots(player).contains(5));
     }
 
@@ -172,6 +180,121 @@ class PlayerSortingPrefsTest extends AbstractClickSortedTest {
         assertTrue(prefs.getLockedSlots(player).contains(12), "Slot should be locked after one toggle");
         prefs.toggleSlotLocked(player, 12);
         assertFalse(prefs.getLockedSlots(player).contains(12), "Slot should be unlocked after second toggle");
+    }
+
+    // --- PlayerPreferenceChangeEvent ---
+
+    private static final class PreferenceListener implements Listener {
+        boolean fired;
+        PlayerPreferenceChangeEvent captured;
+        boolean cancel;
+        Component cancelReason;
+
+        @EventHandler
+        public void onChange(PlayerPreferenceChangeEvent event) {
+            fired = true;
+            captured = event;
+            if (cancel) {
+                event.setCancelled(true);
+                if (cancelReason != null) {
+                    event.setCancelReason(cancelReason);
+                }
+            }
+        }
+    }
+
+    @Test
+    void settingClickMethodFiresTypedChangeEvent() {
+        PreferenceListener listener = new PreferenceListener();
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        ClickMethod before = prefs.getClickMethod(player);
+
+        prefs.setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+
+        assertTrue(listener.fired, "Changing click method should fire PlayerPreferenceChangeEvent");
+        Change<ClickMethod> change = listener.captured.getChange(Preference.CLICK_MODE);
+        assertNotNull(change, "Event should be typed for Preference.CLICK_MODE");
+        assertEquals(before, change.oldValue());
+        assertEquals(ClickMethod.DOUBLE_CLICK, change.newValue());
+        assertNull(listener.captured.getChange(Preference.SORT_MODE),
+                "Typed accessor for an unrelated preference should return null");
+    }
+
+    @Test
+    void cancellingPreferenceChangeEventBlocksPersistence() {
+        PreferenceListener listener = new PreferenceListener();
+        listener.cancel = true;
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        ClickMethod before = prefs.getClickMethod(player);
+
+        prefs.setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+
+        assertEquals(before, prefs.getClickMethod(player), "Cancelled change must not persist");
+    }
+
+    @Test
+    void cancelledChangeCarriesListenerSuppliedReason() {
+        PreferenceListener listener = new PreferenceListener();
+        listener.cancel = true;
+        listener.cancelReason = Component.text("blocked by policy");
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        PreferenceResult result = plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+
+        assertTrue(result.cancelled(), "Change should report cancelled");
+        assertEquals(Component.text("blocked by policy"), result.cancelReason());
+    }
+
+    @Test
+    void cancelledChangeWithNoReasonHasNullReason() {
+        PreferenceListener listener = new PreferenceListener();
+        listener.cancel = true;
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        PreferenceResult result = plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+
+        assertTrue(result.cancelled(), "Change should report cancelled");
+        assertNull(result.cancelReason(), "No reason was set by the listener");
+    }
+
+    @Test
+    void noOpSetterReportsUnchangedWithoutFiringEvent() {
+        PreferenceListener listener = new PreferenceListener();
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        ClickMethod current = prefs.getClickMethod(player);
+
+        PreferenceResult result = prefs.setClickMethod(player, current);
+
+        assertEquals(PreferenceResult.UNCHANGED, result, "Setting the same value should report UNCHANGED");
+        assertFalse(listener.fired, "A no-op set should not fire PlayerPreferenceChangeEvent");
+    }
+
+    @Test
+    void toggleSlotLockedFiresLockedSlotChange() {
+        PreferenceListener listener = new PreferenceListener();
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        plugin.getSortingPrefs().toggleSlotLocked(player, 7);
+
+        assertTrue(listener.fired);
+        assertTrue(listener.captured.getChange() instanceof LockedSlotChange,
+                "Locked-slot toggle should carry a LockedSlotChange payload");
+        LockedSlotChange lockChange = (LockedSlotChange) listener.captured.getChange();
+        assertEquals(7, lockChange.slot());
+        assertEquals(false, lockChange.oldValue());
+        assertEquals(true, lockChange.newValue());
     }
 
 }

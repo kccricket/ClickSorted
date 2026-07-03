@@ -1,4 +1,4 @@
-# Development
+# Building & Testing
 
 ## Building from source
 
@@ -19,4 +19,4 @@ The output JAR will be at `build/libs/clicksorted-<version>.jar`.
 ## License
 
 ClickSorted retains the original **GNU GPL v3** license from the original ClickSort plugin by Des Herriott.
-See [LICENSE](../LICENSE) or the [full licence text](http://www.gnu.org/licenses/gpl-3.0.html).
+See [LICENSE](../../LICENSE) or the [full licence text](http://www.gnu.org/licenses/gpl-3.0.html).

@@ -162,7 +162,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         PlayerMock player = server.addPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
-        boolean added = prefs.addToBundleBlacklist(player, Material.DIRT);
+        boolean added = prefs.addToBundleBlacklist(player, Material.DIRT).applied();
         assertTrue(added, "First add should return true");
         assertTrue(prefs.getBundleBlacklist(player).contains(Material.DIRT));
     }
@@ -173,7 +173,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
         prefs.addToBundleBlacklist(player, Material.DIRT);
-        boolean addedAgain = prefs.addToBundleBlacklist(player, Material.DIRT);
+        boolean addedAgain = prefs.addToBundleBlacklist(player, Material.DIRT).applied();
         assertFalse(addedAgain, "Re-adding an existing entry should return false");
         assertEquals(1, prefs.getBundleBlacklist(player).size());
     }
@@ -184,7 +184,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
         prefs.addToBundleBlacklist(player, Material.COBBLESTONE);
-        boolean removed = prefs.removeFromBundleBlacklist(player, Material.COBBLESTONE);
+        boolean removed = prefs.removeFromBundleBlacklist(player, Material.COBBLESTONE).applied();
         assertTrue(removed);
         assertFalse(prefs.getBundleBlacklist(player).contains(Material.COBBLESTONE));
     }
@@ -192,7 +192,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
     @Test
     void removeReturnsFalseWhenAbsent() {
         PlayerMock player = server.addPlayer("Alice");
-        boolean removed = plugin.getSortingPrefs().removeFromBundleBlacklist(player, Material.DIRT);
+        boolean removed = plugin.getSortingPrefs().removeFromBundleBlacklist(player, Material.DIRT).applied();
         assertFalse(removed);
     }
 
@@ -368,7 +368,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         PlayerMock player = server.addPlayer("Alice");
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
-        boolean added = prefs.addToBundleBlacklistName(player, "Magic Sword");
+        boolean added = prefs.addToBundleBlacklistName(player, "Magic Sword").applied();
         assertTrue(added, "First name add should return true");
         assertTrue(prefs.getBundleBlacklistNames(player).contains("Magic Sword"));
     }
@@ -379,7 +379,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
         prefs.addToBundleBlacklistName(player, "Magic Sword");
-        boolean addedAgain = prefs.addToBundleBlacklistName(player, "Magic Sword");
+        boolean addedAgain = prefs.addToBundleBlacklistName(player, "Magic Sword").applied();
         assertFalse(addedAgain, "Re-adding an existing name entry should return false");
         assertEquals(1, prefs.getBundleBlacklistNames(player).size());
     }
@@ -390,7 +390,7 @@ class BundleBlacklistTest extends AbstractClickSortedTest {
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
         prefs.addToBundleBlacklistName(player, "Magic Sword");
-        boolean removed = prefs.removeFromBundleBlacklistName(player, "Magic Sword");
+        boolean removed = prefs.removeFromBundleBlacklistName(player, "Magic Sword").applied();
         assertTrue(removed);
         assertFalse(prefs.getBundleBlacklistNames(player).contains("Magic Sword"));
     }

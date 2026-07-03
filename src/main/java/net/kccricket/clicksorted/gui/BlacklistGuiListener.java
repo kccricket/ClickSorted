@@ -13,7 +13,9 @@ package net.kccricket.clicksorted.gui;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.text.ItemNames;
+import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -80,7 +82,10 @@ public class BlacklistGuiListener implements Listener {
             if (plugin.getActionThrottle().throttled(player)) {
                 return;
             }
-            removeEntry(player, entry);
+            PreferenceResult result = removeEntry(player, entry);
+            if (result.cancelled()) {
+                MessageUtil.preferenceBlocked(player, result);
+            }
             holder.refresh();
 
         } else if (rawSlot >= BlacklistGuiHolder.PAGE_SIZE && rawSlot < BlacklistGuiHolder.GUI_SIZE) {
@@ -101,7 +106,10 @@ public class BlacklistGuiListener implements Listener {
             if (plugin.getActionThrottle().throttled(player)) {
                 return;
             }
-            addItem(player, item);
+            PreferenceResult result = addItem(player, item);
+            if (result.cancelled()) {
+                MessageUtil.preferenceBlocked(player, result);
+            }
             holder.refresh();
         }
     }
@@ -113,21 +121,21 @@ public class BlacklistGuiListener implements Listener {
         }
     }
 
-    private void removeEntry(Player player, BlacklistGuiHolder.Entry entry) {
-        switch (entry) {
+    private PreferenceResult removeEntry(Player player, BlacklistGuiHolder.Entry entry) {
+        return switch (entry) {
             case BlacklistGuiHolder.MaterialEntry m ->
                 plugin.getSortingPrefs().removeFromBundleBlacklist(player, m.material());
             case BlacklistGuiHolder.NameEntry n ->
                 plugin.getSortingPrefs().removeFromBundleBlacklistName(player, n.name());
-        }
+        };
     }
 
-    private void addItem(Player player, ItemStack item) {
+    private PreferenceResult addItem(Player player, ItemStack item) {
         String name = ItemNames.explicitName(item);
         if (name != null) {
-            plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
+            return plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
         } else {
-            plugin.getSortingPrefs().addToBundleBlacklist(player, item.getType());
+            return plugin.getSortingPrefs().addToBundleBlacklist(player, item.getType());
         }
     }
 }

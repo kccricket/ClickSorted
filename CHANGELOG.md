@@ -1,3 +1,91 @@
+# ClickSorted 2.1.0
+
+Release date: 2026-07-03
+
+ClickSorted 2.1.0 makes sorting and preference changes fully listener-actionable for third-party plugins, adds a configurable update-check cadence, and closes a Folia edge case around shared virtual inventories.
+
+## Highlights
+
+- **`InventorySortEvent` is now listener-actionable** — narrow a sort with `excludeSlot`/`excludeItem`, inspect precise slot classification (`OUT_OF_RANGE`/`ADMIN_LOCKED`/`USER_LOCKED`/`SORTABLE`), and explain a cancellation with `setCancelReason`, shown to the player rate-limited.
+- **New `PlayerPreferenceChangeEvent`** — every per-player preference change (click/sort method, start corner, fill axis, `enabled`, sort-over-items, bundle-packing settings, locked-slot toggles, bundle blacklist add/remove/clear) now fires a cancellable, typed event before it's applied or persisted.
+- **New `PreferenceResult`** — every event-firing `PlayerSortingPrefs` setter now returns `APPLIED`/`UNCHANGED`/`CANCELLED` instead of a bare `boolean`/`void`, so callers can tell a real no-op apart from a listener veto.
+- **Configurable update-check cadence** — `check_for_updates_interval_hours` (default 24) controls how often the recurring Modrinth check repeats while the server runs.
+- **Folia safety** — on Folia, ClickSorted now refuses to sort a plugin-created inventory that is open to more than one viewer at once (e.g. a shared virtual GUI), since such an inventory has no single owning region thread and could otherwise race between viewers' region threads. Vanilla inventories and single-viewer plugin GUIs are unaffected.
+
+## Breaking Changes
+
+These changes are scoped to third-party plugin developers integrating with ClickSorted's Java API — there is no impact on server admins or players.
+
+- **`PlayerSortingPrefs` setter return types changed.** Methods like `setEnabled`, `setClickMethod`, `setSortingMethod`, `setStartCorner`, `setFillAxis`, `setSortOverItems`, `setBundlePackInInventory`, `setBundlePackInContainers`, `setBundleStackLimit`, `addToBundleBlacklist`/`removeFromBundleBlacklist` (and the name variants), `clearBundleBlacklist`, and `toggleSlotLocked` now return `PreferenceResult` instead of `boolean`/`void`. Third-party plugins calling these directly and using the return value must update to check `PreferenceResult.applied()`/`cancelled()`. `setLockedSlots` is unchanged (still `void`, fires no event).
+- **`InventorySortEvent(InventoryView, Inventory, int min, int max)` is deprecated** (not removed) in favor of the new set-based constructor, which carries lock and admin-blacklist metadata the old one can't express. Existing code using the old constructor keeps compiling and working.
+
+## New Features
+
+### `InventorySortEvent`: listener-actionable
+
+The event now carries the click's full region, per-player and admin lock sets, and the admin item-blacklist snapshot, and exposes:
+
+- `getSortableSlots()` / `excludeSlot(int)` — read and narrow the live sortable set.
+- `getRegionSlots()`, `getUserLockedSlots()`, `getAdminLockedSlots()` — the raw inputs behind the sortable set.
+- `statusOf(int)` / `getSlots()` — classify any or every slot as `OUT_OF_RANGE`, `ADMIN_LOCKED`, `USER_LOCKED`, or `SORTABLE`.
+- `excludeItem(Material)` / `excludeItem(String)` / `getExcludedMaterials()` / `getExcludedItemNames()` / `matchesExcludedItem(ItemStack)` — listener-contributed item exclusions, unioned with the admin blacklist.
+- `setCancelReason(Component)` / `getCancelReason()` — an optional explanation shown to the player (rate-limited, since this event fires on every matching click) when a listener cancels the sort.
+
+See the new [Development → Events](development/events/inventory-sort-event.md) docs page for full details and an example listener.
+
+### `PlayerPreferenceChangeEvent`
+
+A new cancellable event fired by `PlayerSortingPrefs` before any per-player preference changes. `getChange()` returns a sealed `Change<T>` (`ValueChange<T>` or `LockedSlotChange`, which adds a `slot()`) with typed `oldValue()`/`newValue()`; `getChange(Preference<T>)` gives a type-narrowed accessor for one specific preference (`Preference.CLICK_MODE`, `.SORT_MODE`, `.ENABLED`, etc. — see the new `Preference<T>` class). A cancelling listener may call `setCancelReason(Component)`; ClickSorted's own commands show that reason, falling back to a generic `preferenceChangeBlocked` lang key when none is set. Only fires when the new value actually differs from the old one.
+
+See the new [Development → Events](development/events/player-preference-change-event.md) docs page for full details and an example listener.
+
+### `PreferenceResult`
+
+`PlayerSortingPrefs` mutators now return a `PreferenceResult` record (`APPLIED`, `UNCHANGED`, or `CANCELLED` with an optional `cancelReason()`), letting ClickSorted's commands (and any third-party caller) distinguish a value that was already set from one a listener blocked, and report each correctly to the player.
+
+### Configurable update-check cadence
+
+`check_for_updates_interval_hours` (default `24`, minimum `1`, lower values clamped up) controls how often `UpdateChecker` repeats its Modrinth check while the server keeps running, in addition to the existing startup/reload check. `/clicksorted admin reload` now restarts the full update-check schedule (previously it only fired a one-off check).
+
+### Development documentation
+
+New `docs/development/` section covering building & testing from source and the events ClickSorted publishes (`InventorySortEvent`, `PlayerPreferenceChangeEvent`), for plugin authors integrating with ClickSorted.
+
+## Bug Fixes
+
+- **Bundle-blacklist add/remove/clear couldn't distinguish "already in that state" from "a listener blocked it"** — these now report a listener veto as blocked rather than silently falling through to the "already present"/"not present" message.
+
+## Other Improvements
+
+- `ClickSortedCommands` deduplicated: `blockedAndReported`/`reportBlacklistResult` helpers own the cancel-report half of every preference-setting command once, instead of per call site.
+- `PlayerSortingPrefs` deduplicated: enum/boolean setters delegate to shared `setEnumPref`/`setBoolPref` helpers, and the set-valued blacklist mutators to `mutateBlacklist`, which own the fire→write→return sequence once; set-valued stores re-read PDC after the event fires so re-entrant listener mutations aren't clobbered.
+- A no-op preference setter call that matches the config default still pins the value in PDC (without firing the event), so an explicit choice survives a later default change.
+- `ProtectedItems.blocks(ItemStack, String)` overload added so callers that already resolved an item's display name (e.g. `InventorySortEvent.matchesExcludedItem`) avoid a second lookup.
+
+## Compatibility
+
+✔️ Paper/Folia 1.21.5 – 26.1.x
+✔️ Java 21+
+
+## Upgrading
+
+1. Stop your server.
+2. Replace the old jar in `plugins/` with this release.
+3. Start your server. `check_for_updates_interval_hours` is added to `config.yml` automatically (default `24`); no other config or stored-preference migration is required.
+
+> **Note for plugin developers:** if you call `PlayerSortingPrefs` setters directly and use their return value, update to the new `PreferenceResult` return type (see Breaking Changes above).
+
+## What's Changed
+
+- Add `InventorySortEvent` slot classification, item exclusions, and cancel reasons by @kccricket
+- Add configurable update-check cadence and cancellable preference events by @kccricket
+- Introduce `PreferenceResult` to distinguish no-op, applied, and cancelled preference changes by @kccricket
+- Fix: distinguish cancelled bundle-blacklist changes from no-ops; dedupe/cache event helpers by @kccricket
+- Refactor: pin explicit preference no-ops to PDC and dedupe command/event helpers by @kccricket
+- Refuse to sort cross-region-unsafe shared plugin inventories on Folia by @kccricket
+
+---
+
 # ClickSorted 2.0.0
 
 Release date: 2026-06-29

@@ -23,4 +23,10 @@ nav:
     - Item Blacklist: admin/item-blacklist.md
     - Slot Locks: admin/slot-locks.md
     - Language: admin/lang.md
-  - Development: development.md
+  - Development:
+    - Overview: development/index.md
+    - Building & Testing: development/building.md
+    - Events:
+      - Overview: development/events/index.md
+      - InventorySortEvent: development/events/inventory-sort-event.md
+      - PlayerPreferenceChangeEvent: development/events/player-preference-change-event.md

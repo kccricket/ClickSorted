@@ -71,9 +71,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         actionThrottle = new ActionThrottle(this);
 
         updateChecker = new UpdateChecker(this);
-        if (configManager.main().getCheckForUpdates()) {
-            updateChecker.check();
-        }
+        updateChecker.restart();
 
         sortService = new InventorySortService(this);
 
@@ -89,6 +87,9 @@ public class ClickSortedPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (updateChecker != null) {
+            updateChecker.stop();
+        }
         if (metrics != null) {
             metrics.shutdown();
         }

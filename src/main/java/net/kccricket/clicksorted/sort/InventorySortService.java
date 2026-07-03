@@ -157,41 +157,47 @@ public class InventorySortService {
             }
         }
 
-        InventorySortEvent sortEvent = new InventorySortEvent(event.getView(), inv, target.min(), target.max());
+        var mainCfg = plugin.getConfigManager().main();
+        Set<Integer> regionSlots = InventorySortEvent.rangeSet(target.min(), target.max());
+        Set<Integer> userLockedSlots = Set.of();
+        Set<Integer> adminLockedSlots = Set.of();
+        if (target.type() == InventoryType.PLAYER) {
+            // Per-player locked slots (player-controlled via /clicksorted set lock).
+            userLockedSlots = prefs.getLockedSlots(p);
+            // Admin-enforced slot locks (config locked_slots.player and clicksorted.lock.player.slot.N).
+            ProtectedSlots protectedSlots = ProtectedSlots.forSort(p, mainCfg);
+            if (!protectedSlots.isEmpty()) {
+                adminLockedSlots = regionSlots.stream().filter(protectedSlots::blocks).collect(Collectors.toUnmodifiableSet());
+            }
+        }
+        ProtectedItems protectedItems = ProtectedItems.forSort(p, mainCfg);
+
+        InventorySortEvent sortEvent = new InventorySortEvent(event.getView(), inv, regionSlots,
+                userLockedSlots, adminLockedSlots, protectedItems);
         Bukkit.getPluginManager().callEvent(sortEvent);
         if (sortEvent.isCancelled()) {
+            // Unlike PlayerPreferenceChangeEvent, this fires on every matching click, so there's no
+            // generic "blocked" fallback here — a per-click message with no listener-supplied reason
+            // would just be noise. A reason, if set, is still worth showing, but rate-limited so a
+            // cancelling listener can't spam chat on rapid clicking.
+            var reason = sortEvent.getCancelReason();
+            if (reason != null) {
+                plugin.getMessenger().message(p, "sortCancelReason", 3, reason);
+            }
             return false;
         }
 
         Set<Integer> sortableSlots = sortEvent.getSortableSlots();
-        var mainCfg = plugin.getConfigManager().main();
-        if (target.type() == InventoryType.PLAYER) {
-            // Per-player locked slots (player-controlled via /clicksorted set lock).
-            for (int locked : prefs.getLockedSlots(p)) {
-                sortEvent.excludeSlot(locked);
-            }
-            // Admin-enforced slot locks (config locked_slots.player and clicksorted.lock.player.slot.N).
-            ProtectedSlots protectedSlots = ProtectedSlots.forSort(p, mainCfg);
-            if (!protectedSlots.isEmpty()) {
-                for (int s : List.copyOf(sortableSlots)) {
-                    if (protectedSlots.blocks(s)) {
-                        sortEvent.excludeSlot(s);
-                    }
-                }
-            }
-        }
 
-        // Exclude slots whose items are on the admin-enforced "do not touch" blacklist.
-        // Applies to player and container inventories alike. Uses the same excludeSlot mechanism as
-        // locked slots: excluded slots are never read, sorted, packed, or overwritten.
-        ProtectedItems protectedItems = ProtectedItems.forSort(p, mainCfg);
-        if (!protectedItems.isEmpty()) {
-            ItemStack[] slotContents = inv.getContents();
-            for (int s : List.copyOf(sortableSlots)) {
-                ItemStack is = slotContents[s];
-                if (is != null && is.getType() != Material.AIR && protectedItems.blocks(is)) {
-                    sortEvent.excludeSlot(s);
-                }
+        // Exclude slots whose items match the admin "do not touch" blacklist or any exclusion a
+        // listener added via excludeItem. Applies to player and container inventories alike.
+        // Uses the same excludeSlot mechanism as locks: excluded slots are never read, sorted,
+        // packed, or overwritten.
+        ItemStack[] slotContents = inv.getContents();
+        for (int s : List.copyOf(sortableSlots)) {
+            ItemStack is = slotContents[s];
+            if (is != null && is.getType() != Material.AIR && sortEvent.matchesExcludedItem(is)) {
+                sortEvent.excludeSlot(s);
             }
         }
 
@@ -284,6 +290,7 @@ public class InventorySortService {
     private Target resolve(InventoryClickEvent event) {
         Inventory inv = event.getClickedInventory();
         if (inv == null || !shouldSort(inv)) return null;
+        if (FOLIA && isUnsafeSharedInventory(inv)) return null;
 
         int slot = event.getSlot();
         InventoryType type = inv.getType();
@@ -464,5 +471,26 @@ public class InventorySortService {
 
     private static boolean isVanillaInventoryHolder(InventoryHolder inventoryHolder) {
         return inventoryHolder != null && inventoryHolder.getClass().getPackageName().startsWith("org.bukkit.");
+    }
+
+    /**
+     * A plugin-created (non-vanilla-held) inventory with more than one current viewer has no
+     * single owning region thread on Folia, so two viewers' clicks can concurrently read-modify-write
+     * the same backing array. This is the honest, cheap proxy for "unsafe to sort here" — see
+     * CLAUDE.md's Folia section for why this is refused rather than serialized with a lock.
+     */
+    static boolean isUnsafeSharedInventory(Inventory inventory) {
+        return inventory.getViewers().size() > 1 && !isVanillaInventoryHolder(inventory.getHolder());
+    }
+
+    private static final boolean FOLIA = detectFolia();
+
+    private static boolean detectFolia() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 }

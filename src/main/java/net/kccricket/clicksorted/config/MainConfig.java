@@ -29,6 +29,9 @@ public class MainConfig implements ManagedConfig {
     /** One past the last sortable player slot: slots 36+ are armor and off-hand, never sorted. */
     public static final int PLAYER_STORAGE_END = 36;
 
+    /** Lower bound for {@code check_for_updates_interval_hours}, to keep API polling reasonable. */
+    public static final int MIN_UPDATE_CHECK_INTERVAL_HOURS = 1;
+
     private final ClickSortedPlugin plugin;
     // Reassigned on reload; read on Folia region threads, so publish via volatile.
     // EnumSet for O(1) membership tests on the per-click sort path.
@@ -85,6 +88,11 @@ public class MainConfig implements ManagedConfig {
                 "Check Modrinth for a newer release on startup and reload, logging a notice to the",
                 "console when one is available. Set to false to disable. No data beyond the request",
                 "itself is sent."));
+        cfg.setComments("check_for_updates_interval_hours", List.of(
+                "How often to repeat the update check while the server is running, in hours.",
+                "Default is 24 (once a day). Enforced minimum is " + MIN_UPDATE_CHECK_INTERVAL_HOURS
+                        + " hour(s); lower values are clamped up.",
+                "Has no effect when check_for_updates is false."));
         cfg.setComments("debug_level", List.of(
                 "Logging verbosity for the plugin.",
                 "Values: OFF (no debug output), DEBUG (high-level flow), TRACE (per-item verbose)"));
@@ -236,6 +244,15 @@ public class MainConfig implements ManagedConfig {
 
     public boolean getCheckForUpdates() {
         return plugin.getConfig().getBoolean("check_for_updates", true);
+    }
+
+    /**
+     * How often (in hours) to repeat the Modrinth update check while the server is running.
+     * Clamped to {@link #MIN_UPDATE_CHECK_INTERVAL_HOURS} or above.
+     */
+    public int getUpdateCheckIntervalHours() {
+        return Math.max(MIN_UPDATE_CHECK_INTERVAL_HOURS,
+                plugin.getConfig().getInt("check_for_updates_interval_hours", 24));
     }
 
     public SortingMethod getDefaultSortingMethod() {

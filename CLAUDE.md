@@ -23,11 +23,11 @@ ClickSorted is a Paper/Bukkit plugin that lets players sort inventories via conf
 net.kccricket.clicksorted
 ├── ClickSortedPlugin          entry point
 ├── model/                   ClickMethod, SortingMethod, SortKey, PlayerSortingPrefs,
-│                            StartCorner, FillAxis, EnumParse
+│                            StartCorner, FillAxis, EnumParse, PreferenceResult
 ├── commands/                ClickSortedCommands (Brigadier command tree)
 ├── config/                  ConfigManager, ManagedConfig, MainConfig, LangConfig,
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
-├── events/                  InventorySortEvent
+├── events/                  InventorySortEvent, PlayerPreferenceChangeEvent, Preference
 ├── gui/                     ClickSortedHolder, BlacklistGuiHolder, BlacklistGuiListener,
 │                            LockGuiHolder, LockGuiListener
 ├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
@@ -92,19 +92,21 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 3. **Sorting on:** `InventorySortService` delegates to `SortEngine`: fungible items are collapsed into a `HashMap<SortKey, Integer>` (material → quantity) and non-fungible items (bundles, non-stackables) are kept discrete, then everything is reconstructed into stacks and written back across the inventory (items may move to any sortable slot).
 4. **Sorting off, packing on:** `InventorySortService` delegates to `InPlacePacker`: same-material stacks consolidate within their *own* slots (full stacks first, remainder last, trailing empties cleared). Loose stacks stay anchored to their lane; items displaced from bundles (or exceeding their lane's slot capacity) fill free/freed slots in ascending order; drops occur only when the region is genuinely full.
 5. When bundle packing is enabled for the target (`defaults.bundle_in_inventory` / `defaults.bundle_in_containers`, toggled per-player), `BundlePacker` runs either as part of `packAndSort` (sorting on) or inside `InPlacePacker` (sorting off). In both cases eligible remainders are repacked into the bundles already present in the sortable region.
-6. A custom `InventorySortEvent` fires after the trigger matches and before any writes, so third-party plugins can intervene. It applies to both the sort-with-layout and in-place consolidation paths.
-7. For player inventories, any slots the player has locked (via `/clicksorted lock-slots`) are excluded from the sortable set — locked slots are neither read nor overwritten.
-8. For player inventories, admin-enforced slot locks are also excluded from the sortable set, immediately after per-player locks. A slot is excluded if it appears in `config.yml`'s `locked_slots.player` list or if the player has the `clicksorted.lock.player.slot.<n>` permission node explicitly set (see `ProtectedSlots`). Admin-locked slots cannot be toggled by the player in the lock GUI — they render as a distinct IRON_BARS pane.
-9. Item-blacklisted slots are also excluded from the sortable set (for all inventory types, not just player), immediately after slot locks. A slot is excluded if its item matches the admin `ProtectedItems` list — checked against `config.yml`'s `blacklist.materials`/`blacklist.names` and the sorting player's explicit `clicksorted.blacklist.*` permission nodes.
-10. On startup (and after `/clicksorted admin reload`), `UpdateChecker` runs an async best-effort Modrinth API call and logs a console notice if a newer release exists (`check_for_updates: true`).
-11. On `PlayerJoinEvent`, `PreferenceRepair` validates the player's PDC preferences and resets any that hold unrecognised values, notifying the player in chat.
+6. Before firing, `InventorySortService` resolves the click's region slots and, for player inventories, its per-player locked slots (`/clicksorted lock-slots`) and admin-enforced slot locks (`ProtectedSlots` — `config.yml`'s `locked_slots.player` list or an explicit `clicksorted.lock.player.slot.<n>` permission node; non-player inventories always resolve to no locks). It then fires a custom `InventorySortEvent` — after the trigger matches and before any writes, so third-party plugins can intervene — carrying that region and both lock sets, plus the admin item-blacklist snapshot (`ProtectedItems`) as metadata. `getSortableSlots()` is pre-narrowed to region minus both lock sets, so listeners see the lock-adjusted set from the start; `getSlots()`/`statusOf(int)` classify every slot in the clicked inventory as `OUT_OF_RANGE`/`ADMIN_LOCKED`/`USER_LOCKED`/`SORTABLE` (that precedence order) — admin-locked slots cannot be toggled by the player in the lock GUI and render as a distinct IRON_BARS pane. Listeners can further narrow the sort via `excludeSlot(int)`, or contribute their own item exclusions via `excludeItem(Material)`/`excludeItem(String)`. The event applies to both the sort-with-layout and in-place consolidation paths. The old `(view, inv, int min, int max)` constructor is deprecated (materializes a contiguous region with empty locks and no blacklist metadata) in favor of the set-based constructor. A cancelling listener may call `setCancelReason(Component)`; since this event fires on every matching click, `InventorySortService` shows a set reason to the player rate-limited via `CooldownMessenger` and stays silent when no reason was given (no generic fallback, unlike preference-change cancellation below).
+7. After the event fires (and if not cancelled), `InventorySortService` excludes any slot in `getSortableSlots()` whose item matches `sortEvent.matchesExcludedItem(is)` — the union of the admin `ProtectedItems` blacklist and any listener `excludeItem` additions — for all inventory types, not just player. This runs after listeners so it can see any content edits they made.
+8. On startup (and after `/clicksorted admin reload`), `UpdateChecker.restart()` fires an async best-effort Modrinth API call (when `check_for_updates: true`) that logs a console notice if a newer release exists, then rearms the recurring schedule (`check_for_updates_interval_hours`, default 24, clamped to a minimum of `MainConfig.MIN_UPDATE_CHECK_INTERVAL_HOURS`); the recurring task is cancelled via `stop()` on disable.
+9. Every per-player preference change (click/sort method, start corner, fill axis, `enabled`, sort-over-items, bundle-packing toggles/stack limit, a locked-slot toggle, or a bundle blacklist add/remove/clear) fires a cancellable `PlayerPreferenceChangeEvent` from `PlayerSortingPrefs` before the change is applied; listeners can inspect `getChange()` (or the typed `getChange(Preference)` accessor) for the before/after values and cancel to block the change from persisting. Every event-firing `PlayerSortingPrefs` mutator returns a `PreferenceResult` (`APPLIED`/`UNCHANGED`/`CANCELLED`) instead of a bare `boolean`/`void`, so command and GUI callers can tell a real no-op apart from a listener veto and report each correctly (the bulk `setLockedSlots` used by `toggleSlotLocked` and tests is the deliberate exception — it writes directly, no event): on `CANCELLED`, `MessageUtil.preferenceBlocked(...)` shows the listener's `getCancelReason()` if one was set (via `setCancelReason(Component)`), else the generic `preferenceChangeBlocked` lang key — this generic fallback is safe here because preference changes are explicit, low-frequency commands, unlike per-click `InventorySortEvent` cancellation above. A no-op setter call that matches the config default still pins the value in PDC (without firing the event), so an explicit choice survives a later default change.
+10. On `PlayerJoinEvent`, `PreferenceRepair` validates the player's PDC preferences and resets any that hold unrecognised values, notifying the player in chat.
 
 ### Key Classes
 
 | Class | Package | Role |
 |---|---|---|
 | `ClickSortedPlugin` | root | `JavaPlugin` entry point, wires all components |
-| `PlayerSortingPrefs` | model | Per-player state (enabled flag, ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, bundle material blacklist, bundle display-name blacklist, locked slots) stored via PDC. PDC leaf names match config-default names (`click_mode`, `sort_mode`, `enabled`, etc.) |
+| `PlayerSortingPrefs` | model | Per-player state (enabled flag, ClickMethod, SortingMethod, sort-over-items flag, bundle-packing flags, bundle stack limit, bundle material blacklist, bundle display-name blacklist, locked slots) stored via PDC. PDC leaf names match config-default names (`click_mode`, `sort_mode`, `enabled`, etc.). Every mutator except the bulk `setLockedSlots` fires a cancellable `PlayerPreferenceChangeEvent` before applying the change (skipped when old == new, though a no-op that matches the config default still pins the value in PDC) and returns a `PreferenceResult`. The enum/boolean setters delegate to two private helpers, `setEnumPref`/`setBoolPref`, and the set-valued blacklist mutators to `mutateBlacklist`, which own the fire→write→return sequence once rather than per setter; set-valued stores re-read PDC after the event fires so re-entrant listener mutations aren't clobbered. |
+| `PreferenceResult` | model | Outcome of a `PlayerSortingPrefs` mutator call: `APPLIED`, `UNCHANGED` (no-op), or `CANCELLED` (with an optional listener-supplied `cancelReason()`) — lets callers distinguish a real no-op from a listener veto, which a bare `boolean`/`void` return could not |
+| `PlayerPreferenceChangeEvent` | events | Cancellable event fired by `PlayerSortingPrefs` before any per-player preference is changed; carries a sealed `Change<T>` payload (`ValueChange<T>` or `LockedSlotChange`, which adds a `slot()`) with typed `oldValue()`/`newValue()`; `getChange(Preference<T>)` gives a type-narrowed accessor for one preference. A cancelling listener may call `setCancelReason(Component)` to explain the veto; callers report it via `MessageUtil.preferenceBlocked(...)`, falling back to the generic `preferenceChangeBlocked` lang key when no reason was set. |
+| `Preference<T>` | events | Typed key identifying a per-player preference (e.g. `Preference.CLICK_MODE : Preference<ClickMethod>`); constants are the sole instances, so identity comparison proves the payload's type parameter |
 | `BlacklistGuiHolder` | gui | 54-slot chest GUI for the per-player bundle blacklist; lists blacklisted materials and display-name entries as item stacks with click-to-remove lore; pagination via arrow items |
 | `BlacklistGuiListener` | gui | Handles clicks in the blacklist GUI; adds items from the real inventory to the blacklist by material or display name, removes listed entries, handles pagination, and cancels all real-inventory interaction |
 | `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier/iron-bars panes and maps chest↔inventory slots; admin-locked slots (config or permission) render as IRON_BARS and are non-toggleable |
@@ -118,7 +120,7 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `FillAxis` | model | Enum (HORIZONTAL, VERTICAL) — whether rows or columns fill first from the start corner |
 | `EnumParse` | model | Case-insensitive enum parse helper used by StartCorner, FillAxis, and others |
 | `InventoryClickListener` | sort | Dispatches click events: master-perm check, trigger match, `hasWork` pre-screen, sort-over-items gate, throttle, then hand off to the sort service |
-| `InventorySortService` | sort | Target resolution (via private `Region`/`Target`), permissions, event lifecycle, mode dispatch (sort-with-layout vs. in-place consolidation), write-back. `hasWork()` is the public pre-screen gate for the listener. |
+| `InventorySortService` | sort | Target resolution (via private `Region`/`Target`), permissions, event lifecycle, mode dispatch (sort-with-layout vs. in-place consolidation), write-back. `hasWork()` is the public pre-screen gate for the listener. On a cancelled `InventorySortEvent`, shows a listener-supplied `getCancelReason()` rate-limited via `CooldownMessenger` (no message when no reason was set). On Folia, `resolve()` refuses a non-vanilla-held, multi-viewer (shared virtual) inventory as a target — see [Folia safety](#folia-safety). |
 | `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) — fungible merge + discrete passthrough |
 | `InPlacePacker` | sort | Pure in-place consolidator (no plugin state): collapses same-material stacks within their own slots and optionally packs eligible remainders into existing bundles — used when sorting is off but packing is on. Loose stacks stay anchored; items displaced from bundles or exceeding lane capacity fill free/freed slots; drops only when region is full. |
 | `GridGeometry` | sort | Maps an inventory's slot indices to a 2-D grid; computes row/column counts and the mount-slot offset |
@@ -134,7 +136,7 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `BundleBenchmark` | sort | In-situ micro-benchmark of the sort and bundle-repack paths (`/clicksorted admin benchmark`) |
 | `ClickSortedHolder` | gui | Base `InventoryHolder` marker for all ClickSorted-owned GUIs (used to block self-sort) |
 | `PreferenceRepair` | migration | Validates and resets invalid per-player PDC preferences on login, notifying the player |
-| `UpdateChecker` | update | Best-effort async Modrinth API check; logs a console notice when a newer release exists |
+| `UpdateChecker` | update | Best-effort async Modrinth API check; logs a console notice when a newer release exists. `restart()` (the single enable/reload entry point) fires a gated immediate check then calls `reschedule()`, which (re)arms a recurring check per `check_for_updates_interval_hours`; `stop()` cancels it. |
 | `ConfigManager` | config | Unified lifecycle for all four config files |
 | `ResourceUpdater` | config | Add-only merge of bundled resource into plugin data folder |
 | `Log`, `DebugLevel` | logging | Plugin logger wrapper with gated debug levels |
@@ -145,7 +147,7 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 
 ### Configuration Files (src/main/resources)
 
-- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag, per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
+- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag and `check_for_updates_interval_hours` cadence, per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
 - `groups.yml` — item groupings for GROUP sort method
 - `items.yml` — persistent store of material → display-name mappings
 - `lang.yml` — all user-facing messages (MiniMessage format)
@@ -236,6 +238,32 @@ Admins can lock specific **player inventory slots** server-wide so they are neve
 `ClickMethod` and `SortingMethod` are plain enums. `SortingMethod.isAvailable()` checks whether `groups.yml` has any mappings loaded (GROUP requires a populated groups file).
 
 **Never invoke `InventoryView` methods from plugin bytecode** (e.g. `event.getView().getTopInventory()`). `InventoryView` is a concrete class on ≤1.20.6 but an interface on 1.21+; compiling against the newer API and running on an older server makes the JVM throw `IncompatibleClassChangeError` ("Found class … but interface was expected") at the call site. Use `InventoryEvent.getInventory()` (resolved inside the API jar, returns the stable `Inventory` interface) instead. Passing a `getView()` result as a plain argument is fine — only *calling methods on* the view from our bytecode breaks.
+
+### Folia safety
+
+`paper-plugin.yml` declares `folia-supported: true`. The sort runs synchronously on the
+event-delivery (region) thread with no scheduling, and every piece of plugin-global mutable state
+it touches is concurrency-safe (`ActionThrottle`/`CooldownMessenger` use `ConcurrentHashMap`;
+config objects are swapped atomically; `SortEngine`/`InPlacePacker`/`BundlePacker` are stateless
+statics on method-local data). Two players in different regions clicking simultaneously cannot
+corrupt plugin state through any of that.
+
+The one remaining gap is a plugin-created *virtual* inventory (`Bukkit.createInventory`, backed by
+no block/chunk, so owned by no region) whose single backing instance is open to viewers in
+**different** regions at once (e.g. a shared GUI). Two region threads could then concurrently
+read-modify-write the same backing array — a data race and potential item dupe — and
+`refreshViewers()`'s `updateInventory()` call would touch another region's player illegally.
+Vanilla inventories don't have this problem: block containers are chunk-owned so Folia delivers
+every viewer's click on the same region thread, and player inventory / ender chest are
+single-owner.
+
+`InventorySortService` guards this with `isUnsafeSharedInventory(Inventory)`: on Folia only
+(`FOLIA`, a one-time `Class.forName` capability probe), a non-vanilla-held inventory with more
+than one current viewer is refused as a sort target — a clean no-op, same as clicking an
+unsortable type. This is deliberately a refusal, not a lock: a lock only covers our own sort code,
+so it cannot stop the *other* viewer's vanilla click (processed on that viewer's region thread,
+outside any lock we hold) from racing the sort — do not "fix" this by adding a per-inventory lock
+or in-progress-sort registry. On Paper, `FOLIA` is `false` and this check is inert.
 
 ## Release Process
 

@@ -1,7 +1,11 @@
 package net.kccricket.clicksorted;
 
+import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.SortingMethod;
+import net.kyori.adventure.text.Component;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
@@ -225,6 +229,96 @@ class CommandsTest extends AbstractClickSortedTest {
         server.dispatchCommand(player, "clicksorted click allow-on-hover");
 
         assertMessageSent(drainMessageList(player), "MSG.setSortOverItemsStatus");
+    }
+
+    // --- cancelled preference changes ---
+
+    private static final class CancellingListener implements Listener {
+        boolean cancel;
+        Component reason;
+
+        @EventHandler
+        public void onChange(PlayerPreferenceChangeEvent event) {
+            if (cancel) {
+                event.setCancelled(true);
+                if (reason != null) {
+                    event.setCancelReason(reason);
+                }
+            }
+        }
+    }
+
+    @Test
+    void cancelledSortMethodDoesNotChangeValueOrSendSuccessMessage() {
+        CancellingListener listener = new CancellingListener();
+        listener.cancel = true;
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        SortingMethod before = plugin.getSortingPrefs().getSortingMethod(player);
+        SortingMethod target = before == SortingMethod.NAME ? SortingMethod.GROUP : SortingMethod.NAME;
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted sort method " + target.name());
+
+        assertEquals(before, plugin.getSortingPrefs().getSortingMethod(player),
+                "A cancelled setter must not change the stored value");
+        assertFalse(anyMessageContains(player, "MSG.setSortingMethodTo"),
+                "A cancelled change must not report success");
+    }
+
+    @Test
+    void cancelledSortMethodWithReasonShowsReason() {
+        CancellingListener listener = new CancellingListener();
+        listener.cancel = true;
+        listener.reason = Component.text("locked by admin");
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted sort method GROUP");
+
+        assertTrue(anyMessageContains(player, "locked by admin"),
+                "A listener-supplied cancel reason should be shown to the player");
+    }
+
+    @Test
+    void cancelledSortMethodWithNoReasonShowsGenericBlockedMessage() {
+        CancellingListener listener = new CancellingListener();
+        listener.cancel = true;
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted sort method GROUP");
+
+        assertMessageSent(drainMessageList(player), "MSG.preferenceChangeBlocked");
+    }
+
+    @Test
+    void cancelledEnabledToggleDoesNotSendSuccessMessage() {
+        CancellingListener listener = new CancellingListener();
+        listener.cancel = true;
+        server.getPluginManager().registerEvents(listener, plugin);
+
+        PlayerMock player = server.addPlayer("Alice");
+        player.setOp(true);
+        boolean before = plugin.getSortingPrefs().getEnabled(player);
+        drainMessages(player);
+
+        server.dispatchCommand(player, "clicksorted sort enabled " + (before ? "no" : "yes"));
+
+        assertEquals(before, plugin.getSortingPrefs().getEnabled(player),
+                "A cancelled setter must not change the stored value");
+        var messages = drainMessageList(player);
+        assertFalse(messages.stream().anyMatch(m -> m.contains("MSG.setEnabledStatus")),
+                "A cancelled change must not report success");
+        assertMessageSent(messages, "MSG.preferenceChangeBlocked");
     }
 
     // --- admin reload (op-only) ---
