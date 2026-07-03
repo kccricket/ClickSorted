@@ -10,6 +10,10 @@ enable_metrics: true
 # A notice is logged to the console if an update is available. Set to false to disable.
 check_for_updates: true
 
+# How often to repeat the update check while the server keeps running, in hours.
+# Enforced minimum is 1 hour; lower values are clamped up. No effect when check_for_updates is false.
+check_for_updates_interval_hours: 24
+
 # Runtime log verbosity. Valid values: OFF, DEBUG, TRACE
 # Can also be changed live with /clicksorted admin debug without editing this file.
 debug_level: 'OFF'
