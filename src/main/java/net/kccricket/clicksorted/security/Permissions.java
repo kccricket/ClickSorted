@@ -53,6 +53,18 @@ public class Permissions {
     public static final String PERM_LOCK_PLAYER_SLOT = "clicksorted.lock.player.slot.";
 
     // -------------------------------------------------------------------------
+    // Admin update-notification permission
+    // -------------------------------------------------------------------------
+
+    /**
+     * Grants an in-game chat notice on join when a newer ClickSorted release is available (per the
+     * {@link net.kccricket.clicksorted.update.UpdateChecker} cache), gated additionally by the
+     * {@code notify_admins_on_update} config toggle. Declared in {@code paper-plugin.yml} with
+     * {@code default: op}, so the standard {@link #isAllowedTo} check applies.
+     */
+    public static final String PERM_NOTIFY_UPDATE = "clicksorted.admin.notify.update-available";
+
+    // -------------------------------------------------------------------------
 
     /**
      * Returns {@code true} only when {@code node} is explicitly attached to {@code who} AND

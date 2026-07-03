@@ -27,6 +27,7 @@ import net.kccricket.clicksorted.sort.InventorySortService;
 import net.kccricket.clicksorted.text.CooldownMessenger;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kccricket.clicksorted.update.UpdateChecker;
+import net.kccricket.clicksorted.update.UpdateNotifyListener;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.plugin.PluginManager;
@@ -80,6 +81,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         pm.registerEvents(new LockGuiListener(this), this);
         pm.registerEvents(new BlacklistGuiListener(this), this);
         pm.registerEvents(new PlayerMigrationListener(this), this);
+        pm.registerEvents(new UpdateNotifyListener(this), this);
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(ClickSortedCommands.build(this), "Manage the ClickSorted plugin"));

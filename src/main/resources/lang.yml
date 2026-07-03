@@ -44,6 +44,11 @@ hoverGovernedByClickMethod: "Sorting while hovering over an item is restricted b
 # Placeholders: <pref>, <value>, <default>
 prefResetInvalid: "Your saved <aqua><pref><white> value, <aqua><value><white>, was invalid and has been reset to <aqua><default><white>."
 
+# Shown (to admins with clicksorted.admin.notify.update-available) at join when a newer release exists.
+# Placeholders: <version> (latest release), <current> (version you are running)
+# The download link always points to the Modrinth page and is not a placeholder.
+updateAvailableNotify: "A new version of ClickSorted is available: <aqua><version><white> (you are running <aqua><current><white>). <click:open_url:'https://modrinth.com/plugin/clicksorted'><hover:show_text:'Open the download page'><aqua>[Download]</aqua></hover></click>"
+
 # Shown when a /clicksorted set … argument can't be parsed.
 # Placeholders: <value> (what the player typed), <valid> (comma-joined valid options)
 invalidValue: "<red>Invalid value '<value>'. Valid values: <valid>."

@@ -93,6 +93,10 @@ public class MainConfig implements ManagedConfig {
                 "Default is 24 (once a day). Enforced minimum is " + MIN_UPDATE_CHECK_INTERVAL_HOURS
                         + " hour(s); lower values are clamped up.",
                 "Has no effect when check_for_updates is false."));
+        cfg.setComments("notify_admins_on_update", List.of(
+                "When a newer release is found (check_for_updates must also be true), notify in chat any",
+                "player with the clicksorted.admin.notify.update-available permission when they join.",
+                "Set to false to disable this in-game notification (the console notice is unaffected)."));
         cfg.setComments("debug_level", List.of(
                 "Logging verbosity for the plugin.",
                 "Values: OFF (no debug output), DEBUG (high-level flow), TRACE (per-item verbose)"));
@@ -253,6 +257,16 @@ public class MainConfig implements ManagedConfig {
     public int getUpdateCheckIntervalHours() {
         return Math.max(MIN_UPDATE_CHECK_INTERVAL_HOURS,
                 plugin.getConfig().getInt("check_for_updates_interval_hours", 24));
+    }
+
+    /**
+     * Whether admins holding {@code clicksorted.admin.notify.update-available} should be notified
+     * in chat, on join, when the cached {@link net.kccricket.clicksorted.update.UpdateChecker}
+     * result indicates a newer release is available. Has no effect when {@link #getCheckForUpdates()}
+     * is false.
+     */
+    public boolean getNotifyAdminsOnUpdate() {
+        return plugin.getConfig().getBoolean("notify_admins_on_update", true);
     }
 
     public SortingMethod getDefaultSortingMethod() {

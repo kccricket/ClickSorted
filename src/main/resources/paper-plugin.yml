@@ -23,6 +23,7 @@ permissions:
       clicksorted.sort: true
       clicksorted.bundle: true
       clicksorted.throttle.bypass: true
+      clicksorted.admin.notify.update-available: true
   clicksorted.commands:
     description: Access to the /clicksorted command tree (umbrella; gates the root literal)
     default: true
@@ -95,6 +96,9 @@ permissions:
     default: op
   clicksorted.throttle.bypass:
     description: Exempt from the per-player action throttle (action_cooldown_ms)
+    default: op
+  clicksorted.admin.notify.update-available:
+    description: Receive an in-game chat notice on join when a newer ClickSorted release is available
     default: op
   clicksorted.sort:
     description: Allow all kinds of inventories to be click-sorted

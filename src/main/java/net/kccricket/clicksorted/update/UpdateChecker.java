@@ -31,9 +31,10 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * The lookup runs entirely off the main thread (Folia-safe via the async scheduler) and never
  * throws into its caller: any network or parse failure degrades to a quiet debug log, since a
- * missed update check must never disrupt startup or a reload. Beyond the plugin handle, the only
- * state held is the handle to the recurring check task ({@link #reschedule()}), mirroring the
- * other small helpers in this codebase.
+ * missed update check must never disrupt startup or a reload. Beyond the plugin handle and the
+ * handle to the recurring check task ({@link #reschedule()}), the only state held is the outcome
+ * of the most recent completed check ({@link #isUpdateAvailable()} / {@link #getLatestVersion()}),
+ * cached (rather than re-queried) so join-time consumers don't hit Modrinth on every login.
  */
 public class UpdateChecker {
 
@@ -42,6 +43,11 @@ public class UpdateChecker {
 
     private final ClickSortedPlugin plugin;
     private ScheduledTask scheduledTask;
+
+    // Written on the async check thread, read on join (region/main thread) — volatile publishes
+    // the pair without needing a lock, mirroring MainConfig's reload-then-region-read fields.
+    private volatile boolean updateAvailable;
+    private volatile String latestVersion;
 
     public UpdateChecker(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -79,6 +85,22 @@ public class UpdateChecker {
         long periodHours = main.getUpdateCheckIntervalHours();
         scheduledTask = plugin.getServer().getAsyncScheduler().runAtFixedRate(
                 plugin, task -> run(), periodHours, periodHours, TimeUnit.HOURS);
+    }
+
+    /**
+     * Whether the most recent completed check found a newer release than the running version.
+     * {@code false} until the first check completes, and after a check finds no newer release.
+     */
+    public boolean isUpdateAvailable() {
+        return updateAvailable;
+    }
+
+    /**
+     * The latest release version number found by the most recent completed check, or {@code null}
+     * if none has completed yet or the running version is already current.
+     */
+    public String getLatestVersion() {
+        return latestVersion;
     }
 
     /** Cancels the recurring check task, if one is scheduled. Safe to call when none is running. */
@@ -119,6 +141,8 @@ public class UpdateChecker {
             }
 
             if (compareVersions(latest, current) > 0) {
+                updateAvailable = true;
+                latestVersion = latest;
                 Log.log(java.util.logging.Level.INFO, "A new version of ClickSorted is available: "
                         + latest + " (you are running " + current + ").");
                 Log.log(java.util.logging.Level.INFO, "Download: "
@@ -126,6 +150,7 @@ public class UpdateChecker {
                         + "https://hangar.papermc.io/kccricket/ClickSorted | "
                         + "https://github.com/kccricket/ClickSorted/releases");
             } else {
+                updateAvailable = false;
                 Log.debug("Update check: ClickSorted is up to date (" + current + ").");
             }
         } catch (Exception e) {
