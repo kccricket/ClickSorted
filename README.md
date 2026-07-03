@@ -13,6 +13,7 @@ ClickSorted lets players sort their player inventory, chests, ender chests, shul
 - Lock individual slots so sorting leaves them alone
 - Optional bundle packing, with a per-player blacklist for item types or display names
 - Server admins can enforce a global item blacklist and lock specific player slots
+- Per-player localisation, with self-updating built-in message defaults — admin overrides only need to list the messages they've actually changed
 
 ## Quick start
 

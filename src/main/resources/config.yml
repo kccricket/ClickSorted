@@ -3,6 +3,7 @@ enable_metrics: true
 check_for_updates: true
 check_for_updates_interval_hours: 24
 notify_admins_on_update: true
+default_locale: en_us
 debug_level: 'OFF'
 drop_excess: true
 default_group_name: '000-default'

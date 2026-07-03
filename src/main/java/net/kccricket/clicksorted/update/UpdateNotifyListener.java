@@ -53,7 +53,7 @@ public class UpdateNotifyListener implements Listener {
             return;
         }
         var lang = plugin.getConfigManager().lang();
-        MessageUtil.statusMessage(player, lang.getColoredMessage("updateAvailableNotify",
+        MessageUtil.statusMessage(player, lang.getColoredMessage(player.locale(), "updateAvailableNotify",
                 Placeholder.unparsed("version", latest),
                 Placeholder.unparsed("current", plugin.getPluginMeta().getVersion())));
     }

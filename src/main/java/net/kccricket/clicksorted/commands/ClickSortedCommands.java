@@ -25,6 +25,7 @@ import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Material;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.List;
@@ -48,6 +49,14 @@ public class ClickSortedCommands {
         return enabled ? "ENABLED" : "DISABLED";
     }
 
+    /**
+     * The client locale to render a message for: a player's own {@code locale()}, or {@code null}
+     * (falls back to the server's {@code default_locale}) for console and other non-player senders.
+     */
+    private static Locale localeOf(CommandSender sender) {
+        return sender instanceof Player p ? p.locale() : null;
+    }
+
     public static LiteralCommandNode<CommandSourceStack> build(ClickSortedPlugin plugin) {
         return Commands.literal("clicksorted")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands"))
@@ -59,7 +68,7 @@ public class ClickSortedCommands {
                     if (!player.hasPermission(Permissions.PERM_MASTER)
                             || !player.hasPermission("clicksorted.commands.sort.enabled")) {
                         MessageUtil.errorMessage(player,
-                                plugin.getConfigManager().lang().getColoredMessage("noPermission"));
+                                plugin.getConfigManager().lang().getColoredMessage(player.locale(), "noPermission"));
                         return Command.SINGLE_SUCCESS;
                     }
                     applyEnabledSetting(plugin, player, !plugin.getSortingPrefs().getEnabled(player));
@@ -150,7 +159,7 @@ public class ClickSortedCommands {
             return;
         }
         MessageUtil.statusMessage(player,
-                plugin.getConfigManager().lang().getColoredMessage("setEnabledStatus",
+                plugin.getConfigManager().lang().getColoredMessage(player.locale(), "setEnabledStatus",
                         Placeholder.unparsed("status", enabledLabel(enabled))));
     }
 
@@ -174,7 +183,7 @@ public class ClickSortedCommands {
             String appliedKey, String unchangedKey, String placeholder, String value) {
         if (blockedAndReported(player, result)) return;
         MessageUtil.statusMessage(player,
-                plugin.getConfigManager().lang().getColoredMessage(result.applied() ? appliedKey : unchangedKey,
+                plugin.getConfigManager().lang().getColoredMessage(player.locale(), result.applied() ? appliedKey : unchangedKey,
                         Placeholder.unparsed(placeholder, value)));
     }
 
@@ -203,7 +212,7 @@ public class ClickSortedCommands {
     /** Send the shared "invalid value" error naming {@code raw} and the {@code valid} options. */
     private static void sendInvalidValue(ClickSortedPlugin plugin, Player player, String raw, String valid) {
         MessageUtil.errorMessage(player,
-                plugin.getConfigManager().lang().getColoredMessage("invalidValue",
+                plugin.getConfigManager().lang().getColoredMessage(player.locale(), "invalidValue",
                         Placeholder.unparsed("value", raw),
                         Placeholder.unparsed("valid", valid)));
     }
@@ -241,7 +250,7 @@ public class ClickSortedCommands {
                                 return Command.SINGLE_SUCCESS;
                             }
                             MessageUtil.statusMessage(player,
-                                    plugin.getConfigManager().lang().getColoredMessage(langKey,
+                                    plugin.getConfigManager().lang().getColoredMessage(player.locale(), langKey,
                                             Placeholder.unparsed(placeholder, value.toString())));
                             return Command.SINGLE_SUCCESS;
                         }));
@@ -305,7 +314,7 @@ public class ClickSortedCommands {
                                 SortingMethod method = SortingMethod.valueOf(arg.toUpperCase());
                                 if (!method.isAvailable()) {
                                     MessageUtil.errorMessage(player,
-                                            plugin.getConfigManager().lang().getColoredMessage("sortingMethodNotAvailable",
+                                            plugin.getConfigManager().lang().getColoredMessage(player.locale(), "sortingMethodNotAvailable",
                                                     Placeholder.unparsed("method", method.toString())));
                                     return Command.SINGLE_SUCCESS;
                                 }
@@ -314,7 +323,7 @@ public class ClickSortedCommands {
                                     return Command.SINGLE_SUCCESS;
                                 }
                                 MessageUtil.statusMessage(player,
-                                        plugin.getConfigManager().lang().getColoredMessage("setSortingMethodTo",
+                                        plugin.getConfigManager().lang().getColoredMessage(player.locale(), "setSortingMethodTo",
                                                 Placeholder.unparsed("method", method.toString())));
                             } catch (IllegalArgumentException ignored) {
                                 sendInvalidValue(plugin, player, arg,
@@ -346,7 +355,7 @@ public class ClickSortedCommands {
                                     return Command.SINGLE_SUCCESS;
                                 }
                                 MessageUtil.statusMessage(player,
-                                        plugin.getConfigManager().lang().getColoredMessage("setClickMethodTo",
+                                        plugin.getConfigManager().lang().getColoredMessage(player.locale(), "setClickMethodTo",
                                                 Placeholder.unparsed("method", method.toString()),
                                                 Placeholder.unparsed("instruction", method.getInstruction())));
                                 // Methods that govern hover (SINGLE_CLICK, CONTROL_DROP) force the player's
@@ -404,7 +413,7 @@ public class ClickSortedCommands {
         if (clickMethod.requiredSortOverItems().isPresent()) {
             // The active click method governs hover; refuse to change the stored value and explain why.
             MessageUtil.statusMessage(player,
-                    plugin.getConfigManager().lang().getColoredMessage("hoverGovernedByClickMethod",
+                    plugin.getConfigManager().lang().getColoredMessage(player.locale(), "hoverGovernedByClickMethod",
                             Placeholder.unparsed("method", clickMethod.name())));
             return;
         }
@@ -412,7 +421,7 @@ public class ClickSortedCommands {
             return;
         }
         MessageUtil.statusMessage(player,
-                plugin.getConfigManager().lang().getColoredMessage("setSortOverItemsStatus",
+                plugin.getConfigManager().lang().getColoredMessage(player.locale(), "setSortOverItemsStatus",
                         Placeholder.unparsed("status", enabledLabel(enabled))));
     }
 
@@ -506,7 +515,7 @@ public class ClickSortedCommands {
             return;
         }
         MessageUtil.statusMessage(player,
-                plugin.getConfigManager().lang().getColoredMessage("setBundlePackEnabledStatus",
+                plugin.getConfigManager().lang().getColoredMessage(player.locale(), "setBundlePackEnabledStatus",
                         Placeholder.unparsed("status", enabledLabel(enabled))));
     }
 
@@ -520,7 +529,7 @@ public class ClickSortedCommands {
                         return;
                     }
                     MessageUtil.statusMessage(player,
-                            plugin.getConfigManager().lang().getColoredMessage(langKey,
+                            plugin.getConfigManager().lang().getColoredMessage(player.locale(), langKey,
                                     Placeholder.unparsed("status", enabledLabel(state))));
                 }));
     }
@@ -579,7 +588,7 @@ public class ClickSortedCommands {
                                 return Command.SINGLE_SUCCESS;
                             }
                             MessageUtil.statusMessage(player,
-                                    plugin.getConfigManager().lang().getColoredMessage("setBundleStackLimitStatus",
+                                    plugin.getConfigManager().lang().getColoredMessage(player.locale(), "setBundleStackLimitStatus",
                                             Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
                             return Command.SINGLE_SUCCESS;
                         }));
@@ -589,12 +598,13 @@ public class ClickSortedCommands {
     static void sendBundleStatus(ClickSortedPlugin plugin, Player player) {
         var prefs = plugin.getSortingPrefs();
         var lang = plugin.getConfigManager().lang();
-        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleInInventory",
+        Locale locale = player.locale();
+        MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusBundleInInventory",
                 Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInInventory(player)))));
-        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleInContainers",
+        MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusBundleInContainers",
                 Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInContainers(player)))));
         int limit = prefs.getBundleStackLimit(player);
-        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleStackLimit",
+        MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusBundleStackLimit",
                 Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
         printBlacklistSection(player, lang, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
                 "statusBundleBlacklistEmpty", "statusBundleBlacklistMaterials", "statusBundleBlacklistNames");
@@ -619,18 +629,19 @@ public class ClickSortedCommands {
     private static void printBlacklistSection(Player player, LangConfig lang,
             Set<Material> materials, Set<String> names,
             String emptyKey, String materialsKey, String namesKey) {
+        Locale locale = player.locale();
         if (materials.isEmpty() && names.isEmpty()) {
-            MessageUtil.statusMessage(player, lang.getColoredMessage(emptyKey));
+            MessageUtil.statusMessage(player, lang.getColoredMessage(locale, emptyKey));
             return;
         }
         if (!materials.isEmpty()) {
             String list = materials.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
-            MessageUtil.statusMessage(player, lang.getColoredMessage(materialsKey,
+            MessageUtil.statusMessage(player, lang.getColoredMessage(locale, materialsKey,
                     Placeholder.unparsed("list", list)));
         }
         if (!names.isEmpty()) {
             String list = names.stream().sorted().collect(Collectors.joining(", "));
-            MessageUtil.statusMessage(player, lang.getColoredMessage(namesKey,
+            MessageUtil.statusMessage(player, lang.getColoredMessage(locale, namesKey,
                     Placeholder.unparsed("list", list)));
         }
     }
@@ -764,7 +775,7 @@ public class ClickSortedCommands {
                             // APPLIED and UNCHANGED (already empty) both report "cleared" — matches the
                             // prior unconditional behavior, which never distinguished the two.
                             MessageUtil.statusMessage(player,
-                                    plugin.getConfigManager().lang().getColoredMessage("setBundleBlacklistCleared"));
+                                    plugin.getConfigManager().lang().getColoredMessage(player.locale(), "setBundleBlacklistCleared"));
                             return Command.SINGLE_SUCCESS;
                         }));
     }
@@ -790,17 +801,18 @@ public class ClickSortedCommands {
                     StartCorner startCorner = prefs.getStartCorner(player);
                     FillAxis fillAxis = prefs.getFillAxis(player);
                     boolean hover = prefs.getSortOverItems(player);
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusEnabled",
+                    Locale locale = player.locale();
+                    MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusEnabled",
                             Placeholder.unparsed("status", enabledLabel(enabled))));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusClickMethod",
+                    MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusClickMethod",
                             Placeholder.unparsed("method", clickMethod.toString())));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusSortMethod",
+                    MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusSortMethod",
                             Placeholder.unparsed("method", sortMethod.toString())));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusStartCorner",
+                    MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusStartCorner",
                             Placeholder.unparsed("corner", startCorner.toString())));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusFillAxis",
+                    MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusFillAxis",
                             Placeholder.unparsed("axis", fillAxis.toString())));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusHover",
+                    MessageUtil.statusMessage(player, lang.getColoredMessage(locale, "statusHover",
                             Placeholder.unparsed("status", enabledLabel(hover))));
                     sendBundleStatus(plugin, player);
                     return Command.SINGLE_SUCCESS;
@@ -820,14 +832,16 @@ public class ClickSortedCommands {
                     } catch (MigrationException e) {
                         Log.severe("Config migration failed on reload; keeping previous configuration.", e);
                         Throwable root = e.getCause() != null ? e.getCause() : e;
-                        MessageUtil.statusMessage(ctx.getSource().getSender(),
-                                plugin.getConfigManager().lang().getColoredMessage("configReloadFailed",
+                        CommandSender sender = ctx.getSource().getSender();
+                        MessageUtil.statusMessage(sender,
+                                plugin.getConfigManager().lang().getColoredMessage(localeOf(sender), "configReloadFailed",
                                         Placeholder.unparsed("reason", String.valueOf(root.getMessage()))));
                         return Command.SINGLE_SUCCESS;
                     }
                     plugin.getUpdateChecker().restart();
-                    MessageUtil.statusMessage(ctx.getSource().getSender(),
-                            plugin.getConfigManager().lang().getColoredMessage("configReloaded"));
+                    CommandSender sender = ctx.getSource().getSender();
+                    MessageUtil.statusMessage(sender,
+                            plugin.getConfigManager().lang().getColoredMessage(localeOf(sender), "configReloaded"));
                     return Command.SINGLE_SUCCESS;
                 });
     }
@@ -860,8 +874,9 @@ public class ClickSortedCommands {
                 .executes(ctx -> {
                     DebugLevel next = Log.getDebugLevel() == DebugLevel.OFF ? DebugLevel.DEBUG : DebugLevel.OFF;
                     Log.setDebugLevel(next);
-                    MessageUtil.statusMessage(ctx.getSource().getSender(),
-                            plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
+                    CommandSender sender = ctx.getSource().getSender();
+                    MessageUtil.statusMessage(sender,
+                            plugin.getConfigManager().lang().getColoredMessage(localeOf(sender), "setDebugLevelTo",
                                     Placeholder.unparsed("level", next.name())));
                     return Command.SINGLE_SUCCESS;
                 })
@@ -869,15 +884,16 @@ public class ClickSortedCommands {
                         .suggests((ctx, builder) -> suggestEnum(builder, DebugLevel.values(), l -> true))
                         .executes(ctx -> {
                             String arg = StringArgumentType.getString(ctx, "level");
+                            CommandSender sender = ctx.getSource().getSender();
                             try {
                                 DebugLevel level = DebugLevel.valueOf(arg.toUpperCase());
                                 Log.setDebugLevel(level);
-                                MessageUtil.statusMessage(ctx.getSource().getSender(),
-                                        plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
+                                MessageUtil.statusMessage(sender,
+                                        plugin.getConfigManager().lang().getColoredMessage(localeOf(sender), "setDebugLevelTo",
                                                 Placeholder.unparsed("level", level.name())));
                             } catch (IllegalArgumentException ignored) {
-                                MessageUtil.errorMessage(ctx.getSource().getSender(),
-                                        plugin.getConfigManager().lang().getColoredMessage("invalidDebugLevel",
+                                MessageUtil.errorMessage(sender,
+                                        plugin.getConfigManager().lang().getColoredMessage(localeOf(sender), "invalidDebugLevel",
                                                 Placeholder.unparsed("level", arg)));
                             }
                             return Command.SINGLE_SUCCESS;

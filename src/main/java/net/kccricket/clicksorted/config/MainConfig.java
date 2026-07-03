@@ -41,6 +41,9 @@ public class MainConfig implements ManagedConfig {
     private volatile Set<String> blacklistNamesLower = Set.of();
     // Admin-enforced player slot locks — parsed once on load/reload, checked on every sort and GUI render.
     private volatile Set<Integer> lockedPlayerSlots = Set.of();
+    // Fallback locale for console output and any player whose client locale has no matching
+    // lang/ override or bundled default — parsed once on load/reload.
+    private volatile Locale defaultLocale = Locale.of("en", "us");
 
     public MainConfig(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -97,6 +100,11 @@ public class MainConfig implements ManagedConfig {
                 "When a newer release is found (check_for_updates must also be true), notify in chat any",
                 "player with the clicksorted.admin.notify.update-available permission when they join.",
                 "Set to false to disable this in-game notification (the console notice is unaffected)."));
+        cfg.setComments("default_locale", List.of(
+                "Fallback language used for console output, and for any player whose Minecraft client",
+                "locale has no matching file under lang/ (neither an override nor a bundled default).",
+                "Format matches Minecraft's own locale strings, lowercase: en_us, de_de, pt_br, etc.",
+                "See lang/en_us.yml and docs/admin/lang.md for how per-player localisation resolves."));
         cfg.setComments("debug_level", List.of(
                 "Logging verbosity for the plugin.",
                 "Values: OFF (no debug output), DEBUG (high-level flow), TRACE (per-item verbose)"));
@@ -236,6 +244,20 @@ public class MainConfig implements ManagedConfig {
             }
         }
         lockedPlayerSlots = parsedSlots;
+
+        defaultLocale = parseLocaleToken(plugin.getConfig().getString("default_locale"));
+    }
+
+    /**
+     * Parses a Minecraft-style locale token ({@code en_us}, or bare {@code en}) into a
+     * {@link Locale}. Falls back to {@code en_us} on a blank or malformed token.
+     */
+    private static Locale parseLocaleToken(String token) {
+        if (token == null || token.isBlank()) {
+            return Locale.of("en", "us");
+        }
+        String[] parts = token.toLowerCase(Locale.ROOT).split("_", 2);
+        return parts.length == 2 ? Locale.of(parts[0], parts[1]) : Locale.of(parts[0]);
     }
 
     // -------------------------------------------------------------------------
@@ -338,5 +360,14 @@ public class MainConfig implements ManagedConfig {
      */
     public Set<String> getBlacklistNamesLower() {
         return blacklistNamesLower;
+    }
+
+    /**
+     * Fallback {@link Locale} ({@code default_locale}) used for console output and any player
+     * whose client locale has no matching {@code lang/} override or bundled default. Parsed and
+     * cached on load/reload.
+     */
+    public Locale getDefaultLocale() {
+        return defaultLocale;
     }
 }

@@ -1,8 +1,42 @@
-# Localisation (`lang.yml`)
+# Localisation (`lang/`)
 
-All player-facing messages are stored in `lang.yml` and rendered with **[MiniMessage](https://docs.advntr.dev/minimessage)**. You may use any MiniMessage formatting tags (`<red>`, `<bold>`, `<#ff0000>`, `<gradient:...>`, etc.). Changes take effect after `/clicksorted admin reload`.
+All player-facing messages are rendered with **[MiniMessage](https://docs.advntr.dev/minimessage)**. You may use any MiniMessage formatting tags (`<red>`, `<bold>`, `<#ff0000>`, `<gradient:...>`, etc.). Changes take effect after `/clicksorted admin reload`.
 
 > **Placeholders:** Tags like `<method>`, `<status>`, `<instruction>`, and `<level>` are filled in at runtime. Do not remove a placeholder from a message that requires it.
+
+## How overrides work
+
+ClickSorted's built-in message text now ships inside the plugin jar and updates automatically with the plugin — you never need to touch it, and a changed default reaches your server on the next update with no action required.
+
+To customise a message, edit `plugins/ClickSorted/lang/en_us.yml`. **This file is sparse**: only the keys you uncomment and edit override the built-in default. Everything else keeps tracking future plugin updates instead of getting stuck on whatever value it shipped with when your server first installed the plugin. A freshly generated copy of this file has every key commented out, so it overrides nothing until you change something.
+
+```yaml
+# Uncomment and edit only the keys you want to change:
+# prefix: "<gray>[<aqua>ClickSorted<gray>] "
+actionTooFast: "<red>Whoa, slow down there!"   # this line now overrides the built-in default
+# noPermission: "<red>You don't have permission to do that."
+```
+
+## Per-player localisation
+
+Messages resolve against each player's Minecraft client locale (e.g. `en_us`, `de_de`), falling back in this order:
+
+```
+override[player's locale] → override[player's language] → override[default_locale]
+  → built-in[player's locale] → built-in[player's language] → built-in[default_locale] → built-in[en_us]
+```
+
+`default_locale` (in `config.yml`, default `en_us`) is the fallback used for console output and any player whose client locale has no matching file at all.
+
+**Adding a translation:** drop a new `plugins/ClickSorted/lang/<locale>.yml` file (e.g. `lang/de_de.yml`) containing just the keys you're translating — it doesn't need to be complete; any key it omits falls back through the chain above. Locale filenames are lowercase and match Minecraft's own locale strings (`en_us`, `de_de`, `pt_br`, …). Only English (`en_us`) ships with the plugin today.
+
+## Upgrading from a pre-localisation `lang.yml`
+
+If your server has a `plugins/ClickSorted/lang.yml` from before this feature, it is migrated automatically the first time you start with the new version: only the keys you'd actually changed from the shipped defaults are carried into the new `lang/en_us.yml` override, and your original file is kept alongside it as `lang.yml.bak` for reference. Keys you'd never touched are **not** carried forward — they now track the plugin's built-in default going forward, exactly as intended.
+
+## Message reference
+
+The tables below list every key, its default text, and its placeholders.
 
 ## Message prefix
 

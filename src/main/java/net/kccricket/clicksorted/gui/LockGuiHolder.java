@@ -24,6 +24,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -57,8 +58,9 @@ public class LockGuiHolder implements ClickSortedHolder {
 
     public LockGuiHolder(ClickSortedPlugin plugin, Player player) {
         LangConfig lang = plugin.getConfigManager().lang();
+        Locale locale = player.locale();
         this.inventory = Bukkit.createInventory(this, GUI_SIZE,
-                lang.getColoredMessage("lockGuiTitle"));
+                lang.getColoredMessage(locale, "lockGuiTitle"));
 
         // Build admin-slot snapshot covering both config and permission channels for this player.
         this.admin = ProtectedSlots.forSort(player, plugin.getConfigManager().main());
@@ -68,26 +70,26 @@ public class LockGuiHolder implements ClickSortedHolder {
         for (int chestSlot = 0; chestSlot < DIVIDER_START; chestSlot++) {
             int invSlot = chestSlotToInvSlot(chestSlot);
             if (admin.blocks(invSlot)) {
-                inventory.setItem(chestSlot, buildAdminLockedPane(lang, chestSlot));
+                inventory.setItem(chestSlot, buildAdminLockedPane(lang, locale, chestSlot));
             } else {
-                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+                inventory.setItem(chestSlot, buildPane(lang, locale, locked.contains(invSlot), chestSlot));
             }
         }
 
         // Row 4: divider panes, with the rightmost slot replaced by the help head
-        ItemStack divider = ClickSortedHolder.buildFiller(lang);
+        ItemStack divider = ClickSortedHolder.buildFiller(lang, locale);
         for (int chestSlot = DIVIDER_START; chestSlot < DIVIDER_END - 1; chestSlot++) {
             inventory.setItem(chestSlot, divider.clone());
         }
-        inventory.setItem(DIVIDER_END - 1, ClickSortedHolder.buildHelpBook(lang, "lockHelpHeadLore"));
+        inventory.setItem(DIVIDER_END - 1, ClickSortedHolder.buildHelpBook(lang, locale, "lockHelpHeadLore"));
 
         // Row 5: hotbar slots 0-8 → chest slots 36-44
         for (int chestSlot = DIVIDER_END; chestSlot < GUI_SIZE; chestSlot++) {
             int invSlot = chestSlotToInvSlot(chestSlot);
             if (admin.blocks(invSlot)) {
-                inventory.setItem(chestSlot, buildAdminLockedPane(lang, chestSlot));
+                inventory.setItem(chestSlot, buildAdminLockedPane(lang, locale, chestSlot));
             } else {
-                inventory.setItem(chestSlot, buildPane(lang, locked.contains(invSlot), chestSlot));
+                inventory.setItem(chestSlot, buildPane(lang, locale, locked.contains(invSlot), chestSlot));
             }
         }
     }
@@ -110,16 +112,16 @@ public class LockGuiHolder implements ClickSortedHolder {
         return chestSlot < DIVIDER_START ? chestSlot + 1 : chestSlot - DIVIDER_END + 1;
     }
 
-    public static ItemStack buildPane(LangConfig lang, boolean locked, int chestSlot) {
+    public static ItemStack buildPane(LangConfig lang, Locale locale, boolean locked, int chestSlot) {
         String slotLangKey = resolveSlotLangKey(chestSlot);
         int displayNumber = resolveDisplayNumber(chestSlot);
 
         ItemStack pane = new ItemStack(locked ? Material.BARRIER : Material.LIME_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage(locked ? "lockPaneLocked" : "lockPaneUnlocked"));
+        meta.displayName(lang.getColoredMessage(locale, locked ? "lockPaneLocked" : "lockPaneUnlocked"));
         meta.lore(MessageUtil.toLore(
-                lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
-                lang.getColoredMessage(locked ? "lockPaneLockedLore" : "lockPaneUnlockedLore")));
+                lang.getColoredMessage(locale, slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
+                lang.getColoredMessage(locale, locked ? "lockPaneLockedLore" : "lockPaneUnlockedLore")));
         pane.setItemMeta(meta);
         return pane;
     }
@@ -130,16 +132,16 @@ public class LockGuiHolder implements ClickSortedHolder {
      * Players see this for slots locked via {@code locked_slots.player} config or the
      * {@code clicksorted.lock.player.slot.<n>} permission node.
      */
-    public static ItemStack buildAdminLockedPane(LangConfig lang, int chestSlot) {
+    public static ItemStack buildAdminLockedPane(LangConfig lang, Locale locale, int chestSlot) {
         String slotLangKey = resolveSlotLangKey(chestSlot);
         int displayNumber = resolveDisplayNumber(chestSlot);
 
         ItemStack pane = new ItemStack(Material.IRON_BARS);
         ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("lockPaneAdmin"));
+        meta.displayName(lang.getColoredMessage(locale, "lockPaneAdmin"));
         meta.lore(MessageUtil.toLore(
-                lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
-                lang.getColoredMessage("lockPaneAdminLore")));
+                lang.getColoredMessage(locale, slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
+                lang.getColoredMessage(locale, "lockPaneAdminLore")));
         pane.setItemMeta(meta);
         return pane;
     }

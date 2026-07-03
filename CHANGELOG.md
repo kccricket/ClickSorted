@@ -1,3 +1,33 @@
+# ClickSorted 2.2.0
+
+Release date: 2026-07-03
+
+ClickSorted 2.2.0 adds per-player localisation and makes lang defaults self-updating: server admins no longer need to delete `lang.yml` to pick up a changed default message.
+
+## Highlights
+
+- **Self-updating lang defaults.** ClickSorted's built-in messages now ship inside the jar and update automatically with the plugin. Admin overrides live in a new, sparse `plugins/ClickSorted/lang/<locale>.yml` file that only needs to contain the keys you actually changed — everything else keeps tracking future plugin updates instead of getting stuck on the value it shipped with when the server first installed it.
+- **Per-player localisation.** Messages now resolve against each player's Minecraft client locale, falling back through the bare language, the server's `default_locale`, and finally the built-in English (`en_us`) default. Only English ships today; a translation is a drop-in `lang/<locale>.yml` file, no code changes required.
+- **New `default_locale` config key** (default `en_us`) — the fallback language for console output and any player whose client locale has no matching file.
+- **Automatic one-time migration.** An existing `lang.yml` from before this release is migrated on first load: only the keys you'd actually changed are carried into the new `lang/en_us.yml` override, and your original file is preserved alongside it as `lang.yml.bak`.
+
+## Breaking Changes
+
+- **`lang.yml` moved to `lang/<locale>.yml`.** This is handled automatically — see "Automatic one-time migration" above — but any external tooling that edits `plugins/ClickSorted/lang.yml` directly must be updated to target `plugins/ClickSorted/lang/en_us.yml` instead.
+- **`LangConfig.getColoredMessage(String, TagResolver...)` still exists** (now resolving via `default_locale`) and third-party plugin code calling it keeps compiling and working; a new `getColoredMessage(Locale, String, TagResolver...)` overload is available for locale-aware messages.
+
+## New Features
+
+### Reusable file-migration layer
+
+Added a new `FileMigration` / `FileMigrationContext` pair to the `migration` package, mirroring the existing `Migration`/`Store` config-and-PDC layer but for whole-file operations (relocate, delete, or extract-only-changed-keys) in the plugin's data folder. `Migrations` gained a `migrateFiles()` entry point and a `FILE_MIGRATIONS` catalog — the `lang.yml` relocation above is a single declarative catalog entry, and future file-level migrations are a one-line append.
+
+## Other Improvements
+
+- See [docs/admin/lang.md](docs/admin/lang.md) for the full override/localisation model and resolution order.
+
+---
+
 # ClickSorted 2.1.0
 
 Release date: 2026-07-03

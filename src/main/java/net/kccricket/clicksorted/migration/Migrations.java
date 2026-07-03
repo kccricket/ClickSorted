@@ -18,6 +18,9 @@ import net.kccricket.clicksorted.config.MainConfig;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,6 +35,11 @@ import static net.kccricket.clicksorted.migration.Migration.*;
  *
  * <h3>Rule hierarchy</h3>
  * <ol>
+ *   <li><b>File migrations</b> ({@link FileMigration}) — relocate or rewrite whole files in the
+ *       data folder, run once at plugin enable via {@link #migrateFiles()}, <em>before</em> any
+ *       config file is loaded. Adding a future file migration is a one-line append to
+ *       {@link #FILE_MIGRATIONS}. Kept as a separate dimension from the config/PDC store rules
+ *       below because it operates on the filesystem, not a {@link Store}.</li>
  *   <li><b>Config-only structural transforms</b> ({@link ConfigTransform}) — derive new config
  *       state from old values in place before any removal pass. Adding a future transform is a
  *       one-line append to {@link #CONFIG_TRANSFORMS}.</li>
@@ -86,6 +94,18 @@ public final class Migrations {
      * No historical aliases yet; extend with {@code .rename(old).to(new)} if a constant is renamed.
      */
     public static final ValueMigration FILL_AXIS = ValueMigration.builder().build();
+
+    /**
+     * File-level migrations, applied once at enable via {@link #migrateFiles()}, before any config
+     * file loads. To add a future file migration, append here.
+     *
+     * <p>{@code lang.yml} (the pre-i18n single-file lang store) relocates to the sparse
+     * per-locale override {@code lang/en_us.yml}: only keys an admin actually changed survive the
+     * move (unchanged keys fall back to the plugin's bundled default and track future updates to
+     * it), and the original is kept alongside as {@code lang.yml.bak}.
+     */
+    private static final List<FileMigration> FILE_MIGRATIONS = List.of(
+            FileMigration.extractChangedKeys("lang.yml", "lang/en_us.yml", "lang/en_us.yml", ".bak"));
 
     /**
      * Structural config transforms, applied in order before root-path removal and shared rules.
@@ -166,6 +186,40 @@ public final class Migrations {
      */
     public void migrate(Player player) {
         run(SHARED, new Store.PdcStore(player.getPersistentDataContainer(), plugin));
+    }
+
+    /**
+     * Runs the {@link #FILE_MIGRATIONS} catalog against the plugin's data folder. Called once
+     * from {@code onEnable}, before {@code ConfigManager#loadAll()} so relocated files (e.g.
+     * {@code lang/en_us.yml}) exist by the time their owning config loads.
+     *
+     * <p>Best-effort: a failure in one migration is logged and does not prevent the others (or
+     * plugin enable) from proceeding, since a file-migration hiccup should never brick a server.
+     */
+    public void migrateFiles() {
+        FileMigrationContext ctx = new PluginFileMigrationContext(plugin);
+        for (FileMigration migration : FILE_MIGRATIONS) {
+            try {
+                if (migration.apply(ctx)) {
+                    Log.debug("Applied file migration: " + migration);
+                }
+            } catch (IOException e) {
+                Log.warning("File migration failed: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    /** Adapts {@link ClickSortedPlugin} to the store-neutral {@link FileMigrationContext}. */
+    private record PluginFileMigrationContext(ClickSortedPlugin plugin) implements FileMigrationContext {
+        @Override
+        public Path dataFolder() {
+            return plugin.getDataFolder().toPath();
+        }
+
+        @Override
+        public InputStream resource(String path) {
+            return plugin.getResource(path);
+        }
     }
 
     // -------------------------------------------------------------------------

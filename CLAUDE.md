@@ -49,14 +49,26 @@ net.kccricket.clicksorted
 stored where**. Loaders/stores don't name specific settings — they just hand the migrator the store:
 config is migrated in `MainConfig.load()` (`plugin.getMigrations().migrate(plugin.getConfig())`, after
 `normalizeValues()` and before `saveConfig()`), and per-player PDC is migrated by
-`PlayerMigrationListener` on `PlayerJoinEvent` (`plugin.getMigrations().migrate(player)`). `Migrations`
-exposes exactly one entry point per store: `migrate(ConfigurationSection)` and `migrate(Player)`.
+`PlayerMigrationListener` on `PlayerJoinEvent` (`plugin.getMigrations().migrate(player)`). File-level
+migrations run once, earlier still — `ClickSortedPlugin.onEnable` calls
+`migrations.migrateFiles()` immediately after constructing `Migrations`, before `ConfigManager` is even
+built, so a relocated file exists before its owning config tries to load it. `Migrations` exposes one
+entry point per dimension: `migrate(ConfigurationSection)`, `migrate(Player)`, and `migrateFiles()`.
 
-**Rule hierarchy** (three layers, applied in order on every `migrate(config)` call):
+**Rule hierarchy** (four layers; the file layer runs once at enable, the other three in order on every `migrate(config)` call):
 
-1. **Structural transforms** (`ConfigTransform` — config only). Derive new config state from old values in place (e.g. translate a deprecated numeric range into an equivalent slot list). Run *first*, before removal, so old keys are still readable. Adding a future transform is a one-line append to `CONFIG_TRANSFORMS`. Source-key removal is not the transform's job.
-2. **Root-path removal** (`DEPRECATED_ROOT_PATHS` — config only). Drop root-level config keys that have been removed (e.g. `player_sort_min`, `player_sort_max`). These are not in `defaults.*` so they fall outside the shared `Store` namespace.
-3. **Shared rules** (`SHARED` — applied to both config and PDC via `Store` adapters). A single ordered `List<Migration>` covers all `defaults.*` / PDC settings with no per-key mapping table.
+1. **File migrations** (`FileMigration` — filesystem only, via `FileMigrationContext`). Relocate or rewrite whole files in the data folder, run once via `migrateFiles()`, before any config file loads. Mirrors the `Migration`/`Store` shape (a functional rule interface plus static factories: `renameFile`, `deleteFile`, `extractChangedKeys`) but is deliberately its own dimension since it has no `Store` to act on — `FileMigrationContext` (`dataFolder()`, `resource(path)`) carries zero ClickSorted-specific types, so this layer could be lifted into a shared library later without dragging any plugin dependency along. Adding a future file migration is a one-line append to `FILE_MIGRATIONS`. Best-effort: a failure is logged and does not block the others or plugin enable.
+2. **Structural transforms** (`ConfigTransform` — config only). Derive new config state from old values in place (e.g. translate a deprecated numeric range into an equivalent slot list). Run *first*, before removal, so old keys are still readable. Adding a future transform is a one-line append to `CONFIG_TRANSFORMS`. Source-key removal is not the transform's job.
+3. **Root-path removal** (`DEPRECATED_ROOT_PATHS` — config only). Drop root-level config keys that have been removed (e.g. `player_sort_min`, `player_sort_max`). These are not in `defaults.*` so they fall outside the shared `Store` namespace.
+4. **Shared rules** (`SHARED` — applied to both config and PDC via `Store` adapters). A single ordered `List<Migration>` covers all `defaults.*` / PDC settings with no per-key mapping table.
+
+**`FileMigration.extractChangedKeys(sourceRel, defaultResource, targetRel, archiveSuffix)`** is the
+reusable "relocate a config file, keeping only admin-changed keys" operation: it diffs every leaf in
+`sourceRel` against the bundled `defaultResource`, writes only the differing keys to `targetRel`, then
+renames `sourceRel` to `sourceRel + archiveSuffix`. No-op when the source is absent or the target
+already exists (idempotent — safe to run on every enable). The one entry in `FILE_MIGRATIONS` today
+relocates a pre-i18n `lang.yml` to the sparse `lang/en_us.yml` override (see [Configuration
+Files](#configuration-files-src-main-resources) below and `docs/admin/lang.md`).
 
 **`Store` and `Migration`** are the shared rule mechanism. `Store` is a store-neutral interface (`getString`, `setString`, `setBoolean`, `clear`, `contains`); each adapter applies its own namespace:
 - `Store.ConfigStore` wraps a `ConfigurationSection`; leaf `k` → path `defaults.k`. No per-key map.
@@ -116,6 +128,8 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK). `NONE` was removed — use the `enabled` preference instead |
 | `Migration` | migration | Composable rule interface (`boolean apply(Store)`). Factory methods: `renameKey`, `remap`, `remove`, `when(…).is(…).then(effects…)`. Effect factories: `set(leaf, String/boolean)`, `clear(leaf)` |
 | `Store` | migration | Store-neutral key/value handle; `ConfigStore` (namespace `defaults.*`) and `PdcStore` (namespace `NamespacedKey(plugin, leaf)`) adapters |
+| `FileMigration` | migration | Composable file-level rule interface (`boolean apply(FileMigrationContext)`), the filesystem counterpart to `Migration`/`Store`. Factory methods: `renameFile`, `deleteFile`, `extractChangedKeys` (relocate a file, keeping only keys that differ from a bundled default). All idempotent — no-op once their precondition no longer holds. |
+| `FileMigrationContext` | migration | Store-neutral handle for file migrations (`dataFolder()`, `resource(path)`); deliberately free of any ClickSorted type so `FileMigration` and its factories could be lifted into a shared library later |
 | `StartCorner` | model | Enum (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT) — which corner the sort grid begins from |
 | `FillAxis` | model | Enum (HORIZONTAL, VERTICAL) — whether rows or columns fill first from the start corner |
 | `EnumParse` | model | Case-insensitive enum parse helper used by StartCorner, FillAxis, and others |
@@ -140,6 +154,7 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `UpdateNotifyListener` | update | On `PlayerJoinEvent`, notifies a player holding `clicksorted.admin.notify.update-available` in chat when `UpdateChecker`'s cached result shows a newer release is available, gated by the `notify_admins_on_update` config toggle. Reads only the cache — never triggers a Modrinth call itself. |
 | `ConfigManager` | config | Unified lifecycle for all four config files |
 | `ResourceUpdater` | config | Add-only merge of bundled resource into plugin data folder |
+| `LangConfig` | config | Resolves player-facing messages from two layers: internal defaults (jar `lang/*.yml`, keyed by locale token) and sparse on-disk overrides (`plugins/ClickSorted/lang/*.yml`). `getColoredMessage(Locale, String, TagResolver...)` resolves override[locale] → override[lang] → override[default_locale] → internal[locale] → internal[lang] → internal[default_locale] → internal[en_us]; the no-locale overload resolves for `default_locale`. Writes a fully-commented `lang/en_us.yml` template on first run (generated from the bundled default) so a fresh override file overrides nothing until an admin uncomments a key. |
 | `Log`, `DebugLevel` | logging | Plugin logger wrapper with gated debug levels |
 | `MessageUtil` | text | Coloured Adventure `Component` message helpers |
 | `CooldownMessenger` | text | Rate-limits repeated messages to players |
@@ -148,10 +163,10 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 
 ### Configuration Files (src/main/resources)
 
-- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag, `check_for_updates_interval_hours` cadence, `notify_admins_on_update` flag (in-game join notice for admins holding `clicksorted.admin.notify.update-available`), per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
+- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag, `check_for_updates_interval_hours` cadence, `notify_admins_on_update` flag (in-game join notice for admins holding `clicksorted.admin.notify.update-available`), `default_locale` (fallback language for console output and any player whose client locale has no matching `lang/` file, default `en_us`), per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
 - `groups.yml` — item groupings for GROUP sort method
 - `items.yml` — persistent store of material → display-name mappings
-- `lang.yml` — all user-facing messages (MiniMessage format)
+- `lang/en_us.yml` — the internal English message defaults (MiniMessage format). This is the single source of truth bundled in the jar; it is not the file admins edit. Admin overrides live in a sparse `plugins/ClickSorted/lang/<locale>.yml` (only the keys an admin actually changed), so unedited keys keep tracking future plugin updates. See `docs/admin/lang.md` and [`LangConfig`](#key-classes) below for the full resolution order and per-player locale support.
 
 ### Testing
 

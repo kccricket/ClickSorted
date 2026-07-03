@@ -27,6 +27,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Holds the 54-slot (double-chest) inventory used as the bundle blacklist GUI.
@@ -83,7 +84,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         this.plugin = plugin;
         this.player = player;
         LangConfig lang = plugin.getConfigManager().lang();
-        this.inventory = Bukkit.createInventory(this, GUI_SIZE, lang.getColoredMessage("blacklistGuiTitle"));
+        this.inventory = Bukkit.createInventory(this, GUI_SIZE, lang.getColoredMessage(player.locale(), "blacklistGuiTitle"));
         this.page = 0;
         refresh();
     }
@@ -168,6 +169,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
 
     private void renderPage() {
         LangConfig lang = plugin.getConfigManager().lang();
+        Locale locale = player.locale();
 
         // Clear top slots.
         for (int i = 0; i < PAGE_SIZE; i++) {
@@ -177,38 +179,38 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         // Populate top slots with the current page's entries.
         int start = page * PAGE_SIZE;
         for (int i = 0; i < PAGE_SIZE && start + i < entries.size(); i++) {
-            inventory.setItem(i, buildEntryItem(lang, entries.get(start + i)));
+            inventory.setItem(i, buildEntryItem(lang, locale, entries.get(start + i)));
         }
 
         // Bottom row: fill all with filler, then overlay controls.
-        ItemStack filler = ClickSortedHolder.buildFiller(lang);
+        ItemStack filler = ClickSortedHolder.buildFiller(lang, locale);
         for (int slot = PAGE_SIZE; slot < GUI_SIZE; slot++) {
             inventory.setItem(slot, filler.clone());
         }
-        inventory.setItem(SLOT_HELP, ClickSortedHolder.buildHelpBook(lang, "blacklistHelpBookLore"));
+        inventory.setItem(SLOT_HELP, ClickSortedHolder.buildHelpBook(lang, locale, "blacklistHelpBookLore"));
         if (page > 0) {
-            inventory.setItem(SLOT_PREV, buildArrow(lang, false));
+            inventory.setItem(SLOT_PREV, buildArrow(lang, locale, false));
         }
         if (page < totalPages(entries.size()) - 1) {
-            inventory.setItem(SLOT_NEXT, buildArrow(lang, true));
+            inventory.setItem(SLOT_NEXT, buildArrow(lang, locale, true));
         }
     }
 
-    private static ItemStack buildEntryItem(LangConfig lang, Entry entry) {
+    private static ItemStack buildEntryItem(LangConfig lang, Locale locale, Entry entry) {
         return switch (entry) {
-            case MaterialEntry m -> buildMaterialItem(lang, m.material());
-            case NameEntry n -> buildNameTagItem(lang, n.name());
+            case MaterialEntry m -> buildMaterialItem(lang, locale, m.material());
+            case NameEntry n -> buildNameTagItem(lang, locale, n.name());
         };
     }
 
     /** Vanilla item of the blacklisted material with a click-to-remove lore line. */
-    private static ItemStack buildMaterialItem(LangConfig lang, Material material) {
+    private static ItemStack buildMaterialItem(LangConfig lang, Locale locale, Material material) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         // Non-item materials (e.g. a stale entry stored before validation) have no ItemMeta; show the
         // bare item rather than throwing and breaking the whole GUI.
         if (meta != null) {
-            meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
+            meta.lore(MessageUtil.toLore(lang.getColoredMessage(locale, "blacklistEntryLore")));
             item.setItemMeta(meta);
         }
         return item;
@@ -218,20 +220,20 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
      * Glinting name tag whose display name is the blacklisted plain-text string, plus a
      * click-to-remove lore line.
      */
-    private static ItemStack buildNameTagItem(LangConfig lang, String name) {
+    private static ItemStack buildNameTagItem(LangConfig lang, Locale locale, String name) {
         ItemStack item = new ItemStack(Material.NAME_TAG);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name).decoration(TextDecoration.ITALIC, false));
         meta.setEnchantmentGlintOverride(true);
-        meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
+        meta.lore(MessageUtil.toLore(lang.getColoredMessage(locale, "blacklistEntryLore")));
         item.setItemMeta(meta);
         return item;
     }
 
-    private static ItemStack buildArrow(LangConfig lang, boolean next) {
+    private static ItemStack buildArrow(LangConfig lang, Locale locale, boolean next) {
         ItemStack arrow = new ItemStack(Material.ARROW);
         ItemMeta meta = arrow.getItemMeta();
-        meta.displayName(lang.getColoredMessage(next ? "blacklistArrowNext" : "blacklistArrowPrev"));
+        meta.displayName(lang.getColoredMessage(locale, next ? "blacklistArrowNext" : "blacklistArrowPrev"));
         arrow.setItemMeta(meta);
         return arrow;
     }

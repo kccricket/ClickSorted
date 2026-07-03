@@ -1,4 +1,14 @@
-# ClickSorted language file
+# ClickSorted built-in English (en_us) language defaults.
+#
+# This file ships inside the plugin jar and is the internal source of truth for every message —
+# it is NOT the file admins are meant to edit. It updates automatically with the plugin, so a
+# changed default here reaches every server on the next release with no admin action required.
+#
+# To override specific messages (or add a translation), edit
+# plugins/ClickSorted/lang/<locale>.yml instead (e.g. lang/en_us.yml, lang/de_de.yml). That file
+# is sparse: only the keys present there override the built-in default below, and everything else
+# still tracks future plugin updates. See docs/admin/lang.md for the full resolution order and
+# lowercase Minecraft-locale filename convention.
 #
 # All values are rendered with MiniMessage (https://docs.advntr.dev/minimessage).
 # You may use color/formatting tags such as <white>, <red>, <bold>, etc.

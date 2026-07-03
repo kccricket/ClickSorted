@@ -19,6 +19,8 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import java.util.Locale;
+
 /**
  * Marker interface for every inventory ClickSorted itself opens (the lock GUI today, any future
  * GUIs). Bukkit exposes no way to ask which plugin created an inventory, so the sort path can't
@@ -30,20 +32,20 @@ import org.bukkit.inventory.meta.ItemMeta;
 public interface ClickSortedHolder extends InventoryHolder {
 
     /** Black stained-glass pane used as inert filler in all ClickSorted GUIs. */
-    static ItemStack buildFiller(LangConfig lang) {
+    static ItemStack buildFiller(LangConfig lang, Locale locale) {
         ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("guiFillerName"));
+        meta.displayName(lang.getColoredMessage(locale, "guiFillerName"));
         pane.setItemMeta(meta);
         return pane;
     }
 
     /** Book used as a help/instructions widget in all ClickSorted GUIs. */
-    static ItemStack buildHelpBook(LangConfig lang, String loreKey) {
+    static ItemStack buildHelpBook(LangConfig lang, Locale locale, String loreKey) {
         ItemStack book = new ItemStack(Material.BOOK);
         ItemMeta meta = book.getItemMeta();
-        meta.displayName(lang.getColoredMessage("guiHelpBookName"));
-        meta.lore(MessageUtil.toLore(lang.getColoredMessage(loreKey)));
+        meta.displayName(lang.getColoredMessage(locale, "guiHelpBookName"));
+        meta.lore(MessageUtil.toLore(lang.getColoredMessage(locale, loreKey)));
         book.setItemMeta(meta);
         return book;
     }
