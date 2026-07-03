@@ -120,7 +120,7 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `FillAxis` | model | Enum (HORIZONTAL, VERTICAL) — whether rows or columns fill first from the start corner |
 | `EnumParse` | model | Case-insensitive enum parse helper used by StartCorner, FillAxis, and others |
 | `InventoryClickListener` | sort | Dispatches click events: master-perm check, trigger match, `hasWork` pre-screen, sort-over-items gate, throttle, then hand off to the sort service |
-| `InventorySortService` | sort | Target resolution (via private `Region`/`Target`), permissions, event lifecycle, mode dispatch (sort-with-layout vs. in-place consolidation), write-back. `hasWork()` is the public pre-screen gate for the listener. On a cancelled `InventorySortEvent`, shows a listener-supplied `getCancelReason()` rate-limited via `CooldownMessenger` (no message when no reason was set). |
+| `InventorySortService` | sort | Target resolution (via private `Region`/`Target`), permissions, event lifecycle, mode dispatch (sort-with-layout vs. in-place consolidation), write-back. `hasWork()` is the public pre-screen gate for the listener. On a cancelled `InventorySortEvent`, shows a listener-supplied `getCancelReason()` rate-limited via `CooldownMessenger` (no message when no reason was set). On Folia, `resolve()` refuses a non-vanilla-held, multi-viewer (shared virtual) inventory as a target — see [Folia safety](#folia-safety). |
 | `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) — fungible merge + discrete passthrough |
 | `InPlacePacker` | sort | Pure in-place consolidator (no plugin state): collapses same-material stacks within their own slots and optionally packs eligible remainders into existing bundles — used when sorting is off but packing is on. Loose stacks stay anchored; items displaced from bundles or exceeding lane capacity fill free/freed slots; drops only when region is full. |
 | `GridGeometry` | sort | Maps an inventory's slot indices to a 2-D grid; computes row/column counts and the mount-slot offset |
@@ -238,6 +238,32 @@ Admins can lock specific **player inventory slots** server-wide so they are neve
 `ClickMethod` and `SortingMethod` are plain enums. `SortingMethod.isAvailable()` checks whether `groups.yml` has any mappings loaded (GROUP requires a populated groups file).
 
 **Never invoke `InventoryView` methods from plugin bytecode** (e.g. `event.getView().getTopInventory()`). `InventoryView` is a concrete class on ≤1.20.6 but an interface on 1.21+; compiling against the newer API and running on an older server makes the JVM throw `IncompatibleClassChangeError` ("Found class … but interface was expected") at the call site. Use `InventoryEvent.getInventory()` (resolved inside the API jar, returns the stable `Inventory` interface) instead. Passing a `getView()` result as a plain argument is fine — only *calling methods on* the view from our bytecode breaks.
+
+### Folia safety
+
+`paper-plugin.yml` declares `folia-supported: true`. The sort runs synchronously on the
+event-delivery (region) thread with no scheduling, and every piece of plugin-global mutable state
+it touches is concurrency-safe (`ActionThrottle`/`CooldownMessenger` use `ConcurrentHashMap`;
+config objects are swapped atomically; `SortEngine`/`InPlacePacker`/`BundlePacker` are stateless
+statics on method-local data). Two players in different regions clicking simultaneously cannot
+corrupt plugin state through any of that.
+
+The one remaining gap is a plugin-created *virtual* inventory (`Bukkit.createInventory`, backed by
+no block/chunk, so owned by no region) whose single backing instance is open to viewers in
+**different** regions at once (e.g. a shared GUI). Two region threads could then concurrently
+read-modify-write the same backing array — a data race and potential item dupe — and
+`refreshViewers()`'s `updateInventory()` call would touch another region's player illegally.
+Vanilla inventories don't have this problem: block containers are chunk-owned so Folia delivers
+every viewer's click on the same region thread, and player inventory / ender chest are
+single-owner.
+
+`InventorySortService` guards this with `isUnsafeSharedInventory(Inventory)`: on Folia only
+(`FOLIA`, a one-time `Class.forName` capability probe), a non-vanilla-held inventory with more
+than one current viewer is refused as a sort target — a clean no-op, same as clicking an
+unsortable type. This is deliberately a refusal, not a lock: a lock only covers our own sort code,
+so it cannot stop the *other* viewer's vanilla click (processed on that viewer's region thread,
+outside any lock we hold) from racing the sort — do not "fix" this by adding a per-inventory lock
+or in-progress-sort registry. On Paper, `FOLIA` is `false` and this check is inert.
 
 ## Release Process
 

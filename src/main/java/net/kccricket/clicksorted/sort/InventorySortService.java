@@ -290,6 +290,7 @@ public class InventorySortService {
     private Target resolve(InventoryClickEvent event) {
         Inventory inv = event.getClickedInventory();
         if (inv == null || !shouldSort(inv)) return null;
+        if (FOLIA && isUnsafeSharedInventory(inv)) return null;
 
         int slot = event.getSlot();
         InventoryType type = inv.getType();
@@ -470,5 +471,26 @@ public class InventorySortService {
 
     private static boolean isVanillaInventoryHolder(InventoryHolder inventoryHolder) {
         return inventoryHolder != null && inventoryHolder.getClass().getPackageName().startsWith("org.bukkit.");
+    }
+
+    /**
+     * A plugin-created (non-vanilla-held) inventory with more than one current viewer has no
+     * single owning region thread on Folia, so two viewers' clicks can concurrently read-modify-write
+     * the same backing array. This is the honest, cheap proxy for "unsafe to sort here" — see
+     * CLAUDE.md's Folia section for why this is refused rather than serialized with a lock.
+     */
+    static boolean isUnsafeSharedInventory(Inventory inventory) {
+        return inventory.getViewers().size() > 1 && !isVanillaInventoryHolder(inventory.getHolder());
+    }
+
+    private static final boolean FOLIA = detectFolia();
+
+    private static boolean detectFolia() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 }

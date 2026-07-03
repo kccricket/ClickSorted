@@ -1,3 +1,9 @@
+# Unreleased
+
+## Other Improvements
+
+- **Folia safety** — on Folia, ClickSorted now refuses to sort a plugin-created inventory that is open to more than one viewer at once (e.g. a shared virtual GUI), since such an inventory has no single owning region thread and could otherwise race between viewers' region threads. Vanilla inventories and single-viewer plugin GUIs are unaffected.
+
 # ClickSorted 2.0.0
 
 Release date: 2026-06-29
