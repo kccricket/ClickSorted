@@ -12,7 +12,6 @@ package net.kccricket.clicksorted.events;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import net.kccricket.clicksorted.sort.MaterialNameSet;
 import net.kccricket.clicksorted.sort.ProtectedItems;
 import net.kccricket.clicksorted.text.ItemNames;
 import net.kyori.adventure.text.Component;
@@ -83,7 +82,6 @@ public class InventorySortEvent extends InventoryInteractEvent {
     private final ProtectedItems protectedItems;
     private final Set<Material> excludedMaterials = new LinkedHashSet<>();
     private final Set<String> excludedItemNames = new LinkedHashSet<>();
-    private MaterialNameSet excludedItemsCache;
     private @Nullable Component cancelReason;
 
     /**
@@ -159,12 +157,14 @@ public class InventorySortEvent extends InventoryInteractEvent {
     }
 
     /**
-     * The current mutable sortable set — slots that will actually be read/moved/overwritten by
+     * The current sortable set — slots that will actually be read/moved/overwritten by
      * the sort, unless further narrowed by {@link #excludeSlot(int)} or an item match against
      * {@link #matchesExcludedItem(ItemStack)}. Already reflects lock state at dispatch time.
+     * Read-only: listeners narrow it via {@link #excludeSlot(int)}; widening is not supported —
+     * locked slots must never re-enter the sort.
      */
     public Set<Integer> getSortableSlots() {
-        return sortableSlots;
+        return Collections.unmodifiableSet(sortableSlots);
     }
 
     /** Removes {@code slot} from {@link #getSortableSlots()}, protecting it from this sort. */
@@ -226,7 +226,6 @@ public class InventorySortEvent extends InventoryInteractEvent {
      */
     public void excludeItem(Material material) {
         excludedMaterials.add(material);
-        excludedItemsCache = null;
     }
 
     /**
@@ -236,7 +235,6 @@ public class InventorySortEvent extends InventoryInteractEvent {
      */
     public void excludeItem(String name) {
         excludedItemNames.add(name.toLowerCase(Locale.ROOT));
-        excludedItemsCache = null;
     }
 
     /** Unmodifiable view of materials added via {@link #excludeItem(Material)} during this event. */
@@ -256,11 +254,11 @@ public class InventorySortEvent extends InventoryInteractEvent {
      * against {@link #getSortableSlots()} after listeners run.
      */
     public boolean matchesExcludedItem(ItemStack is) {
-        if (protectedItems.blocks(is)) return true;
-        if (excludedMaterials.isEmpty() && excludedItemNames.isEmpty()) return false;
-        if (excludedItemsCache == null) {
-            excludedItemsCache = new MaterialNameSet(excludedMaterials, excludedItemNames);
-        }
-        return excludedItemsCache.contains(is);
+        // Resolve the display name once and share it between both membership tests.
+        String name = ItemNames.lookup(is);
+        if (protectedItems.blocks(is, name)) return true;
+        if (excludedMaterials.contains(is.getType())) return true;
+        return name != null && !excludedItemNames.isEmpty()
+                && excludedItemNames.contains(name.toLowerCase(Locale.ROOT));
     }
 }

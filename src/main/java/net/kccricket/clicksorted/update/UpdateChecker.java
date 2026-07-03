@@ -53,6 +53,18 @@ public class UpdateChecker {
     }
 
     /**
+     * (Re)starts the update-check subsystem: fires an immediate check (when
+     * {@code check_for_updates} is enabled) and rearms the recurring schedule. The single entry
+     * point for enable and {@code admin reload}, so every trigger gets the same cadence.
+     */
+    public void restart() {
+        if (plugin.getConfigManager().main().getCheckForUpdates()) {
+            check();
+        }
+        reschedule();
+    }
+
+    /**
      * (Re)schedules the recurring update check per {@code check_for_updates}/
      * {@code check_for_updates_interval_hours}, cancelling any previously scheduled task first.
      * Safe to call repeatedly (on enable and after every {@code admin reload}). Does not itself

@@ -146,14 +146,36 @@ public class ClickSortedCommands {
     }
 
     private static void applyEnabledSetting(ClickSortedPlugin plugin, Player player, boolean enabled) {
-        PreferenceResult result = plugin.getSortingPrefs().setEnabled(player, enabled);
-        if (result.cancelled()) {
-            MessageUtil.preferenceBlocked(player, result);
+        if (blockedAndReported(player, plugin.getSortingPrefs().setEnabled(player, enabled))) {
             return;
         }
         MessageUtil.statusMessage(player,
                 plugin.getConfigManager().lang().getColoredMessage("setEnabledStatus",
                         Placeholder.unparsed("status", enabledLabel(enabled))));
+    }
+
+    /**
+     * Reports a listener-vetoed preference change and returns {@code true}; returns {@code false}
+     * without messaging when the result was not cancelled. Owns the cancel-report half of every
+     * setter call site so the idiom can't be half-applied.
+     */
+    private static boolean blockedAndReported(Player player, PreferenceResult result) {
+        if (!result.cancelled()) return false;
+        MessageUtil.preferenceBlocked(player, result);
+        return true;
+    }
+
+    /**
+     * Reports the outcome of a blacklist add/remove: {@code appliedKey} on APPLIED,
+     * {@code unchangedKey} on UNCHANGED (both with the value under {@code placeholder}),
+     * or the blocked-change message on CANCELLED.
+     */
+    private static void reportBlacklistResult(ClickSortedPlugin plugin, Player player, PreferenceResult result,
+            String appliedKey, String unchangedKey, String placeholder, String value) {
+        if (blockedAndReported(player, result)) return;
+        MessageUtil.statusMessage(player,
+                plugin.getConfigManager().lang().getColoredMessage(result.applied() ? appliedKey : unchangedKey,
+                        Placeholder.unparsed(placeholder, value)));
     }
 
     // -------------------------------------------------------------------------
@@ -215,8 +237,7 @@ public class ClickSortedCommands {
                                 return Command.SINGLE_SUCCESS;
                             }
                             PreferenceResult result = setter.apply(player, value);
-                            if (result.cancelled()) {
-                                MessageUtil.preferenceBlocked(player, result);
+                            if (blockedAndReported(player, result)) {
                                 return Command.SINGLE_SUCCESS;
                             }
                             MessageUtil.statusMessage(player,
@@ -289,8 +310,7 @@ public class ClickSortedCommands {
                                     return Command.SINGLE_SUCCESS;
                                 }
                                 PreferenceResult result = plugin.getSortingPrefs().setSortingMethod(player, method);
-                                if (result.cancelled()) {
-                                    MessageUtil.preferenceBlocked(player, result);
+                                if (blockedAndReported(player, result)) {
                                     return Command.SINGLE_SUCCESS;
                                 }
                                 MessageUtil.statusMessage(player,
@@ -322,8 +342,7 @@ public class ClickSortedCommands {
                             try {
                                 ClickMethod method = ClickMethod.valueOf(arg.toUpperCase());
                                 PreferenceResult result = plugin.getSortingPrefs().setClickMethod(player, method);
-                                if (result.cancelled()) {
-                                    MessageUtil.preferenceBlocked(player, result);
+                                if (blockedAndReported(player, result)) {
                                     return Command.SINGLE_SUCCESS;
                                 }
                                 MessageUtil.statusMessage(player,
@@ -389,9 +408,7 @@ public class ClickSortedCommands {
                             Placeholder.unparsed("method", clickMethod.name())));
             return;
         }
-        PreferenceResult result = plugin.getSortingPrefs().setSortOverItems(player, enabled);
-        if (result.cancelled()) {
-            MessageUtil.preferenceBlocked(player, result);
+        if (blockedAndReported(player, plugin.getSortingPrefs().setSortOverItems(player, enabled))) {
             return;
         }
         MessageUtil.statusMessage(player,
@@ -479,11 +496,13 @@ public class ClickSortedCommands {
     }
 
     private static void applyBundleEnabled(ClickSortedPlugin plugin, Player player, boolean enabled) {
-        PreferenceResult invResult = plugin.getSortingPrefs().setBundlePackInInventory(player, enabled);
-        PreferenceResult contResult = plugin.getSortingPrefs().setBundlePackInContainers(player, enabled);
-        PreferenceResult blocked = invResult.cancelled() ? invResult : contResult.cancelled() ? contResult : null;
-        if (blocked != null) {
-            MessageUtil.preferenceBlocked(player, blocked);
+        // Stop at the first veto: running the second setter after the first was cancelled would
+        // fire a spurious event, and (worse) reporting "blocked" after one half already persisted
+        // makes chat contradict the actual state.
+        if (blockedAndReported(player, plugin.getSortingPrefs().setBundlePackInInventory(player, enabled))) {
+            return;
+        }
+        if (blockedAndReported(player, plugin.getSortingPrefs().setBundlePackInContainers(player, enabled))) {
             return;
         }
         MessageUtil.statusMessage(player,
@@ -497,9 +516,7 @@ public class ClickSortedCommands {
             java.util.function.BiFunction<Player, Boolean, PreferenceResult> setter) {
         return Commands.literal(literal)
                 .then(boolStateArg(plugin, (player, state) -> {
-                    PreferenceResult result = setter.apply(player, state);
-                    if (result.cancelled()) {
-                        MessageUtil.preferenceBlocked(player, result);
+                    if (blockedAndReported(player, setter.apply(player, state))) {
                         return;
                     }
                     MessageUtil.statusMessage(player,
@@ -558,8 +575,7 @@ public class ClickSortedCommands {
                                 }
                             }
                             PreferenceResult result = plugin.getSortingPrefs().setBundleStackLimit(player, limit);
-                            if (result.cancelled()) {
-                                MessageUtil.preferenceBlocked(player, result);
+                            if (blockedAndReported(player, result)) {
                                 return Command.SINGLE_SUCCESS;
                             }
                             MessageUtil.statusMessage(player,
@@ -651,15 +667,10 @@ public class ClickSortedCommands {
                                                 sendInvalidValue(plugin, player, raw, "a material name");
                                                 return Command.SINGLE_SUCCESS;
                                             }
-                                            var lang = plugin.getConfigManager().lang();
-                                            PreferenceResult result = plugin.getSortingPrefs().addToBundleBlacklist(player, mat);
-                                            switch (result.outcome()) {
-                                                case APPLIED -> MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistAdded",
-                                                        Placeholder.unparsed("material", mat.name())));
-                                                case UNCHANGED -> MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistAlreadyPresent",
-                                                        Placeholder.unparsed("material", mat.name())));
-                                                case CANCELLED -> MessageUtil.preferenceBlocked(player, result);
-                                            }
+                                            reportBlacklistResult(plugin, player,
+                                                    plugin.getSortingPrefs().addToBundleBlacklist(player, mat),
+                                                    "setBundleBlacklistAdded", "setBundleBlacklistAlreadyPresent",
+                                                    "material", mat.name());
                                             return Command.SINGLE_SUCCESS;
                                         })))
                         .then(Commands.literal("item-name")
@@ -674,15 +685,10 @@ public class ClickSortedCommands {
                                                 sendInvalidValue(plugin, player, name, "a display name");
                                                 return Command.SINGLE_SUCCESS;
                                             }
-                                            var lang = plugin.getConfigManager().lang();
-                                            PreferenceResult result = plugin.getSortingPrefs().addToBundleBlacklistName(player, name);
-                                            switch (result.outcome()) {
-                                                case APPLIED -> MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAdded",
-                                                        Placeholder.unparsed("name", name)));
-                                                case UNCHANGED -> MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameAlreadyPresent",
-                                                        Placeholder.unparsed("name", name)));
-                                                case CANCELLED -> MessageUtil.preferenceBlocked(player, result);
-                                            }
+                                            reportBlacklistResult(plugin, player,
+                                                    plugin.getSortingPrefs().addToBundleBlacklistName(player, name),
+                                                    "setBundleBlacklistNameAdded", "setBundleBlacklistNameAlreadyPresent",
+                                                    "name", name);
                                             return Command.SINGLE_SUCCESS;
                                         }))))
                 .then(Commands.literal("remove")
@@ -706,15 +712,10 @@ public class ClickSortedCommands {
                                                 sendInvalidValue(plugin, player, raw, "a material name");
                                                 return Command.SINGLE_SUCCESS;
                                             }
-                                            var lang = plugin.getConfigManager().lang();
-                                            PreferenceResult result = plugin.getSortingPrefs().removeFromBundleBlacklist(player, mat);
-                                            switch (result.outcome()) {
-                                                case APPLIED -> MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistRemoved",
-                                                        Placeholder.unparsed("material", mat.name())));
-                                                case UNCHANGED -> MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNotPresent",
-                                                        Placeholder.unparsed("material", mat.name())));
-                                                case CANCELLED -> MessageUtil.preferenceBlocked(player, result);
-                                            }
+                                            reportBlacklistResult(plugin, player,
+                                                    plugin.getSortingPrefs().removeFromBundleBlacklist(player, mat),
+                                                    "setBundleBlacklistRemoved", "setBundleBlacklistNotPresent",
+                                                    "material", mat.name());
                                             return Command.SINGLE_SUCCESS;
                                         })))
                         .then(Commands.literal("item-name")
@@ -735,15 +736,10 @@ public class ClickSortedCommands {
                                                 return Command.SINGLE_SUCCESS;
                                             }
                                             String name = StringArgumentType.getString(ctx, "name").trim();
-                                            var lang = plugin.getConfigManager().lang();
-                                            PreferenceResult result = plugin.getSortingPrefs().removeFromBundleBlacklistName(player, name);
-                                            switch (result.outcome()) {
-                                                case APPLIED -> MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameRemoved",
-                                                        Placeholder.unparsed("name", name)));
-                                                case UNCHANGED -> MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleBlacklistNameNotPresent",
-                                                        Placeholder.unparsed("name", name)));
-                                                case CANCELLED -> MessageUtil.preferenceBlocked(player, result);
-                                            }
+                                            reportBlacklistResult(plugin, player,
+                                                    plugin.getSortingPrefs().removeFromBundleBlacklistName(player, name),
+                                                    "setBundleBlacklistNameRemoved", "setBundleBlacklistNameNotPresent",
+                                                    "name", name);
                                             return Command.SINGLE_SUCCESS;
                                         }))))
                 .then(Commands.literal("list")
@@ -762,8 +758,7 @@ public class ClickSortedCommands {
                                 return Command.SINGLE_SUCCESS;
                             }
                             PreferenceResult result = plugin.getSortingPrefs().clearBundleBlacklist(player);
-                            if (result.cancelled()) {
-                                MessageUtil.preferenceBlocked(player, result);
+                            if (blockedAndReported(player, result)) {
                                 return Command.SINGLE_SUCCESS;
                             }
                             // APPLIED and UNCHANGED (already empty) both report "cleared" — matches the
@@ -830,10 +825,7 @@ public class ClickSortedCommands {
                                         Placeholder.unparsed("reason", String.valueOf(root.getMessage()))));
                         return Command.SINGLE_SUCCESS;
                     }
-                    if (plugin.getConfigManager().main().getCheckForUpdates()) {
-                        plugin.getUpdateChecker().check();
-                    }
-                    plugin.getUpdateChecker().reschedule();
+                    plugin.getUpdateChecker().restart();
                     MessageUtil.statusMessage(ctx.getSource().getSender(),
                             plugin.getConfigManager().lang().getColoredMessage("configReloaded"));
                     return Command.SINGLE_SUCCESS;

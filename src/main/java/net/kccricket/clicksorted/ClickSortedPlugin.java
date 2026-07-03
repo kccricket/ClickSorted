@@ -71,10 +71,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         actionThrottle = new ActionThrottle(this);
 
         updateChecker = new UpdateChecker(this);
-        if (configManager.main().getCheckForUpdates()) {
-            updateChecker.check();
-        }
-        updateChecker.reschedule();
+        updateChecker.restart();
 
         sortService = new InventorySortService(this);
 

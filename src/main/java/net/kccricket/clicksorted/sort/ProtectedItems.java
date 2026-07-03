@@ -71,7 +71,17 @@ public record ProtectedItems(MaterialNameSet config, Permissible permissible) {
      * @param is the item to test; must not be null
      */
     public boolean blocks(ItemStack is) {
-        String name = ItemNames.lookup(is);
+        return blocks(is, ItemNames.lookup(is));
+    }
+
+    /**
+     * Same as {@link #blocks(ItemStack)} with the display name already resolved via
+     * {@link ItemNames#lookup}, so callers that need the name themselves avoid a second lookup.
+     *
+     * @param is   the item to test; must not be null
+     * @param name the item's resolved plain-text display name; may be null
+     */
+    public boolean blocks(ItemStack is, String name) {
         if (config.contains(is.getType(), name)) return true;
 
         if (permissible != null) {
