@@ -11,6 +11,7 @@ import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.config.LangConfig;
 import net.kccricket.clicksorted.gui.BlacklistGuiHolder;
 import net.kccricket.clicksorted.gui.LockGuiHolder;
+import net.kccricket.clicksorted.gui.PreferencesDialog;
 import net.kccricket.clicksorted.logging.DebugLevel;
 import net.kccricket.clicksorted.migration.MigrationException;
 import net.kccricket.clicksorted.migration.PreferenceRepair;
@@ -71,7 +72,26 @@ public class ClickSortedCommands {
                 .then(buildLockSlots(plugin))
                 .then(buildBundle(plugin))
                 .then(buildStatus(plugin))
+                .then(buildMenu(plugin))
                 .build();
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted menu — opens the dialog-based preferences UI
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildMenu(ClickSortedPlugin plugin) {
+        return Commands.literal("menu")
+                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                        && src.getSender().hasPermission("clicksorted.commands.menu"))
+                .executes(ctx -> {
+                    Player player = requirePlayer(plugin, ctx);
+                    if (player == null || throttled(plugin, ctx.getSource())) {
+                        return Command.SINGLE_SUCCESS;
+                    }
+                    PreferencesDialog.open(plugin, player);
+                    return Command.SINGLE_SUCCESS;
+                });
     }
 
     // -------------------------------------------------------------------------

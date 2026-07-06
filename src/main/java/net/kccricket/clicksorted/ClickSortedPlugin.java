@@ -16,6 +16,7 @@ import net.kccricket.clicksorted.commands.ClickSortedCommands;
 import net.kccricket.clicksorted.config.ConfigManager;
 import net.kccricket.clicksorted.gui.BlacklistGuiListener;
 import net.kccricket.clicksorted.gui.LockGuiListener;
+import net.kccricket.clicksorted.gui.PreferencesDialogService;
 import net.kccricket.clicksorted.logging.Log;
 import net.kccricket.clicksorted.migration.MigrationException;
 import net.kccricket.clicksorted.migration.Migrations;
@@ -41,6 +42,7 @@ public class ClickSortedPlugin extends JavaPlugin {
     private ActionThrottle actionThrottle;
     private Migrations migrations;
     private UpdateChecker updateChecker;
+    private PreferencesDialogService preferencesDialogService;
 
     private static ClickSortedPlugin instance = null;
 
@@ -74,12 +76,14 @@ public class ClickSortedPlugin extends JavaPlugin {
         updateChecker.restart();
 
         sortService = new InventorySortService(this);
+        preferencesDialogService = new PreferencesDialogService(this);
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new InventoryClickListener(this, sortService), this);
         pm.registerEvents(new LockGuiListener(this), this);
         pm.registerEvents(new BlacklistGuiListener(this), this);
         pm.registerEvents(new PlayerMigrationListener(this), this);
+        pm.registerEvents(preferencesDialogService, this);
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(ClickSortedCommands.build(this), "Manage the ClickSorted plugin"));
@@ -131,5 +135,10 @@ public class ClickSortedPlugin extends JavaPlugin {
 
     public UpdateChecker getUpdateChecker() {
         return updateChecker;
+    }
+
+    /** @return the stash/restore service backing the {@code /clicksorted menu} preferences dialog */
+    public PreferencesDialogService getPreferencesDialogService() {
+        return preferencesDialogService;
     }
 }

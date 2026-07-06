@@ -1,5 +1,7 @@
 # Getting Started
 
+> **Tip:** every preference on this page (and the rest of the player guide) can also be set from one screen with `/clicksorted menu` — see [Preferences Menu](preferences-menu.md).
+
 ## Sorting an inventory
 
 By default, sorting is triggered by pressing the **swap-offhand key** (usually `F`) while hovering over any empty slot in a sortable inventory. Open a chest, your ender chest, a shulker box — any sortable container — hover any empty slot, and press `F` (or whatever your offhand swap key is).

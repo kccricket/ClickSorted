@@ -12,6 +12,7 @@ These commands are available to every player by default.
 | `/clicksorted sort start-corner <TOP_LEFT\|TOP_RIGHT\|BOTTOM_LEFT\|BOTTOM_RIGHT>` | Set which corner sorted items are placed from. |
 | `/clicksorted sort fill-axis <HORIZONTAL\|VERTICAL>` | Set whether sorted items fill rows first (`HORIZONTAL`) or columns first (`VERTICAL`). |
 | `/clicksorted status` | Show your current settings (enabled state, click method, sort method, start corner, fill direction, sort-over-items, bundle packing). |
+| `/clicksorted menu` | Open the [preferences menu](preferences-menu.md) — every sorting preference on one screen. |
 
 ## Click trigger
 
