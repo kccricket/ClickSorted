@@ -1,3 +1,29 @@
+# ClickSorted 2.2.0
+
+ClickSorted 2.2.0 adds a dialog-based preferences UI and raises the minimum supported server to Paper 1.21.6.
+
+## Highlights
+
+- **New `/clicksorted menu`** — a single Paper Dialog listing every sorting preference (enabled, click/sort method, start corner, fill axis, allow-on-hover, bundle in-inventory/in-containers, bundle stack-limit) with current values pre-filled, plus buttons to launch the slot-lock and bundle-blacklist GUIs without leaving the flow. The existing `/clicksorted sort`/`click`/`bundle`/`status` commands are unchanged and remain the console/scripting interface.
+
+## Breaking Changes
+
+- **Minimum supported server raised to Paper 1.21.6** (from 1.21.5), the version that introduced the Dialog API this release's preferences menu is built on. A 1.21.5 server can no longer run this build — upgrade Paper first.
+
+## New Features
+
+### Dialog-based preferences menu
+
+`/clicksorted menu` (permission `clicksorted.commands.menu`, default `true`) opens a single form covering every scalar sorting preference, each shown only if the player holds the matching command's permission node, so the dialog can never change something the player couldn't already change by command. Saving applies every changed value through the same `PlayerSortingPrefs` setters the commands use, so listener vetoes and PDC persistence behave identically. The "Locked Slots…" and "Bundle Blacklist…" buttons preserve any unsaved edits made in the dialog, open the corresponding GUI, and restore the dialog with those edits intact once the GUI is closed.
+
+Bedrock/Geyser clients cannot render server-side dialogs; the existing commands remain their path to the same preferences.
+
+## Other Improvements
+
+- README and documentation updated for the new command and the 1.21.6 floor.
+
+---
+
 # ClickSorted 2.1.0
 
 Release date: 2026-07-03

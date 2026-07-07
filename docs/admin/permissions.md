@@ -20,6 +20,7 @@ Out of the box, all players can click-sort everything and change their own prefe
 | `clicksorted.commands.bundle` | `true` | Use `/clicksorted bundle` subcommands. |
 | `clicksorted.commands.lock` | `true` | Use `/clicksorted lock-slots`. |
 | `clicksorted.commands.status` | `true` | Use `/clicksorted status`. |
+| `clicksorted.commands.menu` | `true` | Use `/clicksorted menu` (the dialog-based preferences UI). |
 | `clicksorted.admin.commands` | `op` | Access to `/clicksorted admin` subcommands. |
 | `clicksorted.admin.commands.reload` | `op` | Use `/clicksorted admin reload`. |
 | `clicksorted.admin.commands.config` | `op` | Use `/clicksorted admin config`. |

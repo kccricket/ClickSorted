@@ -10,6 +10,7 @@ nav:
   - Home: index.md
   - Player Guide:
     - Getting Started: player-guide/getting-started.md
+    - Preferences Menu: player-guide/preferences-menu.md
     - Sort Methods: player-guide/sort-methods.md
     - Sort Direction: player-guide/sort-direction.md
     - Slot Locking: player-guide/slot-locking.md
