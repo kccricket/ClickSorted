@@ -76,7 +76,7 @@ listOf(
 }
 
 // Filter only paper-plugin.yml — it's the only resource that contains a ${project.version} token.
-// The other YAMLs (lang.yml, items.yml, groups.yml, config.yml) contain literal ${} and $
+// The other YAMLs (lang/en_us.yml, items.yml, groups.yml, config.yml) contain literal ${} and $
 // characters that Gradle's expand() would corrupt. We bind "project.version" to match the
 // Maven ${project.version} placeholder without touching the source file.
 tasks.processResources {

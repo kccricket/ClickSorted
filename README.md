@@ -13,6 +13,7 @@ ClickSorted lets players sort their player inventory, chests, ender chests, shul
 - Lock individual slots so sorting leaves them alone
 - Optional bundle packing, with a per-player blacklist for item types or display names
 - Server admins can enforce a global item blacklist and lock specific player slots
+- Per-player localisation with self-updating default messages — admin customizations are sparse overrides that never shadow a future default-text improvement
 
 ## Quick start
 
@@ -31,6 +32,8 @@ Tune it to taste with commands:
 - `/clicksorted menu` — open a single dialog listing every sorting preference at once, with buttons to launch the slot-lock and bundle-blacklist GUIs. (Bedrock/Geyser clients can't render server dialogs — use the commands above instead.)
 
 Fully customisable item groups, messages, and sortable inventory types are available for admins. Admins can also declare a server-wide item blacklist (items that are never sorted or packed) and lock specific player inventory slots across all players.
+
+Messages are stored as sparse per-locale override files under `plugins/ClickSorted/lang/` (e.g. `en_us.yml`); anything you don't override keeps resolving to the plugin's built-in default, so a new release's improved wording reaches you automatically. Existing `lang.yml` files are migrated to this format automatically on first load. See [`docs/admin/lang.md`](docs/admin/lang.md).
 
 ## Requirements
 

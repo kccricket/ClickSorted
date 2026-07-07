@@ -21,7 +21,6 @@ import io.papermc.paper.registry.data.dialog.input.DialogInput;
 import io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput;
 import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.config.LangConfig;
 import net.kccricket.clicksorted.migration.PreferenceRepair;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
@@ -31,6 +30,7 @@ import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.text.MessageUtil;
+import net.kccricket.clicksorted.text.lang.Localized;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
@@ -143,7 +143,7 @@ public final class PreferencesDialog {
      * unsaved edits after a "Locked Slots…" / "Bundle Blacklist…" GUI round trip.
      */
     public static void open(ClickSortedPlugin plugin, Player player, PendingPrefs seed) {
-        LangConfig lang = plugin.getConfigManager().lang();
+        Localized lang = plugin.getConfigManager().lang(player.locale());
 
         List<DialogInput> inputs = planInputs(plugin, player, seed).stream()
                 .map(spec -> toPaperInput(spec, lang))
@@ -254,7 +254,7 @@ public final class PreferencesDialog {
     }
 
     /** Translates one plain-value {@link InputSpec} into the Paper dialog input it describes. */
-    private static DialogInput toPaperInput(InputSpec spec, LangConfig lang) {
+    private static DialogInput toPaperInput(InputSpec spec, Localized lang) {
         Component label = lang.getColoredMessage(spec.element().langKey());
         return switch (spec.kind()) {
             case BOOL -> DialogInput.bool(spec.element().key(), label, spec.boolInitial(), "true", "false");
@@ -274,7 +274,7 @@ public final class PreferencesDialog {
     }
 
     /** Translates one {@link ButtonSpec} into the Paper action button, wiring its click callback. */
-    private static ActionButton toPaperButton(ButtonSpec spec, ClickSortedPlugin plugin, LangConfig lang) {
+    private static ActionButton toPaperButton(ButtonSpec spec, ClickSortedPlugin plugin, Localized lang) {
         Component label = lang.getColoredMessage(spec.element().langKey());
         return switch (spec.element()) {
             case LOCK_BUTTON -> ActionButton.builder(label)
@@ -368,7 +368,7 @@ public final class PreferencesDialog {
      */
     public static void applyResponse(ClickSortedPlugin plugin, Player player, PendingPrefs values) {
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-        LangConfig lang = plugin.getConfigManager().lang();
+        Localized lang = plugin.getConfigManager().lang(player.locale());
 
         if (values.clickMethod() != null) {
             if (reportIfBlocked(player, prefs.setClickMethod(player, values.clickMethod()))) {
@@ -376,7 +376,7 @@ public final class PreferencesDialog {
             }
             MessageUtil.statusMessage(player, lang.getColoredMessage("setClickMethodTo",
                     Placeholder.unparsed("method", values.clickMethod().toString()),
-                    Placeholder.unparsed("instruction", values.clickMethod().getInstruction())));
+                    Placeholder.unparsed("instruction", values.clickMethod().getInstruction(player.locale()))));
             PreferenceRepair.enforceHover(plugin, player, values.clickMethod());
             player.updateCommands();
         }

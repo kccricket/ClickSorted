@@ -1,6 +1,28 @@
-# Localisation (`lang.yml`)
+# Localisation & lang overrides
 
-All player-facing messages are stored in `lang.yml` and rendered with **[MiniMessage](https://docs.advntr.dev/minimessage)**. You may use any MiniMessage formatting tags (`<red>`, `<bold>`, `<#ff0000>`, `<gradient:...>`, etc.). Changes take effect after `/clicksorted admin reload`.
+All player-facing messages are rendered with **[MiniMessage](https://docs.advntr.dev/minimessage)**. You may use any MiniMessage formatting tags (`<red>`, `<bold>`, `<#ff0000>`, `<gradient:...>`, etc.).
+
+## How message resolution works
+
+ClickSorted ships its default English strings **inside the jar**, not as a file in your data folder. A changed default in a new release takes effect for every server automatically, with no action required.
+
+To customize a message, create a **sparse override file** at `plugins/ClickSorted/lang/<locale>.yml`, where `<locale>` is a lowercase Minecraft-style locale token — `en_us.yml`, `de_de.yml`, `pt_br.yml`, or any other locale your players use. A language-only filename (`de.yml`) is also honored, as a fallback tier below the full `lang_country` token. Only add the keys you actually want to change; every key you omit keeps resolving to the plugin's internal default, so your customizations survive future releases that change unrelated strings.
+
+A commented copy of every available key is written to `plugins/ClickSorted/lang/en_us.yml` the first time the plugin starts, as documentation — every line is prefixed with `# ` so the file overrides nothing until you uncomment and edit a line. Changes to an override file take effect after `/clicksorted admin reload`.
+
+**Per-player locale:** each player's client locale (e.g. `en_us`, `de_de`) is used to pick which override/internal file applies, so different players can see different languages once translations exist. The resolution order for a player's locale token, its language-only token, and the server's configured `default_locale` (in `config.yml`, default `en_us`) is:
+
+```
+override[token] → override[lang] → override[default_locale]
+  → internal[token] → internal[lang] → internal[default_locale] → internal[en_us]
+  → (missing) a visible "[missing lang key: ...]" placeholder, logged as an error
+```
+
+`default_locale` also selects the language used for console output and any non-player command sender.
+
+**Adding a translation:** create `plugins/ClickSorted/lang/<locale>.yml` with just the keys you're translating (or a full copy — the per-key/placeholder tables below list every available key). No other locales need to be present, and no code changes are required — a new locale file is a pure drop-in.
+
+**If a `lang.yml` file is present** in your data folder, it is migrated automatically the next time the server starts: any key whose value differs from the bundled English default is copied into `plugins/ClickSorted/lang/en_us.yml` as an override, and `lang.yml` is renamed to `lang.yml.bak` (kept for reference, no longer read). Keys left at their default are dropped, so you immediately get the current release's default wording for anything you didn't customize; genuine customizations are preserved.
 
 > **Placeholders:** Tags like `<method>`, `<status>`, `<instruction>`, and `<level>` are filled in at runtime. Do not remove a placeholder from a message that requires it.
 

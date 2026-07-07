@@ -1,14 +1,16 @@
 # ClickSorted 2.2.0
 
-ClickSorted 2.2.0 adds a dialog-based preferences UI and raises the minimum supported server to Paper 1.21.6.
+ClickSorted 2.2.0 adds a dialog-based preferences UI, per-player localisation with self-updating default strings, and raises the minimum supported server to Paper 1.21.6.
 
 ## Highlights
 
 - **New `/clicksorted menu`** — a single Paper Dialog listing every sorting preference (enabled, click/sort method, start corner, fill axis, allow-on-hover, bundle in-inventory/in-containers, bundle stack-limit) with current values pre-filled, plus buttons to launch the slot-lock and bundle-blacklist GUIs without leaving the flow. The existing `/clicksorted sort`/`click`/`bundle`/`status` commands are unchanged and remain the console/scripting interface.
+- **Per-player localisation** — every message now resolves against the viewing/target player's Minecraft client locale, with a sparse-override model so default text updates automatically without shadowing admin customizations. See below.
 
 ## Breaking Changes
 
 - **Minimum supported server raised to Paper 1.21.6** (from 1.21.5), the version that introduced the Dialog API this release's preferences menu is built on. A 1.21.5 server can no longer run this build — upgrade Paper first.
+- **`lang.yml` is replaced by `lang/<locale>.yml` override files** (e.g. `lang/en_us.yml`). An existing `lang.yml` is migrated automatically on first load: any key you had customized is extracted into `lang/en_us.yml`, the old file is archived to `lang.yml.bak`, and any key left at its default is dropped (so you pick up any improved default text in this release). No action is required. See [`docs/admin/lang.md`](docs/admin/lang.md).
 
 ## New Features
 
@@ -17,6 +19,10 @@ ClickSorted 2.2.0 adds a dialog-based preferences UI and raises the minimum supp
 `/clicksorted menu` (permission `clicksorted.commands.menu`, default `true`) opens a single form covering every scalar sorting preference, each shown only if the player holds the matching command's permission node, so the dialog can never change something the player couldn't already change by command. Saving applies every changed value through the same `PlayerSortingPrefs` setters the commands use, so listener vetoes and PDC persistence behave identically. The "Locked Slots…" and "Bundle Blacklist…" buttons preserve any unsaved edits made in the dialog, open the corresponding GUI, and restore the dialog with those edits intact once the GUI is closed.
 
 Bedrock/Geyser clients cannot render server-side dialogs; the existing commands remain their path to the same preferences.
+
+### Per-player localisation & self-updating lang defaults
+
+Default message strings are now bundled inside the jar (`lang/en_us.yml`) rather than copied onto disk, so a changed default in a future release takes effect for everyone automatically — no more permanently-shadowed `lang.yml`. Admins customize strings via sparse override files at `plugins/ClickSorted/lang/<locale>.yml`; only the keys you edit are overridden, everything else keeps resolving to the built-in default. Messages are now resolved per-player against their Minecraft client locale, so future translation files (`de_de.yml`, `pt_br.yml`, …) are a pure drop-in with no code changes. A new `default_locale` config key (default `en_us`) controls console output and the fallback for any locale with no matching file. See [`docs/admin/lang.md`](docs/admin/lang.md) for the full resolution order.
 
 ## Other Improvements
 

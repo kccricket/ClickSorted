@@ -53,6 +53,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         Log.init(this);
 
         migrations = new Migrations(this);
+        migrations.migrateFiles();
 
         configManager = new ConfigManager(this);
         try {

@@ -1,8 +1,18 @@
-# ClickSorted language file
+# ClickSorted internal English (en_us) language defaults.
+#
+# This file is the plugin's built-in source of truth for every user-facing message and is
+# bundled inside the jar — it is NOT read from the plugin data folder, so editing a copy of it
+# there has no effect. Changed defaults here take effect for every server on the next release
+# automatically, with no admin action required.
+#
+# To customize strings for your server, edit plugins/ClickSorted/lang/en_us.yml (or another
+# locale file in that folder) instead: that file is sparse — only the keys you uncomment and
+# edit are overridden; every other key keeps resolving to this internal default, so your
+# customizations survive future releases that change unrelated defaults.
 #
 # All values are rendered with MiniMessage (https://docs.advntr.dev/minimessage).
 # You may use color/formatting tags such as <white>, <red>, <bold>, etc.
-# Edits take effect after running /clicksorted reload.
+# Edits (to an on-disk override file) take effect after running /clicksorted admin reload.
 #
 # Placeholder tags are listed in comments above each message that accepts one.
 # Do not remove a placeholder from a message that requires it.

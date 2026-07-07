@@ -71,7 +71,7 @@ public class ActionThrottle {
             return false;
         }
         plugin.getMessenger().message(player, "throttle", 3,
-                plugin.getConfigManager().lang().getColoredMessage("actionTooFast"));
+                plugin.getConfigManager().lang(player.locale()).getColoredMessage("actionTooFast"));
         return true;
     }
 

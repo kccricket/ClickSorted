@@ -86,7 +86,7 @@ public final class PreferenceRepair {
             return;
         }
         pdc.remove(key);
-        var lang = plugin.getConfigManager().lang();
+        var lang = plugin.getConfigManager().lang(player.locale());
         MessageUtil.statusMessage(player, lang.getColoredMessage("prefResetInvalid",
                 Placeholder.unparsed("pref", pref.label()),
                 Placeholder.unparsed("value", stored),
@@ -119,7 +119,7 @@ public final class PreferenceRepair {
                 if (!result.applied()) {
                     return;
                 }
-                var lang = plugin.getConfigManager().lang();
+                var lang = plugin.getConfigManager().lang(player.locale());
                 MessageUtil.statusMessage(player, lang.getColoredMessage("hoverForcedByClickMethod",
                         Placeholder.unparsed("status", required ? "ENABLED" : "DISABLED"),
                         Placeholder.unparsed("method", method.name())));
