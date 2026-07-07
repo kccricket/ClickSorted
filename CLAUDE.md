@@ -23,17 +23,18 @@ ClickSorted is a Paper/Bukkit plugin that lets players sort inventories via conf
 net.kccricket.clicksorted
 ├── ClickSortedPlugin          entry point
 ├── model/                   ClickMethod, SortingMethod, SortKey, PlayerSortingPrefs,
-│                            StartCorner, FillAxis, EnumParse, PreferenceResult
+│                            StartCorner, FillAxis, EnumParse, PreferenceResult, PendingPrefs
 ├── commands/                ClickSortedCommands (Brigadier command tree)
 ├── config/                  ConfigManager, ManagedConfig, MainConfig, LangConfig,
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
 ├── events/                  InventorySortEvent, PlayerPreferenceChangeEvent, Preference
 ├── gui/                     ClickSortedHolder, BlacklistGuiHolder, BlacklistGuiListener,
-│                            LockGuiHolder, LockGuiListener
+│                            LockGuiHolder, LockGuiListener, PreferencesDialog,
+│                            PreferencesDialogService
 ├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
 │                            BundlePacker, BundleBlacklist, InPlacePacker, BundleBenchmark,
 │                            GridGeometry, SlotOrder, MaterialNameSet,
-│                            TreemapPacker, PrefsCycleHandler, ProtectedItems, ProtectedSlots
+│                            TreemapPacker, ProtectedItems, ProtectedSlots
 ├── migration/               ValueMigration, Migration, Store, FileMigration,
 │                            FileMigrationContext, Migrations, PlayerMigrationListener,
 │                            PreferenceRepair
@@ -116,6 +117,8 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `BlacklistGuiListener` | gui | Handles clicks in the blacklist GUI; adds items from the real inventory to the blacklist by material or display name, removes listed entries, handles pagination, and cancels all real-inventory interaction |
 | `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier/iron-bars panes and maps chest↔inventory slots; admin-locked slots (config or permission) render as IRON_BARS and are non-toggleable |
 | `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; guards admin-locked slots via `ProtectedSlots.forSort`, toggles per-player lock state, and cancels all real-inventory interaction |
+| `PreferencesDialog` | gui | Builds/shows the `/clicksorted menu` Paper Dialog: one input per scalar preference (enabled, click/sort method, start corner, fill axis, allow-on-hover, bundle in-inventory/in-containers, bundle stack-limit), each gated behind the same permission node its equivalent command requires, plus buttons to launch the lock and blacklist GUIs. `planInputs`/`planButtons` compute plain `InputSpec`/`ButtonSpec` descriptors (unit-testable without a real Paper server); `open` translates those into real `DialogInput`/`ActionButton` objects. `applyResponse` applies every present field through the same `PlayerSortingPrefs` setters the commands use, in the same order, stopping at the first listener veto. |
+| `PreferencesDialogService` | gui | `Listener` holding unsaved dialog edits (keyed by player UUID in a `ConcurrentHashMap`) across a "Locked Slots…"/"Bundle Blacklist…" round trip: those buttons stash the in-progress edits before opening the GUI, and `onInventoryClose` re-shows the dialog seeded from the stash once that GUI closes; a directly-opened lock/blacklist GUI has no stash entry and is untouched. Clears the stash on `PlayerQuitEvent`. |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
 | `SortingMethod` | model | Enum (NAME, GROUP, TREEMAP) controlling `SortKey.makeSortPrefix()`; `isTreemap()` routes placement through `TreemapPacker` instead of `SlotOrder` |
 | `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK). `NONE` was removed — use the `enabled` preference instead. `getInstruction(Locale)` resolves the trigger-instruction text via `configManager.lang(locale)`. |
@@ -124,6 +127,7 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `StartCorner` | model | Enum (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT) — which corner the sort grid begins from |
 | `FillAxis` | model | Enum (HORIZONTAL, VERTICAL) — whether rows or columns fill first from the start corner |
 | `EnumParse` | model | Case-insensitive enum parse helper used by StartCorner, FillAxis, and others |
+| `PendingPrefs` | model | Immutable record of every scalar preference the `/clicksorted menu` dialog can edit, each field nullable to mean "not present/changed"; used both as the dialog's response payload and as the `PreferencesDialogService` stash seed |
 | `InventoryClickListener` | sort | Dispatches click events: master-perm check, trigger match, `hasWork` pre-screen, sort-over-items gate, throttle, then hand off to the sort service |
 | `InventorySortService` | sort | Target resolution (via private `Region`/`Target`), permissions, event lifecycle, mode dispatch (sort-with-layout vs. in-place consolidation), write-back. `hasWork()` is the public pre-screen gate for the listener. On a cancelled `InventorySortEvent`, shows a listener-supplied `getCancelReason()` rate-limited via `CooldownMessenger` (no message when no reason was set). On Folia, `resolve()` refuses a non-vanilla-held, multi-viewer (shared virtual) inventory as a target — see [Folia safety](#folia-safety). |
 | `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) — fungible merge + discrete passthrough |
@@ -131,7 +135,6 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `GridGeometry` | sort | Maps an inventory's slot indices to a 2-D grid; computes row/column counts and the mount-slot offset |
 | `SlotOrder` | sort | Produces a write-back slot sequence from a `GridGeometry` given a `StartCorner` and `FillAxis` |
 | `TreemapPacker` | sort | Implements the `TREEMAP` sort method: assigns each item type a contiguous near-square block sized to its stack count; respects `StartCorner` and `FillAxis`; falls back to gap-free fill when rectangles no longer fit |
-| `PrefsCycleHandler` | sort | Handles a click-method-driven preference cycle (used internally by InventoryClickListener) |
 | `BundlePacker` | sort | Pure pool-and-repack of bundle-eligible items into bundles (no plugin state) |
 | `BundleBlacklist` | sort | Immutable per-player snapshot of blacklisted materials and display names; delegates matching to `MaterialNameSet`. Blocks packing and unpacking for matching items and blocks blacklisted bundle colors as packing bins. |
 | `MaterialNameSet` | sort | Immutable record holding a `Set<Material>` and a pre-lowercased `Set<String>` of display names; shared by `BundleBlacklist` and `ProtectedItems` for material-or-name membership tests |
@@ -193,6 +196,7 @@ Commands are implemented as a Brigadier tree in `ClickSortedCommands` and regist
   - `bundle blacklist add item-name|remove item-name <text>` — display-name text-command alternatives.
   - `bundle blacklist list`, `bundle blacklist clear` — cover both material and display-name entries together.
 - **`status`** — print the player's current enabled state, click method, sort method, start corner, fill axis, sort-over-items, and bundle settings. Requires `clicksorted.commands.status`.
+- **`menu`** — opens the `PreferencesDialog`, a single Paper Dialog covering every scalar preference above plus buttons to launch the lock-slots and bundle-blacklist GUIs. Requires `clicksorted.commands.menu`. Bedrock/Geyser clients can't render server-side dialogs; the discrete commands above remain their path to the same preferences.
 - **`admin`** — admin/diagnostic commands (requires `clicksorted.admin.commands`):
   - `admin reload` — reload all config files. Requires `clicksorted.admin.commands.reload`.
   - `admin config` — print every `config.yml` key/value. Requires `clicksorted.admin.commands.config`.
@@ -210,7 +214,7 @@ Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs 
 `clicksorted` (default `true`) is the top-level player-facing kill-switch. Denying it disables:
 - Click-triggered sorting (both modes)
 - Click-triggered bundle packing (both modes)
-- All player-facing commands (`/clicksorted`, `/clicksorted sort`, `/clicksorted click`, `/clicksorted lock-slots`, `/clicksorted bundle`, `/clicksorted status`)
+- All player-facing commands (`/clicksorted`, `/clicksorted sort`, `/clicksorted click`, `/clicksorted lock-slots`, `/clicksorted bundle`, `/clicksorted status`, `/clicksorted menu`)
 
 It has **no effect on admin access**: `clicksorted.admin.commands.*` is gated separately and is not a child of `clicksorted`. Admins can still run `admin reload`, `admin config`, `admin debug`, and `admin benchmark` regardless of the master switch.
 
