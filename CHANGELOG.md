@@ -24,6 +24,17 @@ Bedrock/Geyser clients cannot render server-side dialogs; the existing commands 
 
 Default message strings are now bundled inside the jar (`lang/en_us.yml`) rather than copied onto disk, so a changed default in a future release takes effect for everyone automatically — no more permanently-shadowed `lang.yml`. Admins customize strings via sparse override files at `plugins/ClickSorted/lang/<locale>.yml`; only the keys you edit are overridden, everything else keeps resolving to the built-in default. Messages are now resolved per-player against their Minecraft client locale, so future translation files (`de_de.yml`, `pt_br.yml`, …) are a pure drop-in with no code changes. A new `default_locale` config key (default `en_us`) controls console output and the fallback for any locale with no matching file. See [`docs/admin/lang.md`](https://kccricket.github.io/ClickSorted/admin/lang.md) for the full resolution order.
 
+## Compatibility
+
+✔️ Paper/Folia 1.21.6 – 26.1.x
+✔️ Java 21+
+
+## Upgrading
+
+1. Stop your server.
+2. Replace the old jar in `plugins/` with this release.
+3. Start your server.
+
 ## Other Improvements
 
 - README and documentation updated for the new command and the 1.21.6 floor.
