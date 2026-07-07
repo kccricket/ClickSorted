@@ -1,8 +1,18 @@
-# ClickSorted language file
+# ClickSorted internal English (en_us) language defaults.
+#
+# This file is the plugin's built-in source of truth for every user-facing message and is
+# bundled inside the jar — it is NOT read from the plugin data folder, so editing a copy of it
+# there has no effect. Changed defaults here take effect for every server on the next release
+# automatically, with no admin action required.
+#
+# To customize strings for your server, edit plugins/ClickSorted/lang/en_us.yml (or another
+# locale file in that folder) instead: that file is sparse — only the keys you uncomment and
+# edit are overridden; every other key keeps resolving to this internal default, so your
+# customizations survive future releases that change unrelated defaults.
 #
 # All values are rendered with MiniMessage (https://docs.advntr.dev/minimessage).
 # You may use color/formatting tags such as <white>, <red>, <bold>, etc.
-# Edits take effect after running /clicksorted reload.
+# Edits (to an on-disk override file) take effect after running /clicksorted admin reload.
 #
 # Placeholder tags are listed in comments above each message that accepts one.
 # Do not remove a placeholder from a message that requires it.
@@ -166,3 +176,19 @@ lockPaneUnlockedLore: "<!italic><gray>Click to lock this slot."
 lockPaneLockedLore: "<!italic><gray>Click to unlock this slot."
 lockPaneAdminLore: "<!italic><gray>This slot is locked by the server and cannot be changed."
 lockHelpHeadLore: "<!italic><gray>Locked inventory slots will not be sorted and<newline>bundles in a locked slot will not be packed."
+
+# Preferences dialog (/clicksorted menu)
+dialogTitle: "<!italic>ClickSorted Preferences"
+dialogEnabledLabel: "<!italic>Click-sorting enabled"
+dialogClickMethodLabel: "<!italic>Click method"
+dialogSortMethodLabel: "<!italic>Sort method"
+dialogStartCornerLabel: "<!italic>Start corner"
+dialogFillAxisLabel: "<!italic>Fill direction"
+dialogHoverLabel: "<!italic>Sort while hovering an item"
+dialogBundleInventoryLabel: "<!italic>Bundle packing (inventory)"
+dialogBundleContainersLabel: "<!italic>Bundle packing (containers)"
+dialogStackLimitLabel: "<!italic>Bundle stack limit (0 = off)"
+dialogSave: "<!italic>Save"
+dialogCancel: "<!italic>Cancel"
+dialogOpenLockGui: "<!italic>Locked Slots…"
+dialogOpenBlacklistGui: "<!italic>Bundle Blacklist…"

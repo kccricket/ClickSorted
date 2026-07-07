@@ -86,7 +86,7 @@ public class LockGuiListener implements Listener {
         // toggle leaves the slot unchanged, and this redraws the pane to match either way.
         boolean nowLocked = prefs.getLockedSlots(player).contains(invSlot);
         event.getInventory().setItem(rawSlot,
-                LockGuiHolder.buildPane(plugin.getConfigManager().lang(), nowLocked, rawSlot));
+                LockGuiHolder.buildPane(plugin.getConfigManager().lang(player.locale()), nowLocked, rawSlot));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

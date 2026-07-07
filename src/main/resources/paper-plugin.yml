@@ -4,7 +4,7 @@ authors: [ kccricket, desht, chengzi ]
 version: ${project.version}
 description: Super-convenient inventory sorting
 website: https://github.com/kccricket/ClickSorted
-api-version: 1.21.5
+api-version: 1.21.6
 folia-supported: true
 
 permissions:
@@ -32,6 +32,7 @@ permissions:
       clicksorted.commands.bundle: true
       clicksorted.commands.lock: true
       clicksorted.commands.status: true
+      clicksorted.commands.menu: true
   clicksorted.commands.sort:
     description: Access to /clicksorted sort subcommands
     default: true
@@ -72,6 +73,9 @@ permissions:
     default: true
   clicksorted.commands.status:
     description: Allow use of /clicksorted status
+    default: true
+  clicksorted.commands.menu:
+    description: Allow use of /clicksorted menu (the dialog-based preferences UI)
     default: true
   clicksorted.admin.commands:
     description: Access to /clicksorted admin subcommands

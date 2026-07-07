@@ -6,6 +6,7 @@ debug_level: 'OFF'
 drop_excess: true
 default_group_name: '000-default'
 ignore_plugin_inventory: false
+default_locale: en_us
 defaults:
   enabled: true
   click_mode: SWAP

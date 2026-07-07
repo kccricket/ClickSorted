@@ -4,6 +4,7 @@ import net.kccricket.clicksorted.ClickSortedPlugin;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 
+import java.util.Locale;
 import java.util.Optional;
 
 public enum ClickMethod {
@@ -54,8 +55,8 @@ public enum ClickMethod {
         };
     }
 
-    public String getInstruction() {
-        var lang = ClickSortedPlugin.getInstance().getConfigManager().lang();
+    public String getInstruction(Locale locale) {
+        var lang = ClickSortedPlugin.getInstance().getConfigManager().lang(locale);
         return switch (this) {
             case SINGLE_CLICK -> lang.getMessage("instructionSingle");
             case DOUBLE_CLICK -> lang.getMessage("instructionDouble");

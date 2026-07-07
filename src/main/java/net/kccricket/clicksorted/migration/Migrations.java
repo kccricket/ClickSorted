@@ -18,6 +18,9 @@ import net.kccricket.clicksorted.config.MainConfig;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,6 +46,12 @@ import static net.kccricket.clicksorted.migration.Migration.*;
  *       first so that value-remap and conditional rules see the renamed keys. Because PDC leaf names
  *       now match config-default leaf names (both use e.g. {@code click_mode}), a single declared
  *       rule covers both stores with no per-key mapping table.</li>
+ *   <li><b>File migrations</b> ({@link FileMigration}, via {@link #migrateFiles()}) — a fourth
+ *       dimension parallel to the three value-store passes above, operating on whole files in the
+ *       data folder rather than keys within a store (e.g. archiving the legacy {@code lang.yml}
+ *       into a sparse {@code lang/en_us.yml} override). Runs once, at enable time, before
+ *       {@code ConfigManager.loadAll()} so loaders see the post-migration file layout; failures are
+ *       logged and skipped rather than fatal, since a lang hiccup must not block plugin enable.</li>
  * </ol>
  *
  * <h3>NONE migration</h3>
@@ -126,6 +135,13 @@ public final class Migrations {
             when("click_mode").is("NONE").then(set("enabled", false), set("click_mode", "SWAP")),
             remove("shift_click"));
 
+    /**
+     * File-dimension migrations, applied once at enable time via {@link #migrateFiles()}, before
+     * {@code ConfigManager.loadAll()}. To add a future file migration, append here.
+     */
+    private static final List<FileMigration> FILE_MIGRATIONS = List.of(
+            FileMigration.extractChangedKeys("lang.yml", "lang/en_us.yml", "lang/en_us.yml", ".bak"));
+
     private final ClickSortedPlugin plugin;
 
     public Migrations(ClickSortedPlugin plugin) {
@@ -166,6 +182,39 @@ public final class Migrations {
      */
     public void migrate(Player player) {
         run(SHARED, new Store.PdcStore(player.getPersistentDataContainer(), plugin));
+    }
+
+    /**
+     * Runs the file-migration catalog ({@link #FILE_MIGRATIONS}) against the plugin data folder,
+     * best-effort: each migration's failure is logged and skipped rather than propagated, since a
+     * file-migration hiccup (e.g. a locked/unreadable legacy file) must not block plugin enable the
+     * way a config migration failure does. Call before {@code ConfigManager.loadAll()} so loaders
+     * see the post-migration file layout.
+     */
+    public void migrateFiles() {
+        FileMigrationContext ctx = new PluginFileMigrationContext(plugin);
+        for (FileMigration migration : FILE_MIGRATIONS) {
+            try {
+                if (migration.apply(ctx)) {
+                    Log.debug("file migration applied changes to the data folder");
+                }
+            } catch (IOException | RuntimeException e) {
+                Log.warning("File migration failed; continuing with remaining migrations.", e);
+            }
+        }
+    }
+
+    /** Adapts {@link ClickSortedPlugin} to the store-neutral {@link FileMigrationContext}. */
+    private record PluginFileMigrationContext(ClickSortedPlugin plugin) implements FileMigrationContext {
+        @Override
+        public Path dataFolder() {
+            return plugin.getDataFolder().toPath();
+        }
+
+        @Override
+        public InputStream resource(String name) {
+            return plugin.getResource(name);
+        }
     }
 
     // -------------------------------------------------------------------------

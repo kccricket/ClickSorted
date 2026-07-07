@@ -19,7 +19,7 @@ class ConfigReloadTest extends AbstractClickSortedTest {
         File dataFolder = plugin.getDataFolder();
 
         // Delete all four config files mid-session
-        for (String name : new String[]{"config.yml", "groups.yml", "lang.yml", "items.yml"}) {
+        for (String name : new String[]{"config.yml", "groups.yml", "lang/en_us.yml", "items.yml"}) {
             File f = new File(dataFolder, name);
             if (f.exists()) {
                 assertTrue(f.delete(), "Setup: failed to delete " + name);
@@ -30,7 +30,7 @@ class ConfigReloadTest extends AbstractClickSortedTest {
         plugin.getConfigManager().reloadAll();
 
         // All four must now exist again
-        for (String name : new String[]{"config.yml", "groups.yml", "lang.yml", "items.yml"}) {
+        for (String name : new String[]{"config.yml", "groups.yml", "lang/en_us.yml", "items.yml"}) {
             File f = new File(dataFolder, name);
             assertTrue(f.exists(), name + " was not recreated by reloadAll()");
         }

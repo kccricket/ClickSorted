@@ -10,6 +10,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +56,8 @@ public class MessageUtil {
      */
     public static void preferenceBlocked(Audience sender, PreferenceResult result) {
         Component reason = result.cancelReason();
-        errorMessage(sender, reason != null ? reason : configManager.lang().getColoredMessage("preferenceChangeBlocked"));
+        var lang = sender instanceof Player p ? configManager.lang(p.locale()) : configManager.lang();
+        errorMessage(sender, reason != null ? reason : lang.getColoredMessage("preferenceChangeBlocked"));
     }
 
     public static void rawMessage(Audience sender, Component component) {
@@ -128,7 +130,8 @@ public class MessageUtil {
         } else {
             Component out = component;
             if (level != null && configManager != null) {
-                out = configManager.lang().getColoredMessage("prefix").append(component);
+                var lang = sender instanceof Player p ? configManager.lang(p.locale()) : configManager.lang();
+                out = lang.getColoredMessage("prefix").append(component);
             }
             sender.sendMessage(out);
         }

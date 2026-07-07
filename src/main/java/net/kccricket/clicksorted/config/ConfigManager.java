@@ -1,6 +1,9 @@
 package net.kccricket.clicksorted.config;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.text.lang.Localized;
+
+import java.util.Locale;
 
 /**
  * Owns all four plugin configuration files and provides a single unified lifecycle:
@@ -50,6 +53,11 @@ public class ConfigManager {
 
     public MainConfig main()   { return main; }
     public GroupsConfig groups() { return groups; }
-    public LangConfig lang()   { return lang; }
     public ItemsConfig items() { return items; }
+
+    /** The default-locale-bound message handle — console output and any non-player sender. */
+    public Localized lang() { return lang.defaultLocale(); }
+
+    /** The message handle bound to {@code locale} — used for player-facing call sites. */
+    public Localized lang(Locale locale) { return lang.forLocale(locale); }
 }

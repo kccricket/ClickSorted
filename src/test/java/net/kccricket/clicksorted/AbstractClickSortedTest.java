@@ -45,16 +45,18 @@ abstract class AbstractClickSortedTest {
         // Use the test-config.yml fixture: disables bStats.
         InputStream configStream = getClass().getClassLoader().getResourceAsStream("test-config.yml");
         plugin = MockBukkit.loadWithConfig(ClickSortedPlugin.class, configStream);
-        // Install the sentinel lang fixture so assertions key off stable tokens rather than
-        // production prose. ResourceUpdater re-merges production as defaults for any key the
-        // fixture omits, so only the asserted keys need to be present in the fixture.
+        // Install the sentinel lang fixture as an on-disk override (highest precedence in the
+        // resolution order), so assertions key off stable tokens rather than production prose.
+        // Any key the fixture omits still resolves from the bundled internal en_us default.
         InputStream langStream = getClass().getClassLoader().getResourceAsStream("test-lang.yml");
         if (langStream != null) {
+            File langDir = new File(plugin.getDataFolder(), "lang");
+            langDir.mkdirs();
             try (langStream) {
-                Files.copy(langStream, new File(plugin.getDataFolder(), "lang.yml").toPath(),
+                Files.copy(langStream, new File(langDir, "en_us.yml").toPath(),
                         StandardCopyOption.REPLACE_EXISTING);
             }
-            plugin.getConfigManager().lang().load();
+            plugin.getConfigManager().reloadAll();
         }
     }
 

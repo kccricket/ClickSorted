@@ -13,7 +13,7 @@ package net.kccricket.clicksorted.gui;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.config.LangConfig;
+import net.kccricket.clicksorted.text.lang.Localized;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -82,7 +82,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
     public BlacklistGuiHolder(ClickSortedPlugin plugin, Player player) {
         this.plugin = plugin;
         this.player = player;
-        LangConfig lang = plugin.getConfigManager().lang();
+        Localized lang = plugin.getConfigManager().lang(player.locale());
         this.inventory = Bukkit.createInventory(this, GUI_SIZE, lang.getColoredMessage("blacklistGuiTitle"));
         this.page = 0;
         refresh();
@@ -167,7 +167,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
     }
 
     private void renderPage() {
-        LangConfig lang = plugin.getConfigManager().lang();
+        Localized lang = plugin.getConfigManager().lang(player.locale());
 
         // Clear top slots.
         for (int i = 0; i < PAGE_SIZE; i++) {
@@ -194,7 +194,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         }
     }
 
-    private static ItemStack buildEntryItem(LangConfig lang, Entry entry) {
+    private static ItemStack buildEntryItem(Localized lang, Entry entry) {
         return switch (entry) {
             case MaterialEntry m -> buildMaterialItem(lang, m.material());
             case NameEntry n -> buildNameTagItem(lang, n.name());
@@ -202,7 +202,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
     }
 
     /** Vanilla item of the blacklisted material with a click-to-remove lore line. */
-    private static ItemStack buildMaterialItem(LangConfig lang, Material material) {
+    private static ItemStack buildMaterialItem(Localized lang, Material material) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         // Non-item materials (e.g. a stale entry stored before validation) have no ItemMeta; show the
@@ -218,7 +218,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
      * Glinting name tag whose display name is the blacklisted plain-text string, plus a
      * click-to-remove lore line.
      */
-    private static ItemStack buildNameTagItem(LangConfig lang, String name) {
+    private static ItemStack buildNameTagItem(Localized lang, String name) {
         ItemStack item = new ItemStack(Material.NAME_TAG);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name).decoration(TextDecoration.ITALIC, false));
@@ -228,7 +228,7 @@ public class BlacklistGuiHolder implements ClickSortedHolder {
         return item;
     }
 
-    private static ItemStack buildArrow(LangConfig lang, boolean next) {
+    private static ItemStack buildArrow(Localized lang, boolean next) {
         ItemStack arrow = new ItemStack(Material.ARROW);
         ItemMeta meta = arrow.getItemMeta();
         meta.displayName(lang.getColoredMessage(next ? "blacklistArrowNext" : "blacklistArrowPrev"));

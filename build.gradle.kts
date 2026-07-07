@@ -16,7 +16,7 @@ version = project.property("version") as String
 // Append new versions there when compatibility is verified — no other changes needed.
 val gameVersionsList: List<String> = (project.findProperty("gameVersions") as? String)
     ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-    ?: listOf("1.21.5")
+    ?: listOf("1.21.6")
 
 repositories {
     mavenCentral()
@@ -76,7 +76,7 @@ listOf(
 }
 
 // Filter only paper-plugin.yml — it's the only resource that contains a ${project.version} token.
-// The other YAMLs (lang.yml, items.yml, groups.yml, config.yml) contain literal ${} and $
+// The other YAMLs (lang/en_us.yml, items.yml, groups.yml, config.yml) contain literal ${} and $
 // characters that Gradle's expand() would corrupt. We bind "project.version" to match the
 // Maven ${project.version} placeholder without touching the source file.
 tasks.processResources {
@@ -139,10 +139,10 @@ tasks.build {
 }
 
 // Run a local Paper dev server with the plugin already loaded.
-// Usage: ./gradlew runServer
+// Usage: ./gradlew runServer [-PmcVersion=1.21.6]
 tasks.runServer {
     serverType(org.bxteam.runserver.ServerType.PAPER)
-    serverVersion("26.2")
+    serverVersion((project.findProperty("mcVersion") as String?) ?: "26.2")
     acceptMojangEula()
     // Use the Shadow JAR (bStats relocated) instead of the plain jar task output.
     inputTask(tasks.named("shadowJar"))

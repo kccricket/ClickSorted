@@ -41,6 +41,9 @@ public class MainConfig implements ManagedConfig {
     private volatile Set<String> blacklistNamesLower = Set.of();
     // Admin-enforced player slot locks — parsed once on load/reload, checked on every sort and GUI render.
     private volatile Set<Integer> lockedPlayerSlots = Set.of();
+    // Fallback locale for console output and any locale with no matching lang file; parsed once on
+    // load/reload, read on Folia region threads.
+    private volatile Locale defaultLocale = Locale.forLanguageTag("en-US");
 
     public MainConfig(ClickSortedPlugin plugin) {
         this.plugin = plugin;
@@ -106,6 +109,11 @@ public class MainConfig implements ManagedConfig {
         cfg.setComments("ignore_plugin_inventory", List.of(
                 "When true, only vanilla container inventories are sortable; custom plugin GUIs are skipped.",
                 "When false (default), any inventory whose type appears in sortable_inventories can be sorted."));
+        cfg.setComments("default_locale", List.of(
+                "Fallback locale (lowercase Minecraft-style token, e.g. en_us) used for console output",
+                "and for any player locale with no matching file under plugins/ClickSorted/lang/.",
+                "Falls back further to the plugin's internal English (en_us) defaults if this locale",
+                "has no lang file at all."));
         cfg.setComments("defaults", List.of(
                 "Default preferences applied to new players (or any player whose PDC entry is missing)."));
         cfg.setComments("defaults.enabled", List.of(
@@ -232,6 +240,22 @@ public class MainConfig implements ManagedConfig {
             }
         }
         lockedPlayerSlots = parsedSlots;
+
+        defaultLocale = parseLocaleToken(plugin.getConfig().getString("default_locale", "en_us"));
+    }
+
+    /** Parses a lowercase Minecraft-style locale token ({@code lang} or {@code lang_country}), falling back to {@code en_us} on garbage. */
+    private static Locale parseLocaleToken(String token) {
+        if (token != null) {
+            String[] parts = token.trim().toLowerCase(Locale.ROOT).split("_", 2);
+            if (parts[0].matches("[a-z]{2,3}")) {
+                return parts.length == 2 && !parts[1].isEmpty()
+                        ? Locale.of(parts[0], parts[1].toUpperCase(Locale.ROOT))
+                        : Locale.of(parts[0]);
+            }
+        }
+        Log.warning("Invalid default_locale '" + token + "' — falling back to en_us");
+        return Locale.of("en", "US");
     }
 
     // -------------------------------------------------------------------------
@@ -324,5 +348,13 @@ public class MainConfig implements ManagedConfig {
      */
     public Set<String> getBlacklistNamesLower() {
         return blacklistNamesLower;
+    }
+
+    /**
+     * The fallback locale ({@code default_locale}) used for console output and for any player
+     * locale with no matching lang file. Parsed and cached on load/reload.
+     */
+    public Locale getDefaultLocale() {
+        return defaultLocale;
     }
 }

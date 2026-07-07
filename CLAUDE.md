@@ -23,20 +23,23 @@ ClickSorted is a Paper/Bukkit plugin that lets players sort inventories via conf
 net.kccricket.clicksorted
 ├── ClickSortedPlugin          entry point
 ├── model/                   ClickMethod, SortingMethod, SortKey, PlayerSortingPrefs,
-│                            StartCorner, FillAxis, EnumParse, PreferenceResult
+│                            StartCorner, FillAxis, EnumParse, PreferenceResult, PendingPrefs
 ├── commands/                ClickSortedCommands (Brigadier command tree)
 ├── config/                  ConfigManager, ManagedConfig, MainConfig, LangConfig,
 │                            GroupsConfig, ItemsConfig, ResourceUpdater
 ├── events/                  InventorySortEvent, PlayerPreferenceChangeEvent, Preference
 ├── gui/                     ClickSortedHolder, BlacklistGuiHolder, BlacklistGuiListener,
-│                            LockGuiHolder, LockGuiListener
+│                            LockGuiHolder, LockGuiListener, PreferencesDialog,
+│                            PreferencesDialogService
 ├── sort/                    InventoryClickListener, InventorySortService, SortEngine,
 │                            BundlePacker, BundleBlacklist, InPlacePacker, BundleBenchmark,
 │                            GridGeometry, SlotOrder, MaterialNameSet,
-│                            TreemapPacker, PrefsCycleHandler, ProtectedItems, ProtectedSlots
-├── migration/               ValueMigration, Migration, Store, Migrations,
-│                            PlayerMigrationListener, PreferenceRepair
+│                            TreemapPacker, ProtectedItems, ProtectedSlots
+├── migration/               ValueMigration, Migration, Store, FileMigration,
+│                            FileMigrationContext, Migrations, PlayerMigrationListener,
+│                            PreferenceRepair
 ├── text/                    MessageUtil, CooldownMessenger, ItemNames
+│   └── lang/                MessageSource, Localized, LocaleMessages
 ├── logging/                 Log, DebugLevel
 ├── security/                Permissions, ActionThrottle
 └── update/                  UpdateChecker
@@ -52,11 +55,12 @@ config is migrated in `MainConfig.load()` (`plugin.getMigrations().migrate(plugi
 `PlayerMigrationListener` on `PlayerJoinEvent` (`plugin.getMigrations().migrate(player)`). `Migrations`
 exposes exactly one entry point per store: `migrate(ConfigurationSection)` and `migrate(Player)`.
 
-**Rule hierarchy** (three layers, applied in order on every `migrate(config)` call):
+**Rule hierarchy** (four layers; the first three apply on every `migrate(config)` call, the fourth runs once at enable time via a separate entry point):
 
 1. **Structural transforms** (`ConfigTransform` — config only). Derive new config state from old values in place (e.g. translate a deprecated numeric range into an equivalent slot list). Run *first*, before removal, so old keys are still readable. Adding a future transform is a one-line append to `CONFIG_TRANSFORMS`. Source-key removal is not the transform's job.
 2. **Root-path removal** (`DEPRECATED_ROOT_PATHS` — config only). Drop root-level config keys that have been removed (e.g. `player_sort_min`, `player_sort_max`). These are not in `defaults.*` so they fall outside the shared `Store` namespace.
 3. **Shared rules** (`SHARED` — applied to both config and PDC via `Store` adapters). A single ordered `List<Migration>` covers all `defaults.*` / PDC settings with no per-key mapping table.
+4. **File migrations** (`FileMigration`, via `Migrations.migrateFiles()`). A dimension parallel to the three value-store passes above: it operates on whole files in the data folder rather than keys within a store (e.g. archiving the legacy `lang.yml` into a sparse `lang/en_us.yml` override). Called once from `ClickSortedPlugin.onEnable` right after `migrations = new Migrations(this)` and before `configManager.loadAll()`, so loaders see the post-migration file layout. Failures are logged and skipped, not fatal — a file-migration hiccup must not block plugin enable the way a config migration failure does.
 
 **`Store` and `Migration`** are the shared rule mechanism. `Store` is a store-neutral interface (`getString`, `setString`, `setBoolean`, `clear`, `contains`); each adapter applies its own namespace:
 - `Store.ConfigStore` wraps a `ConfigurationSection`; leaf `k` → path `defaults.k`. No per-key map.
@@ -85,6 +89,8 @@ remove("shift_click")               // drops defaults.shift_click (config) and s
 
 Config-only structural work (slot-bounds migration, root-path removal) stays outside `SHARED` as the dedicated escape hatch for store-specific migrations.
 
+**`FileMigration` and `FileMigrationContext`** mirror `Migration`/`Store` but at the file level: `FileMigrationContext` is a store-neutral handle (`Path dataFolder()`, `InputStream resource(String name)`) that `Migrations` adapts over the real plugin; `FileMigration` is `boolean apply(FileMigrationContext)` with factories `renameFile(from, to)`, `deleteFile(path)`, and `extractChangedKeys(sourceRel, defaultResource, targetRel, archiveSuffix)` (diffs a flat YAML file against a bundled default, writes only the differing keys to the target, then archives the source — used for the one-time `lang.yml` → `lang/en_us.yml` migration, appending `.bak` to the archived legacy file). The catalog lives in `Migrations.FILE_MIGRATIONS`; a future file migration is a one-line append, same as `CONFIG_TRANSFORMS`.
+
 ### Core Flow
 
 1. `InventoryClickEvent` fires when a player clicks inside an inventory.
@@ -111,14 +117,17 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `BlacklistGuiListener` | gui | Handles clicks in the blacklist GUI; adds items from the real inventory to the blacklist by material or display name, removes listed entries, handles pagination, and cancels all real-inventory interaction |
 | `LockGuiHolder` | gui | 45-slot chest inventory for the lock GUI; builds lime/barrier/iron-bars panes and maps chest↔inventory slots; admin-locked slots (config or permission) render as IRON_BARS and are non-toggleable |
 | `LockGuiListener` | gui | Handles clicks/drags in the lock GUI; guards admin-locked slots via `ProtectedSlots.forSort`, toggles per-player lock state, and cancels all real-inventory interaction |
+| `PreferencesDialog` | gui | Builds/shows the `/clicksorted menu` Paper Dialog: one input per scalar preference (enabled, click/sort method, start corner, fill axis, allow-on-hover, bundle in-inventory/in-containers, bundle stack-limit), each gated behind the same permission node its equivalent command requires, plus buttons to launch the lock and blacklist GUIs. `planInputs`/`planButtons` compute plain `InputSpec`/`ButtonSpec` descriptors (unit-testable without a real Paper server); `open` translates those into real `DialogInput`/`ActionButton` objects. `applyResponse` applies every present field through the same `PlayerSortingPrefs` setters the commands use, in the same order, stopping at the first listener veto. |
+| `PreferencesDialogService` | gui | `Listener` holding unsaved dialog edits (keyed by player UUID in a `ConcurrentHashMap`) across a "Locked Slots…"/"Bundle Blacklist…" round trip: those buttons stash the in-progress edits before opening the GUI, and `onInventoryClose` re-shows the dialog seeded from the stash once that GUI closes; a directly-opened lock/blacklist GUI has no stash entry and is untouched. Clears the stash on `PlayerQuitEvent`. |
 | `SortKey` | model | `Comparable` wrapper around an ItemStack that drives all sort ordering |
 | `SortingMethod` | model | Enum (NAME, GROUP, TREEMAP) controlling `SortKey.makeSortPrefix()`; `isTreemap()` routes placement through `TreemapPacker` instead of `SlotOrder` |
-| `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK). `NONE` was removed — use the `enabled` preference instead |
+| `ClickMethod` | model | Enum (SINGLE_CLICK, DOUBLE_CLICK, SWAP, CONTROL_DROP, SHIFT_LEFT_CLICK, SHIFT_RIGHT_CLICK). `NONE` was removed — use the `enabled` preference instead. `getInstruction(Locale)` resolves the trigger-instruction text via `configManager.lang(locale)`. |
 | `Migration` | migration | Composable rule interface (`boolean apply(Store)`). Factory methods: `renameKey`, `remap`, `remove`, `when(…).is(…).then(effects…)`. Effect factories: `set(leaf, String/boolean)`, `clear(leaf)` |
 | `Store` | migration | Store-neutral key/value handle; `ConfigStore` (namespace `defaults.*`) and `PdcStore` (namespace `NamespacedKey(plugin, leaf)`) adapters |
 | `StartCorner` | model | Enum (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT) — which corner the sort grid begins from |
 | `FillAxis` | model | Enum (HORIZONTAL, VERTICAL) — whether rows or columns fill first from the start corner |
 | `EnumParse` | model | Case-insensitive enum parse helper used by StartCorner, FillAxis, and others |
+| `PendingPrefs` | model | Immutable record of every scalar preference the `/clicksorted menu` dialog can edit, each field nullable to mean "not present/changed"; used both as the dialog's response payload and as the `PreferencesDialogService` stash seed |
 | `InventoryClickListener` | sort | Dispatches click events: master-perm check, trigger match, `hasWork` pre-screen, sort-over-items gate, throttle, then hand off to the sort service |
 | `InventorySortService` | sort | Target resolution (via private `Region`/`Target`), permissions, event lifecycle, mode dispatch (sort-with-layout vs. in-place consolidation), write-back. `hasWork()` is the public pre-screen gate for the listener. On a cancelled `InventorySortEvent`, shows a listener-supplied `getCancelReason()` rate-limited via `CooldownMessenger` (no message when no reason was set). On Folia, `resolve()` refuses a non-vanilla-held, multi-viewer (shared virtual) inventory as a target — see [Folia safety](#folia-safety). |
 | `SortEngine` | sort | Pure sort/merge algorithm (no plugin state) — fungible merge + discrete passthrough |
@@ -126,7 +135,6 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `GridGeometry` | sort | Maps an inventory's slot indices to a 2-D grid; computes row/column counts and the mount-slot offset |
 | `SlotOrder` | sort | Produces a write-back slot sequence from a `GridGeometry` given a `StartCorner` and `FillAxis` |
 | `TreemapPacker` | sort | Implements the `TREEMAP` sort method: assigns each item type a contiguous near-square block sized to its stack count; respects `StartCorner` and `FillAxis`; falls back to gap-free fill when rectangles no longer fit |
-| `PrefsCycleHandler` | sort | Handles a click-method-driven preference cycle (used internally by InventoryClickListener) |
 | `BundlePacker` | sort | Pure pool-and-repack of bundle-eligible items into bundles (no plugin state) |
 | `BundleBlacklist` | sort | Immutable per-player snapshot of blacklisted materials and display names; delegates matching to `MaterialNameSet`. Blocks packing and unpacking for matching items and blocks blacklisted bundle colors as packing bins. |
 | `MaterialNameSet` | sort | Immutable record holding a `Set<Material>` and a pre-lowercased `Set<String>` of display names; shared by `BundleBlacklist` and `ProtectedItems` for material-or-name membership tests |
@@ -137,20 +145,26 @@ Config-only structural work (slot-bounds migration, root-path removal) stays out
 | `ClickSortedHolder` | gui | Base `InventoryHolder` marker for all ClickSorted-owned GUIs (used to block self-sort) |
 | `PreferenceRepair` | migration | Validates and resets invalid per-player PDC preferences on login, notifying the player |
 | `UpdateChecker` | update | Best-effort async Modrinth API check; logs a console notice when a newer release exists. `restart()` (the single enable/reload entry point) fires a gated immediate check then calls `reschedule()`, which (re)arms a recurring check per `check_for_updates_interval_hours`; `stop()` cancels it. |
-| `ConfigManager` | config | Unified lifecycle for all four config files |
-| `ResourceUpdater` | config | Add-only merge of bundled resource into plugin data folder |
+| `ConfigManager` | config | Unified lifecycle for all four config files. `lang()`/`lang(Locale)` expose the message-facade shape (`Localized`) over the swappable `LangConfig` snapshot; lifecycle methods (`loadAll`/`reloadAll`/`saveAll`) call the private `lang` field's `ManagedConfig` methods directly. |
+| `LangConfig` | config | `ManagedConfig` loader over a `volatile LocaleMessages` snapshot (Folia-safe publish, mirrors `GroupsConfig`). On `load()`: ensures `plugins/ClickSorted/lang/` exists, writes a fully-commented `en_us.yml` template if absent, loads internal jar defaults (`lang/<token>.yml`, currently just `en_us`) and scans on-disk `lang/*.yml` overrides, then builds and publishes a fresh `LocaleMessages`. Deliberately does **not** route through `ResourceUpdater`'s add-only merge — that would bake every default onto disk and shadow future default changes. Implements `MessageSource` itself, delegating to the current snapshot. |
+| `MessageSource` | text/lang | Store-neutral, plugin-agnostic contract: `getMessage(Locale, path)`, `getColoredMessage(Locale, path, TagResolver...)`, `forLocale(Locale)`. Free of any file/plugin coupling — library-extractable. |
+| `Localized` | text/lang | Record `(MessageSource source, Locale locale)` — the locale-bound handle call sites use so a captured `var lang = configManager.lang(player.locale());` needs no further locale threading in that scope. |
+| `LocaleMessages` | text/lang | Immutable `MessageSource` implementation: two locale maps (internal jar defaults, on-disk overrides), a default locale, and the resolution order `override[token] → override[lang] → override[default] → internal[token] → internal[lang] → internal[default] → internal[en_us] → missing`. Unit-testable with no MockBukkit bootstrap — constructed directly from maps. `static localeToken(Locale)` → lowercased `lang` or `lang_country`. |
+| `ResourceUpdater` | config | Add-only merge of bundled resource into plugin data folder (used by `groups.yml`/`items.yml`; deliberately *not* used for lang loading — see `LangConfig`) |
 | `Log`, `DebugLevel` | logging | Plugin logger wrapper with gated debug levels |
-| `MessageUtil` | text | Coloured Adventure `Component` message helpers |
+| `MessageUtil` | text | Coloured Adventure `Component` message helpers. `message(...)` and `preferenceBlocked(...)` resolve the sender's locale (`configManager.lang(p.locale())`) when the sender is a `Player`, else the default-locale `configManager.lang()`. |
 | `CooldownMessenger` | text | Rate-limits repeated messages to players |
 | `Permissions` | security | Permission-check helper with debug logging |
 | `ActionThrottle` | security | Global per-player rate limiter (`action_cooldown_ms`) gating every plugin-driven action; `throttled()` also sends the rate-limited notice |
+| `FileMigration` | migration | Composable, store-neutral file migration rule (`boolean apply(FileMigrationContext)`). Factories: `renameFile`, `deleteFile`, `extractChangedKeys` (the legacy `lang.yml` → sparse override migration) |
+| `FileMigrationContext` | migration | Store-neutral handle for a `FileMigration`: `Path dataFolder()`, `InputStream resource(String name)`. Free of any ClickSorted/plugin type. |
 
 ### Configuration Files (src/main/resources)
 
-- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag and `check_for_updates_interval_hours` cadence, per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
+- `config.yml` — debug level, sortable inventory types, `action_cooldown_ms` throttle, `check_for_updates` flag and `check_for_updates_interval_hours` cadence, `default_locale` fallback token, per-player `defaults` (including `enabled`, click/sort mode, `start_corner`, `fill_axis`, sort-over-items, bundle packing), the admin `blacklist` section (`blacklist.materials` / `blacklist.names` — items matching these are never sorted, moved, or packed by anyone), and the admin `locked_slots` section (`locked_slots.player` — list of player inventory slot indices (0–35) that are always excluded from sorting; also enforced via `clicksorted.lock.player.slot.<n>` permission nodes)
 - `groups.yml` — item groupings for GROUP sort method
 - `items.yml` — persistent store of material → display-name mappings
-- `lang.yml` — all user-facing messages (MiniMessage format)
+- `lang/en_us.yml` — the plugin's internal (bundled) English defaults for every user-facing message, MiniMessage format. This is the single source of truth for default strings; it is **not** read from the plugin data folder. Admins customize strings via sparse override files at `plugins/ClickSorted/lang/<locale>.yml` (lowercase Minecraft-style locale tokens, e.g. `en_us.yml`, future `de_de.yml`) — only the keys an admin uncomments/edits are overridden; every other key resolves from the internal default, so a release that changes an unrelated default reaches everyone automatically. `default_locale` (config.yml) sets the console/fallback locale. A legacy `lang.yml` is migrated once on first load: edited keys are extracted into `lang/en_us.yml` and the old file is archived to `lang.yml.bak` (see `FileMigration`/`Migrations.migrateFiles()` above).
 
 ### Testing
 
@@ -182,6 +196,7 @@ Commands are implemented as a Brigadier tree in `ClickSortedCommands` and regist
   - `bundle blacklist add item-name|remove item-name <text>` — display-name text-command alternatives.
   - `bundle blacklist list`, `bundle blacklist clear` — cover both material and display-name entries together.
 - **`status`** — print the player's current enabled state, click method, sort method, start corner, fill axis, sort-over-items, and bundle settings. Requires `clicksorted.commands.status`.
+- **`menu`** — opens the `PreferencesDialog`, a single Paper Dialog covering every scalar preference above plus buttons to launch the lock-slots and bundle-blacklist GUIs. Requires `clicksorted.commands.menu`. Bedrock/Geyser clients can't render server-side dialogs; the discrete commands above remain their path to the same preferences.
 - **`admin`** — admin/diagnostic commands (requires `clicksorted.admin.commands`):
   - `admin reload` — reload all config files. Requires `clicksorted.admin.commands.reload`.
   - `admin config` — print every `config.yml` key/value. Requires `clicksorted.admin.commands.config`.
@@ -199,7 +214,7 @@ Note: the `AbstractCommand` / `CommandManager` pattern referenced in older docs 
 `clicksorted` (default `true`) is the top-level player-facing kill-switch. Denying it disables:
 - Click-triggered sorting (both modes)
 - Click-triggered bundle packing (both modes)
-- All player-facing commands (`/clicksorted`, `/clicksorted sort`, `/clicksorted click`, `/clicksorted lock-slots`, `/clicksorted bundle`, `/clicksorted status`)
+- All player-facing commands (`/clicksorted`, `/clicksorted sort`, `/clicksorted click`, `/clicksorted lock-slots`, `/clicksorted bundle`, `/clicksorted status`, `/clicksorted menu`)
 
 It has **no effect on admin access**: `clicksorted.admin.commands.*` is gated separately and is not a child of `clicksorted`. Admins can still run `admin reload`, `admin config`, `admin debug`, and `admin benchmark` regardless of the master switch.
 

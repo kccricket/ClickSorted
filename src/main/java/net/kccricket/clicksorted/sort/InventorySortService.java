@@ -230,7 +230,7 @@ public class InventorySortService {
                 : SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
-            MessageUtil.errorMessage(p, plugin.getConfigManager().lang().getColoredMessage("invOverFlow"));
+            MessageUtil.errorMessage(p, plugin.getConfigManager().lang(p.locale()).getColoredMessage("invOverFlow"));
             return false;
         }
 
@@ -440,7 +440,7 @@ public class InventorySortService {
         if (!overflow.isEmpty()) {
             // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
             // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
-            MessageUtil.alertMessage(p, plugin.getConfigManager().lang().getColoredMessage("dropItems"));
+            MessageUtil.alertMessage(p, plugin.getConfigManager().lang(p.locale()).getColoredMessage("dropItems"));
             for (ItemStack item : overflow) {
                 Log.debug("dropping " + item + " by player " + p.getName());
                 p.getWorld().dropItemNaturally(p.getLocation(), item);

@@ -13,7 +13,7 @@ package net.kccricket.clicksorted.gui;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.config.LangConfig;
+import net.kccricket.clicksorted.text.lang.Localized;
 import net.kccricket.clicksorted.sort.ProtectedSlots;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -56,7 +56,7 @@ public class LockGuiHolder implements ClickSortedHolder {
     private final ProtectedSlots admin;
 
     public LockGuiHolder(ClickSortedPlugin plugin, Player player) {
-        LangConfig lang = plugin.getConfigManager().lang();
+        Localized lang = plugin.getConfigManager().lang(player.locale());
         this.inventory = Bukkit.createInventory(this, GUI_SIZE,
                 lang.getColoredMessage("lockGuiTitle"));
 
@@ -110,7 +110,7 @@ public class LockGuiHolder implements ClickSortedHolder {
         return chestSlot < DIVIDER_START ? chestSlot + 1 : chestSlot - DIVIDER_END + 1;
     }
 
-    public static ItemStack buildPane(LangConfig lang, boolean locked, int chestSlot) {
+    public static ItemStack buildPane(Localized lang, boolean locked, int chestSlot) {
         String slotLangKey = resolveSlotLangKey(chestSlot);
         int displayNumber = resolveDisplayNumber(chestSlot);
 
@@ -130,7 +130,7 @@ public class LockGuiHolder implements ClickSortedHolder {
      * Players see this for slots locked via {@code locked_slots.player} config or the
      * {@code clicksorted.lock.player.slot.<n>} permission node.
      */
-    public static ItemStack buildAdminLockedPane(LangConfig lang, int chestSlot) {
+    public static ItemStack buildAdminLockedPane(Localized lang, int chestSlot) {
         String slotLangKey = resolveSlotLangKey(chestSlot);
         int displayNumber = resolveDisplayNumber(chestSlot);
 
