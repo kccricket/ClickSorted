@@ -130,7 +130,11 @@ public final class PreferencesDialog {
             inputs.add(DialogInput.bool("bundle_in_containers", lang.getColoredMessage("dialogBundleContainersLabel"),
                     bundleCont, "true", "false"));
 
-            int stackLimit = seed.bundleStackLimit() != null ? seed.bundleStackLimit() : prefs.getBundleStackLimit(player);
+            // Clamp the seed to the input's declared [0, 64] range: prefs.getBundleStackLimit can
+            // return an unclamped config default (defaults.bundle_stack_limit is read raw), and an
+            // out-of-range initial value is rejected by the numberRange builder / breaks the dialog.
+            int stackLimit = Math.min(64, Math.max(0,
+                    seed.bundleStackLimit() != null ? seed.bundleStackLimit() : prefs.getBundleStackLimit(player)));
             inputs.add(DialogInput.numberRange("bundle_stack_limit", lang.getColoredMessage("dialogStackLimitLabel"),
                             0f, 64f)
                     .step(1f)
