@@ -53,6 +53,15 @@ import java.util.List;
  * <p>{@link #applyResponse} is a plain-value entry point deliberately separate from dialog
  * extraction so it's unit-testable without a real {@code DialogResponseView} (which MockBukkit has
  * no way to construct).
+ *
+ * <p>{@link #planInputs} and {@link #planButtons} likewise separate "which elements appear, with
+ * what values" from "how to render them as Paper dialog objects": every Paper dialog builder
+ * ({@code DialogInput}, {@code ActionButton}, {@code Dialog} itself) is backed by a
+ * {@code ServiceLoader}-provided implementation that only exists inside a running Paper server, so
+ * constructing one under MockBukkit throws. The plan methods return plain {@link InputSpec}/
+ * {@link ButtonSpec} descriptors instead, so the permission-gating and value-selection logic —
+ * previously untestable — can be asserted directly; {@link #open} does nothing but translate those
+ * descriptors into real Paper objects and show them.
  */
 public final class PreferencesDialog {
 
@@ -61,6 +70,66 @@ public final class PreferencesDialog {
             new PendingPrefs(null, null, null, null, null, null, null, null, null);
 
     private PreferencesDialog() {
+    }
+
+    /** Which flavor of {@link DialogInput} an {@link InputSpec} describes. */
+    public enum InputKind { BOOL, SINGLE_OPTION, NUMBER_RANGE }
+
+    /**
+     * Stable identity for every dialog element (input or button), paired with the lang key that
+     * resolves its on-screen label. {@code key()} is the Paper dialog input key and is {@code null}
+     * for buttons, which have no response value.
+     */
+    public enum DialogElement {
+        ENABLED("enabled", "dialogEnabledLabel"),
+        CLICK_METHOD("click_method", "dialogClickMethodLabel"),
+        SORT_METHOD("sort_method", "dialogSortMethodLabel"),
+        START_CORNER("start_corner", "dialogStartCornerLabel"),
+        FILL_AXIS("fill_axis", "dialogFillAxisLabel"),
+        HOVER("hover", "dialogHoverLabel"),
+        BUNDLE_IN_INVENTORY("bundle_in_inventory", "dialogBundleInventoryLabel"),
+        BUNDLE_IN_CONTAINERS("bundle_in_containers", "dialogBundleContainersLabel"),
+        BUNDLE_STACK_LIMIT("bundle_stack_limit", "dialogStackLimitLabel"),
+        LOCK_BUTTON(null, "dialogOpenLockGui"),
+        BLACKLIST_BUTTON(null, "dialogOpenBlacklistGui"),
+        SAVE_BUTTON(null, "dialogSave"),
+        CANCEL_BUTTON(null, "dialogCancel");
+
+        private final String key;
+        private final String langKey;
+
+        DialogElement(String key, String langKey) {
+            this.key = key;
+            this.langKey = langKey;
+        }
+
+        /** The Paper dialog input key this element reads/writes; {@code null} for buttons. */
+        public String key() {
+            return key;
+        }
+
+        /** The {@code lang.yml} key for this element's on-screen label. */
+        public String langKey() {
+            return langKey;
+        }
+    }
+
+    /** One selectable entry in a {@link InputKind#SINGLE_OPTION} input. */
+    public record OptionSpec(String id, boolean selected) {
+    }
+
+    /**
+     * One planned dialog input. Only the field matching {@code kind} is populated: {@code boolInitial}
+     * for {@link InputKind#BOOL}, {@code options} (already filtered and selection-marked) for
+     * {@link InputKind#SINGLE_OPTION}, {@code numberInitial} (already clamped to [0, 64]) for
+     * {@link InputKind#NUMBER_RANGE}.
+     */
+    public record InputSpec(DialogElement element, InputKind kind,
+                             Boolean boolInitial, List<OptionSpec> options, Integer numberInitial) {
+    }
+
+    /** One planned action button. */
+    public record ButtonSpec(DialogElement element) {
     }
 
     /** Shows the dialog seeded from the player's currently stored preferences. */
@@ -75,116 +144,14 @@ public final class PreferencesDialog {
      */
     public static void open(ClickSortedPlugin plugin, Player player, PendingPrefs seed) {
         LangConfig lang = plugin.getConfigManager().lang();
-        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
 
-        List<DialogInput> inputs = new ArrayList<>();
+        List<DialogInput> inputs = planInputs(plugin, player, seed).stream()
+                .map(spec -> toPaperInput(spec, lang))
+                .toList();
 
-        if (player.hasPermission("clicksorted.commands.sort.enabled")) {
-            boolean enabled = seed.enabled() != null ? seed.enabled() : prefs.getEnabled(player);
-            inputs.add(DialogInput.bool("enabled", lang.getColoredMessage("dialogEnabledLabel"),
-                    enabled, "true", "false"));
-        }
-
-        // Click method is resolved once up front: the hover input's visibility (below) depends on
-        // whichever click method is in effect for this dialog (seeded or stored).
-        ClickMethod effectiveClickMethod = seed.clickMethod() != null ? seed.clickMethod() : prefs.getClickMethod(player);
-
-        if (player.hasPermission("clicksorted.commands.click.method")) {
-            inputs.add(DialogInput.singleOption("click_method", lang.getColoredMessage("dialogClickMethodLabel"),
-                    optionsFor(ClickMethod.values(), m -> true, effectiveClickMethod)).build());
-        }
-
-        if (player.hasPermission("clicksorted.commands.sort.method")) {
-            SortingMethod current = seed.sortingMethod() != null ? seed.sortingMethod() : prefs.getSortingMethod(player);
-            inputs.add(DialogInput.singleOption("sort_method", lang.getColoredMessage("dialogSortMethodLabel"),
-                    optionsFor(SortingMethod.values(), SortingMethod::isAvailable, current)).build());
-        }
-
-        if (player.hasPermission("clicksorted.commands.sort.start-corner")) {
-            StartCorner current = seed.startCorner() != null ? seed.startCorner() : prefs.getStartCorner(player);
-            inputs.add(DialogInput.singleOption("start_corner", lang.getColoredMessage("dialogStartCornerLabel"),
-                    optionsFor(StartCorner.values(), c -> true, current)).build());
-        }
-
-        if (player.hasPermission("clicksorted.commands.sort.fill-axis")) {
-            FillAxis current = seed.fillAxis() != null ? seed.fillAxis() : prefs.getFillAxis(player);
-            inputs.add(DialogInput.singleOption("fill_axis", lang.getColoredMessage("dialogFillAxisLabel"),
-                    optionsFor(FillAxis.values(), a -> true, current)).build());
-        }
-
-        // Omitted entirely when the (seeded or stored) click method governs hover — mirrors the
-        // command tree hiding /clicksorted click allow-on-hover in the same situation. Because the
-        // dialog is static, changing click method and hover in the same submission is resolved by
-        // apply order in applyResponse, not by this input reactively hiding.
-        if (player.hasPermission("clicksorted.commands.click.hover") && !effectiveClickMethod.governsHover()) {
-            boolean hover = seed.sortOverItems() != null ? seed.sortOverItems() : prefs.getSortOverItems(player);
-            inputs.add(DialogInput.bool("hover", lang.getColoredMessage("dialogHoverLabel"), hover, "true", "false"));
-        }
-
-        if (player.hasPermission("clicksorted.commands.bundle")) {
-            boolean bundleInv = seed.bundleInInventory() != null ? seed.bundleInInventory() : prefs.getBundlePackInInventory(player);
-            inputs.add(DialogInput.bool("bundle_in_inventory", lang.getColoredMessage("dialogBundleInventoryLabel"),
-                    bundleInv, "true", "false"));
-
-            boolean bundleCont = seed.bundleInContainers() != null ? seed.bundleInContainers() : prefs.getBundlePackInContainers(player);
-            inputs.add(DialogInput.bool("bundle_in_containers", lang.getColoredMessage("dialogBundleContainersLabel"),
-                    bundleCont, "true", "false"));
-
-            // Clamp the seed to the input's declared [0, 64] range: prefs.getBundleStackLimit can
-            // return an unclamped config default (defaults.bundle_stack_limit is read raw), and an
-            // out-of-range initial value is rejected by the numberRange builder / breaks the dialog.
-            int stackLimit = Math.min(64, Math.max(0,
-                    seed.bundleStackLimit() != null ? seed.bundleStackLimit() : prefs.getBundleStackLimit(player)));
-            inputs.add(DialogInput.numberRange("bundle_stack_limit", lang.getColoredMessage("dialogStackLimitLabel"),
-                            0f, 64f)
-                    .step(1f)
-                    .initial((float) stackLimit)
-                    .build());
-        }
-
-        List<ActionButton> buttons = new ArrayList<>();
-
-        if (player.hasPermission("clicksorted.commands.lock")) {
-            buttons.add(ActionButton.builder(lang.getColoredMessage("dialogOpenLockGui"))
-                    .action(DialogAction.customClick((view, audience) -> {
-                        if (!(audience instanceof Player p)) {
-                            return;
-                        }
-                        plugin.getPreferencesDialogService().stash(p, extract(view));
-                        p.openInventory(new LockGuiHolder(plugin, p).getInventory());
-                    }, ClickCallback.Options.builder().build()))
-                    .build());
-        }
-
-        if (player.hasPermission("clicksorted.commands.bundle")) {
-            buttons.add(ActionButton.builder(lang.getColoredMessage("dialogOpenBlacklistGui"))
-                    .action(DialogAction.customClick((view, audience) -> {
-                        if (!(audience instanceof Player p)) {
-                            return;
-                        }
-                        plugin.getPreferencesDialogService().stash(p, extract(view));
-                        p.openInventory(new BlacklistGuiHolder(plugin, p).getInventory());
-                    }, ClickCallback.Options.builder().build()))
-                    .build());
-        }
-
-        buttons.add(ActionButton.builder(lang.getColoredMessage("dialogSave"))
-                .action(DialogAction.customClick((view, audience) -> {
-                    if (!(audience instanceof Player p)) {
-                        return;
-                    }
-                    plugin.getPreferencesDialogService().clearStash(p);
-                    applyResponse(plugin, p, extract(view));
-                }, ClickCallback.Options.builder().build()))
-                .build());
-
-        buttons.add(ActionButton.builder(lang.getColoredMessage("dialogCancel"))
-                .action(DialogAction.customClick((view, audience) -> {
-                    if (audience instanceof Player p) {
-                        plugin.getPreferencesDialogService().clearStash(p);
-                    }
-                }, ClickCallback.Options.builder().build()))
-                .build());
+        List<ActionButton> buttons = planButtons(player).stream()
+                .map(spec -> toPaperButton(spec, plugin, lang))
+                .toList();
 
         Dialog dialog = Dialog.create(factory -> factory.empty()
                 .base(DialogBase.builder(lang.getColoredMessage("dialogTitle"))
@@ -194,16 +161,169 @@ public final class PreferencesDialog {
         player.showDialog(dialog);
     }
 
-    /** One {@code OptionEntry} per {@code values} constant passing {@code include}, current pre-selected. */
-    private static <E extends Enum<E>> List<SingleOptionDialogInput.OptionEntry> optionsFor(
+    /**
+     * Computes which dialog inputs {@code player} may see and their initial values, without
+     * touching any Paper dialog/registry API. This is the pure, unit-testable half of {@link #open}:
+     * every {@code clicksorted.commands.*} gate, the seed-over-stored precedence for each value, the
+     * {@code sort_method} option filtering by {@link SortingMethod#isAvailable()}, the hover dual-gate,
+     * and the bundle stack-limit clamp all live here.
+     */
+    public static List<InputSpec> planInputs(ClickSortedPlugin plugin, Player player, PendingPrefs seed) {
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        List<InputSpec> inputs = new ArrayList<>();
+
+        if (player.hasPermission("clicksorted.commands.sort.enabled")) {
+            boolean enabled = seed.enabled() != null ? seed.enabled() : prefs.getEnabled(player);
+            inputs.add(new InputSpec(DialogElement.ENABLED, InputKind.BOOL, enabled, null, null));
+        }
+
+        // Click method is resolved once up front: the hover input's visibility (below) depends on
+        // whichever click method is in effect for this dialog (seeded or stored).
+        ClickMethod effectiveClickMethod = seed.clickMethod() != null ? seed.clickMethod() : prefs.getClickMethod(player);
+
+        if (player.hasPermission("clicksorted.commands.click.method")) {
+            inputs.add(new InputSpec(DialogElement.CLICK_METHOD, InputKind.SINGLE_OPTION, null,
+                    optionsFor(ClickMethod.values(), m -> true, effectiveClickMethod), null));
+        }
+
+        if (player.hasPermission("clicksorted.commands.sort.method")) {
+            SortingMethod current = seed.sortingMethod() != null ? seed.sortingMethod() : prefs.getSortingMethod(player);
+            inputs.add(new InputSpec(DialogElement.SORT_METHOD, InputKind.SINGLE_OPTION, null,
+                    optionsFor(SortingMethod.values(), SortingMethod::isAvailable, current), null));
+        }
+
+        if (player.hasPermission("clicksorted.commands.sort.start-corner")) {
+            StartCorner current = seed.startCorner() != null ? seed.startCorner() : prefs.getStartCorner(player);
+            inputs.add(new InputSpec(DialogElement.START_CORNER, InputKind.SINGLE_OPTION, null,
+                    optionsFor(StartCorner.values(), c -> true, current), null));
+        }
+
+        if (player.hasPermission("clicksorted.commands.sort.fill-axis")) {
+            FillAxis current = seed.fillAxis() != null ? seed.fillAxis() : prefs.getFillAxis(player);
+            inputs.add(new InputSpec(DialogElement.FILL_AXIS, InputKind.SINGLE_OPTION, null,
+                    optionsFor(FillAxis.values(), a -> true, current), null));
+        }
+
+        // Omitted entirely when the (seeded or stored) click method governs hover — mirrors the
+        // command tree hiding /clicksorted click allow-on-hover in the same situation. Because the
+        // dialog is static, changing click method and hover in the same submission is resolved by
+        // apply order in applyResponse, not by this input reactively hiding.
+        if (player.hasPermission("clicksorted.commands.click.hover") && !effectiveClickMethod.governsHover()) {
+            boolean hover = seed.sortOverItems() != null ? seed.sortOverItems() : prefs.getSortOverItems(player);
+            inputs.add(new InputSpec(DialogElement.HOVER, InputKind.BOOL, hover, null, null));
+        }
+
+        if (player.hasPermission("clicksorted.commands.bundle")) {
+            boolean bundleInv = seed.bundleInInventory() != null ? seed.bundleInInventory() : prefs.getBundlePackInInventory(player);
+            inputs.add(new InputSpec(DialogElement.BUNDLE_IN_INVENTORY, InputKind.BOOL, bundleInv, null, null));
+
+            boolean bundleCont = seed.bundleInContainers() != null ? seed.bundleInContainers() : prefs.getBundlePackInContainers(player);
+            inputs.add(new InputSpec(DialogElement.BUNDLE_IN_CONTAINERS, InputKind.BOOL, bundleCont, null, null));
+
+            // Clamp the seed to the input's declared [0, 64] range: prefs.getBundleStackLimit can
+            // return an unclamped config default (defaults.bundle_stack_limit is read raw), and an
+            // out-of-range initial value is rejected by the numberRange builder / breaks the dialog.
+            int stackLimit = Math.min(64, Math.max(0,
+                    seed.bundleStackLimit() != null ? seed.bundleStackLimit() : prefs.getBundleStackLimit(player)));
+            inputs.add(new InputSpec(DialogElement.BUNDLE_STACK_LIMIT, InputKind.NUMBER_RANGE, null, null, stackLimit));
+        }
+
+        return inputs;
+    }
+
+    /**
+     * Computes which action buttons {@code player} may see, without touching any Paper dialog API.
+     * Save and Cancel are always present; the two GUI-launch buttons are gated the same as their
+     * matching input group above.
+     */
+    public static List<ButtonSpec> planButtons(Player player) {
+        List<ButtonSpec> buttons = new ArrayList<>();
+
+        if (player.hasPermission("clicksorted.commands.lock")) {
+            buttons.add(new ButtonSpec(DialogElement.LOCK_BUTTON));
+        }
+
+        if (player.hasPermission("clicksorted.commands.bundle")) {
+            buttons.add(new ButtonSpec(DialogElement.BLACKLIST_BUTTON));
+        }
+
+        buttons.add(new ButtonSpec(DialogElement.SAVE_BUTTON));
+        buttons.add(new ButtonSpec(DialogElement.CANCEL_BUTTON));
+
+        return buttons;
+    }
+
+    /** Translates one plain-value {@link InputSpec} into the Paper dialog input it describes. */
+    private static DialogInput toPaperInput(InputSpec spec, LangConfig lang) {
+        Component label = lang.getColoredMessage(spec.element().langKey());
+        return switch (spec.kind()) {
+            case BOOL -> DialogInput.bool(spec.element().key(), label, spec.boolInitial(), "true", "false");
+            case SINGLE_OPTION -> {
+                List<SingleOptionDialogInput.OptionEntry> entries = new ArrayList<>();
+                for (OptionSpec option : spec.options()) {
+                    entries.add(SingleOptionDialogInput.OptionEntry.create(
+                            option.id(), Component.text(option.id()), option.selected()));
+                }
+                yield DialogInput.singleOption(spec.element().key(), label, entries).build();
+            }
+            case NUMBER_RANGE -> DialogInput.numberRange(spec.element().key(), label, 0f, 64f)
+                    .step(1f)
+                    .initial((float) spec.numberInitial())
+                    .build();
+        };
+    }
+
+    /** Translates one {@link ButtonSpec} into the Paper action button, wiring its click callback. */
+    private static ActionButton toPaperButton(ButtonSpec spec, ClickSortedPlugin plugin, LangConfig lang) {
+        Component label = lang.getColoredMessage(spec.element().langKey());
+        return switch (spec.element()) {
+            case LOCK_BUTTON -> ActionButton.builder(label)
+                    .action(DialogAction.customClick((view, audience) -> {
+                        if (!(audience instanceof Player p)) {
+                            return;
+                        }
+                        plugin.getPreferencesDialogService().stash(p, extract(view));
+                        p.openInventory(new LockGuiHolder(plugin, p).getInventory());
+                    }, ClickCallback.Options.builder().build()))
+                    .build();
+            case BLACKLIST_BUTTON -> ActionButton.builder(label)
+                    .action(DialogAction.customClick((view, audience) -> {
+                        if (!(audience instanceof Player p)) {
+                            return;
+                        }
+                        plugin.getPreferencesDialogService().stash(p, extract(view));
+                        p.openInventory(new BlacklistGuiHolder(plugin, p).getInventory());
+                    }, ClickCallback.Options.builder().build()))
+                    .build();
+            case SAVE_BUTTON -> ActionButton.builder(label)
+                    .action(DialogAction.customClick((view, audience) -> {
+                        if (!(audience instanceof Player p)) {
+                            return;
+                        }
+                        plugin.getPreferencesDialogService().clearStash(p);
+                        applyResponse(plugin, p, extract(view));
+                    }, ClickCallback.Options.builder().build()))
+                    .build();
+            case CANCEL_BUTTON -> ActionButton.builder(label)
+                    .action(DialogAction.customClick((view, audience) -> {
+                        if (audience instanceof Player p) {
+                            plugin.getPreferencesDialogService().clearStash(p);
+                        }
+                    }, ClickCallback.Options.builder().build()))
+                    .build();
+            default -> throw new IllegalArgumentException("Not a button element: " + spec.element());
+        };
+    }
+
+    /** One {@code OptionSpec} per {@code values} constant passing {@code include}, current pre-selected. */
+    private static <E extends Enum<E>> List<OptionSpec> optionsFor(
             E[] values, java.util.function.Predicate<E> include, E current) {
-        List<SingleOptionDialogInput.OptionEntry> entries = new ArrayList<>();
+        List<OptionSpec> entries = new ArrayList<>();
         for (E value : values) {
             if (!include.test(value)) {
                 continue;
             }
-            entries.add(SingleOptionDialogInput.OptionEntry.create(
-                    value.name(), Component.text(value.name()), value == current));
+            entries.add(new OptionSpec(value.name(), value == current));
         }
         return entries;
     }
