@@ -16,7 +16,7 @@ version = project.property("version") as String
 // Append new versions there when compatibility is verified — no other changes needed.
 val gameVersionsList: List<String> = (project.findProperty("gameVersions") as? String)
     ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-    ?: listOf("1.21.5")
+    ?: listOf("1.21.6")
 
 repositories {
     mavenCentral()

@@ -1,5 +1,7 @@
 # ClickSorted 2.2.0
 
+Release date: 2026-07-07
+
 ClickSorted 2.2.0 adds a dialog-based preferences UI, per-player localisation with self-updating default strings, and raises the minimum supported server to Paper 1.21.6.
 
 ## Highlights
