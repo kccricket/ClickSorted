@@ -89,8 +89,15 @@ public interface FileMigration {
                 }
             }
 
-            Files.createDirectories(target.getParent());
-            diff.save(target.toFile());
+            // Only materialize the sparse override when it actually overrides something. If the
+            // legacy file matched every default (empty diff), writing an empty target would exist
+            // on disk and suppress the fully-commented documentation template LangConfig writes
+            // when the target is absent — leaving the admin with an empty, undocumented file. Skip
+            // the write in that case so the template is regenerated, matching a fresh install.
+            if (!diff.getKeys(false).isEmpty()) {
+                Files.createDirectories(target.getParent());
+                diff.save(target.toFile());
+            }
 
             Path archived = source.resolveSibling(source.getFileName() + archiveSuffix);
             Files.move(source, archived, StandardCopyOption.REPLACE_EXISTING);
