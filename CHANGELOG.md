@@ -10,7 +10,7 @@ ClickSorted 2.2.0 adds a dialog-based preferences UI, per-player localisation wi
 ## Breaking Changes
 
 - **Minimum supported server raised to Paper 1.21.6** (from 1.21.5), the version that introduced the Dialog API this release's preferences menu is built on. A 1.21.5 server can no longer run this build — upgrade Paper first.
-- **`lang.yml` is replaced by `lang/<locale>.yml` override files** (e.g. `lang/en_us.yml`). An existing `lang.yml` is migrated automatically on first load: any key you had customized is extracted into `lang/en_us.yml`, the old file is archived to `lang.yml.bak`, and any key left at its default is dropped (so you pick up any improved default text in this release). No action is required. See [`docs/admin/lang.md`](docs/admin/lang.md).
+- **`lang.yml` is replaced by `lang/<locale>.yml` override files** (e.g. `lang/en_us.yml`). An existing `lang.yml` is migrated automatically on first load: any key you had customized is extracted into `lang/en_us.yml`, the old file is archived to `lang.yml.bak`, and any key left at its default is dropped (so you pick up any improved default text in this release). No action is required. See [`docs/admin/lang.md`](https://kccricket.github.io/ClickSorted/admin/lang.md).
 
 ## New Features
 
@@ -22,7 +22,7 @@ Bedrock/Geyser clients cannot render server-side dialogs; the existing commands 
 
 ### Per-player localisation & self-updating lang defaults
 
-Default message strings are now bundled inside the jar (`lang/en_us.yml`) rather than copied onto disk, so a changed default in a future release takes effect for everyone automatically — no more permanently-shadowed `lang.yml`. Admins customize strings via sparse override files at `plugins/ClickSorted/lang/<locale>.yml`; only the keys you edit are overridden, everything else keeps resolving to the built-in default. Messages are now resolved per-player against their Minecraft client locale, so future translation files (`de_de.yml`, `pt_br.yml`, …) are a pure drop-in with no code changes. A new `default_locale` config key (default `en_us`) controls console output and the fallback for any locale with no matching file. See [`docs/admin/lang.md`](docs/admin/lang.md) for the full resolution order.
+Default message strings are now bundled inside the jar (`lang/en_us.yml`) rather than copied onto disk, so a changed default in a future release takes effect for everyone automatically — no more permanently-shadowed `lang.yml`. Admins customize strings via sparse override files at `plugins/ClickSorted/lang/<locale>.yml`; only the keys you edit are overridden, everything else keeps resolving to the built-in default. Messages are now resolved per-player against their Minecraft client locale, so future translation files (`de_de.yml`, `pt_br.yml`, …) are a pure drop-in with no code changes. A new `default_locale` config key (default `en_us`) controls console output and the fallback for any locale with no matching file. See [`docs/admin/lang.md`](https://kccricket.github.io/ClickSorted/admin/lang.md) for the full resolution order.
 
 ## Other Improvements
 
