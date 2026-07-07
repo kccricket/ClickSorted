@@ -139,10 +139,10 @@ tasks.build {
 }
 
 // Run a local Paper dev server with the plugin already loaded.
-// Usage: ./gradlew runServer
+// Usage: ./gradlew runServer [-PmcVersion=1.21.6]
 tasks.runServer {
     serverType(org.bxteam.runserver.ServerType.PAPER)
-    serverVersion("26.2")
+    serverVersion((project.findProperty("mcVersion") as String?) ?: "26.2")
     acceptMojangEula()
     // Use the Shadow JAR (bStats relocated) instead of the plain jar task output.
     inputTask(tasks.named("shadowJar"))
