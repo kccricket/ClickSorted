@@ -32,6 +32,11 @@ dependencies {
     // paper-api is provided by the server at runtime — compile against it but don't bundle it
     compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
 
+    // KcMcLib is a composite-build submodule (see settings.gradle.kts); its classes are bundled
+    // into the fat jar via Shadow like any other `implementation` dependency, no relocation needed
+    // (own namespace, net.kccricket.kcmclib).
+    implementation("net.kccricket:kcmclib")
+
     // bStats is bundled and relocated by Shadow
     implementation("org.bstats:bstats-bukkit:3.0.1")
 

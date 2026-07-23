@@ -1,10 +1,11 @@
 package net.kccricket.clicksorted.config;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.Log;
-import net.kccricket.clicksorted.text.lang.Localized;
-import net.kccricket.clicksorted.text.lang.LocaleMessages;
-import net.kccricket.clicksorted.text.lang.MessageSource;
+import net.kccricket.kcmclib.config.ManagedConfig;
+import net.kccricket.kcmclib.logging.Log;
+import net.kccricket.kcmclib.text.lang.Localized;
+import net.kccricket.kcmclib.text.lang.LocaleMessages;
+import net.kccricket.kcmclib.text.lang.MessageSource;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.configuration.file.FileConfiguration;

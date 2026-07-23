@@ -12,7 +12,7 @@ package net.kccricket.clicksorted.gui;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import net.kccricket.clicksorted.text.lang.Localized;
+import net.kccricket.kcmclib.text.lang.Localized;
 import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.Material;
 import org.bukkit.inventory.InventoryHolder;

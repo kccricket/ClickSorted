@@ -14,7 +14,7 @@ package net.kccricket.clicksorted.sort;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.gui.ClickSortedHolder;
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.security.Permissions;

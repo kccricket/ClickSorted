@@ -1,6 +1,8 @@
 package net.kccricket.clicksorted.config;
 
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.config.ManagedConfig;
+import net.kccricket.kcmclib.config.ResourceUpdater;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.SortingMethod;
 import org.bukkit.Material;
 import org.bukkit.configuration.Configuration;

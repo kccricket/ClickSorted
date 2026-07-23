@@ -1,0 +1,3 @@
+[submodule "KcMcLib"]
+	path = KcMcLib
+	url = https://github.com/kccricket/KcMcLib.git

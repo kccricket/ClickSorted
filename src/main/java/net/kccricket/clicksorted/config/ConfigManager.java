@@ -1,7 +1,7 @@
 package net.kccricket.clicksorted.config;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.text.lang.Localized;
+import net.kccricket.kcmclib.text.lang.Localized;
 
 import java.util.Locale;
 

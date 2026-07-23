@@ -1,8 +1,9 @@
 package net.kccricket.clicksorted.config;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.DebugLevel;
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.config.ManagedConfig;
+import net.kccricket.kcmclib.logging.DebugLevel;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;

@@ -15,7 +15,7 @@ package net.kccricket.clicksorted.sort;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.config.MainConfig;
 import net.kccricket.clicksorted.events.InventorySortEvent;
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortKey;
@@ -182,7 +182,7 @@ public class InventorySortService {
             // cancelling listener can't spam chat on rapid clicking.
             var reason = sortEvent.getCancelReason();
             if (reason != null) {
-                plugin.getMessenger().message(p, "sortCancelReason", 3, reason);
+                plugin.getMessenger().message(p, "sortCancelReason", 3, MessageUtil.withPrefix(p, reason));
             }
             return false;
         }

@@ -13,8 +13,14 @@ package net.kccricket.clicksorted.migration;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.config.MainConfig;
+import net.kccricket.kcmclib.migration.FileMigration;
+import net.kccricket.kcmclib.migration.FileMigrationContext;
+import net.kccricket.kcmclib.migration.Migration;
+import net.kccricket.kcmclib.migration.MigrationException;
+import net.kccricket.kcmclib.migration.Store;
+import net.kccricket.kcmclib.migration.ValueMigration;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
@@ -26,7 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import static net.kccricket.clicksorted.migration.Migration.*;
+import static net.kccricket.kcmclib.migration.Migration.*;
 
 /**
  * Owns the full catalog of <em>what is stored where</em> and <em>which rules apply</em>, and

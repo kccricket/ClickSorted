@@ -12,7 +12,7 @@ package net.kccricket.clicksorted.sort;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.SortKey;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;

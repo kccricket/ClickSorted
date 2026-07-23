@@ -19,6 +19,7 @@ package net.kccricket.clicksorted.model;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.text.ItemNames;
+import net.kccricket.kcmclib.util.EnumParse;
 import org.bukkit.inventory.ItemStack;
 
 public enum SortingMethod {

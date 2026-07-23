@@ -17,21 +17,23 @@ import net.kccricket.clicksorted.config.ConfigManager;
 import net.kccricket.clicksorted.gui.BlacklistGuiListener;
 import net.kccricket.clicksorted.gui.LockGuiListener;
 import net.kccricket.clicksorted.gui.PreferencesDialogService;
-import net.kccricket.clicksorted.logging.Log;
-import net.kccricket.clicksorted.migration.MigrationException;
+import net.kccricket.kcmclib.logging.Log;
+import net.kccricket.kcmclib.migration.MigrationException;
 import net.kccricket.clicksorted.migration.Migrations;
 import net.kccricket.clicksorted.migration.PlayerMigrationListener;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.security.ActionThrottle;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
 import net.kccricket.clicksorted.sort.InventorySortService;
-import net.kccricket.clicksorted.text.CooldownMessenger;
+import net.kccricket.kcmclib.text.CooldownMessenger;
 import net.kccricket.clicksorted.text.MessageUtil;
-import net.kccricket.clicksorted.update.UpdateChecker;
+import net.kccricket.kcmclib.update.ModrinthUpdateChecker;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.List;
 
 public class ClickSortedPlugin extends JavaPlugin {
     private final CooldownMessenger messenger = new CooldownMessenger();
@@ -41,7 +43,7 @@ public class ClickSortedPlugin extends JavaPlugin {
     private InventorySortService sortService;
     private ActionThrottle actionThrottle;
     private Migrations migrations;
-    private UpdateChecker updateChecker;
+    private ModrinthUpdateChecker updateChecker;
     private PreferencesDialogService preferencesDialogService;
 
     private static ClickSortedPlugin instance = null;
@@ -73,7 +75,15 @@ public class ClickSortedPlugin extends JavaPlugin {
         sortingPrefs = new PlayerSortingPrefs(this);
         actionThrottle = new ActionThrottle(this);
 
-        updateChecker = new UpdateChecker(this);
+        updateChecker = new ModrinthUpdateChecker(this, "clicksorted",
+                () -> configManager.main().getCheckForUpdates(),
+                () -> configManager.main().getUpdateCheckIntervalHours(),
+                (latest, current) -> List.of(
+                        "A new version of ClickSorted is available: " + latest
+                                + " (you are running " + current + ").",
+                        "Download: https://modrinth.com/plugin/clicksorted | "
+                                + "https://hangar.papermc.io/kccricket/ClickSorted | "
+                                + "https://github.com/kccricket/ClickSorted/releases"));
         updateChecker.restart();
 
         sortService = new InventorySortService(this);
@@ -134,7 +144,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         return migrations;
     }
 
-    public UpdateChecker getUpdateChecker() {
+    public ModrinthUpdateChecker getUpdateChecker() {
         return updateChecker;
     }
 

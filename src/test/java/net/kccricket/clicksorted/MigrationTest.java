@@ -1,10 +1,6 @@
 package net.kccricket.clicksorted;
 
-import net.kccricket.clicksorted.migration.Migration;
-import static net.kccricket.clicksorted.migration.Migration.*;
 import net.kccricket.clicksorted.migration.Migrations;
-import net.kccricket.clicksorted.migration.Store;
-import net.kccricket.clicksorted.migration.ValueMigration;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kyori.adventure.text.Component;
 import org.bukkit.NamespacedKey;
@@ -14,65 +10,15 @@ import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Covers the generic {@link ValueMigration} / {@link Migrations} framework and the two lifecycle
- * points it is wired into: config (eager rewrite on load) and player PDC (rewrite on join).
+ * Covers {@link Migrations} — ClickSorted's migration catalog — and the two lifecycle points it is
+ * wired into: config (eager rewrite on load) and player PDC (rewrite on join). The generic
+ * {@code Migration}/{@code ValueMigration} framework primitives are covered independently in
+ * KcMcLib.
  */
 class MigrationTest extends AbstractClickSortedTest {
-
-    // --- ValueMigration (pure) ---
-
-    @Test
-    void valueMigration_remapsCaseInsensitivelyAndPassesUnknownThrough() {
-        ValueMigration m = ValueMigration.builder().rename("OLD").to("NEW").build();
-        assertEquals("NEW", m.migrate("OLD"));
-        assertEquals("NEW", m.migrate("old"));
-        assertEquals("KEEP", m.migrate("KEEP"), "Unmapped tokens are returned unchanged");
-        assertNull(m.migrate(null), "null is returned unchanged");
-    }
-
-    @Test
-    void builder_chainedLineageMapsEveryHopDirectlyToCanonical() {
-        ValueMigration m = ValueMigration.builder()
-                .rename("A").to("B").to("C")
-                .build();
-
-        assertEquals("C", m.migrate("A"));
-        assertEquals("C", m.migrate("B"));
-        assertEquals("C", m.migrate("C"));
-    }
-
-    @Test
-    void builder_multiplePathsResolveIndependently() {
-        ValueMigration m = ValueMigration.builder()
-                .rename("DOUBLE").to("DOUBLE_CLICK")
-                .rename("SINGLE").to("SINGLE_CLICK")
-                .build();
-
-        assertEquals("DOUBLE_CLICK", m.migrate("DOUBLE"));
-        assertEquals("SINGLE_CLICK", m.migrate("SINGLE"));
-    }
-
-    @Test
-    void builder_convergesInOnePassAcrossMultipleHops() {
-        // SINGLE → SINGLE_CLICK → SINGLE_PUNCH: a value stored as the oldest alias must reach the
-        // current canonical in a single migrate() call, not one hop per pass.
-        ValueMigration m = ValueMigration.builder()
-                .rename("SINGLE").to("SINGLE_CLICK").to("SINGLE_PUNCH")
-                .build();
-
-        assertEquals("SINGLE_PUNCH", m.migrate("SINGLE"));
-        assertEquals("SINGLE_PUNCH", m.migrate("SINGLE_CLICK"));
-        assertEquals("SINGLE_PUNCH", m.migrate("SINGLE_PUNCH"));
-    }
-
-    @Test
-    void builder_toBeforeRenameThrows() {
-        assertThrows(IllegalStateException.class, () -> ValueMigration.builder().to("X"));
-    }
 
     // --- PDC migration on join ---
 
@@ -381,35 +327,4 @@ class MigrationTest extends AbstractClickSortedTest {
                 "Value must appear under 'defaults.bundle_in_containers'");
     }
 
-    // --- when…then primitive in isolation ---
-
-    @Test
-    void whenThenPrimitive_firesOnMatchAndIsNoOpOnMismatch() {
-        // Use an in-memory store fake to verify the when…then mechanism independently.
-        java.util.Map<String, String> data = new java.util.HashMap<>();
-        Store fake = new Store() {
-            @Override public String getString(String key) { return data.get(key); }
-            @Override public Boolean getBoolean(String key) { String v = data.get(key); return v != null ? Boolean.parseBoolean(v) : null; }
-            @Override public void setString(String key, String value) { data.put(key, value); }
-            @Override public void setBoolean(String key, boolean value) { data.put(key, String.valueOf(value)); }
-            @Override public void clear(String key) { data.remove(key); }
-            @Override public boolean contains(String key) { return data.containsKey(key); }
-        };
-
-        Migration rule = when("mode").is("LEGACY").then(set("mode", "MODERN"), set("flag", "true"));
-
-        // Absent key → no-op.
-        assertFalse(rule.apply(fake), "Should be a no-op when key is absent");
-
-        // Wrong value → no-op.
-        data.put("mode", "OTHER");
-        assertFalse(rule.apply(fake), "Should be a no-op when value doesn't match");
-        assertEquals("OTHER", data.get("mode"));
-
-        // Matching value → effects applied.
-        data.put("mode", "LEGACY");
-        assertTrue(rule.apply(fake));
-        assertEquals("MODERN", data.get("mode"), "mode must be rewritten to MODERN");
-        assertEquals("true", data.get("flag"), "flag must be set to true");
-    }
 }

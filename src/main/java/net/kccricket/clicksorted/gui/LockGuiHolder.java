@@ -13,7 +13,7 @@ package net.kccricket.clicksorted.gui;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.text.lang.Localized;
+import net.kccricket.kcmclib.text.lang.Localized;
 import net.kccricket.clicksorted.sort.ProtectedSlots;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
