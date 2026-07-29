@@ -914,7 +914,8 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBenchmark(ClickSortedPlugin plugin) {
         return Commands.literal("benchmark")
-                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.benchmark"))
+                .requires(src -> plugin.getConfigManager().main().getEnableBenchmark()
+                        && src.getSender().hasPermission("clicksorted.admin.commands.benchmark"))
                 .executes(ctx -> runBenchmark(plugin, ctx.getSource(), BENCH_DEFAULT_ITERATIONS))
                 .then(Commands.argument("iterations", IntegerArgumentType.integer(BENCH_MIN_ITERATIONS, BENCH_MAX_ITERATIONS))
                         .executes(ctx -> runBenchmark(plugin, ctx.getSource(),

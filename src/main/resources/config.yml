@@ -20,6 +20,11 @@ defaults:
 locked_slots:
   player: []
 action_cooldown_ms: 150
+
+# Master switch for /clicksorted admin benchmark, an in-situ sort/repack timing test — it runs
+# synchronously on the main thread and briefly pauses the server. Requires
+# clicksorted.admin.commands.benchmark as well. Leave this false on production servers.
+enable_benchmark: false
 sortable_inventories:
   - "PLAYER"
   - "CHEST"
