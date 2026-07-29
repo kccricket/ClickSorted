@@ -28,6 +28,14 @@ repositories {
     maven("https://maven.enginehub.org/repo/")
 }
 
+// A standalone source set for one-off dev tooling (e.g. the items.yml sort-key generator).
+// Never bundled into the plugin jar and not part of the `build`/`test` task graph.
+sourceSets {
+    create("tools") {
+        java.setSrcDirs(listOf("tools/src/main/java"))
+    }
+}
+
 dependencies {
     // paper-api is provided by the server at runtime — compile against it but don't bundle it
     compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
@@ -54,6 +62,9 @@ dependencies {
     testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v26.1.2:4.113.1")
     // Gradle 9 no longer auto-includes the JUnit Platform launcher; add it explicitly.
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // tools source set: only needs paper-api, for Material/ItemType reflection.
+    "toolsImplementation"("io.papermc.paper:paper-api:26.1.2.build.+")
 }
 
 // Emit Java 21 bytecode regardless of the JDK used to compile.
@@ -71,7 +82,9 @@ val runningJvm = Runtime.version().feature()
 listOf(
     configurations.compileClasspath,
     configurations.testCompileClasspath,
-    configurations.testRuntimeClasspath
+    configurations.testRuntimeClasspath,
+    configurations.named("toolsCompileClasspath"),
+    configurations.named("toolsRuntimeClasspath")
 ).forEach { cfg ->
     cfg.configure {
         attributes {
@@ -141,6 +154,20 @@ tasks.jar {
 // Make the standard 'build' task produce the shadow JAR
 tasks.build {
     dependsOn(tasks.shadowJar)
+}
+
+// Regenerates tools/items.generated.yml (variant-aware sort-key table) from the paper-api
+// Material/ItemType tables. Usage: ./gradlew generateItemNames
+tasks.register<JavaExec>("generateItemNames") {
+    group = "tools"
+    description = "Regenerates tools/items.generated.yml from the paper-api Material/ItemType tables"
+    classpath = sourceSets["tools"].runtimeClasspath
+    mainClass.set("net.kccricket.clicksorted.tools.ItemNameKeyGenerator")
+    workingDir = projectDir
+    val paperApiVersion = configurations.named("toolsRuntimeClasspath").get()
+        .resolvedConfiguration.resolvedArtifacts
+        .find { it.name == "paper-api" }?.moduleVersion?.id?.version ?: "unknown"
+    args("tools/items.generated.yml", paperApiVersion)
 }
 
 // Run a local Paper dev server with the plugin already loaded.

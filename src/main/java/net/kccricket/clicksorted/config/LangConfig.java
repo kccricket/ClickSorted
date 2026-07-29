@@ -28,7 +28,8 @@ import java.util.Map;
  * Loads and swaps the plugin's {@link LocaleMessages} snapshot: internal (jar-bundled) defaults
  * under {@code lang/<locale>.yml} plus sparse on-disk overrides under
  * {@code plugins/ClickSorted/lang/<locale>.yml}. Unlike {@code groups.yml}/{@code items.yml}, lang
- * loading deliberately does <em>not</em> go through {@link ResourceUpdater}'s add-only merge — that
+ * loading deliberately does <em>not</em> go through {@link net.kccricket.kcmclib.config.ResourceUpdater}'s
+ * add-only merge — that
  * merge bakes every default onto disk, which would shadow future default changes forever. Instead
  * on-disk files stay sparse and missing keys always fall through to the internal default.
  *

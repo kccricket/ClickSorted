@@ -61,7 +61,7 @@ import java.util.stream.Collectors;
  *
  * <p>When both modes are disabled for the player and target, this service returns {@code false}
  * immediately (a complete no-op). The caller ({@link InventoryClickListener}) pre-screens via
- * {@link #hasWork} to avoid unnecessarily entering the throttle/cancel path.
+ * {@code checkWork} to avoid unnecessarily entering the throttle/cancel path.
  */
 public class InventorySortService {
 

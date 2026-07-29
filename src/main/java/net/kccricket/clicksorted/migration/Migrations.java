@@ -39,7 +39,7 @@ import static net.kccricket.kcmclib.migration.Migration.*;
  * exposes one entry point per store. Callers pass only the store; the loader/store has no
  * knowledge of which settings get migrated.
  *
- * <h3>Rule hierarchy</h3>
+ * <h2>Rule hierarchy</h2>
  * <ol>
  *   <li><b>Config-only structural transforms</b> ({@link ConfigTransform}) — derive new config
  *       state from old values in place before any removal pass. Adding a future transform is a
@@ -60,7 +60,7 @@ import static net.kccricket.kcmclib.migration.Migration.*;
  *       logged and skipped rather than fatal, since a lang hiccup must not block plugin enable.</li>
  * </ol>
  *
- * <h3>NONE migration</h3>
+ * <h2>NONE migration</h2>
  * {@code ClickMethod.NONE} (disabled state) has been replaced by a dedicated boolean
  * {@code enabled} preference. A player or admin with {@code click_mode=NONE} is migrated to
  * {@code enabled=false} and {@code click_mode=SWAP}. This is expressed as a pure data rule in

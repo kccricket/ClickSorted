@@ -9,9 +9,10 @@ import java.util.Locale;
  * Owns all four plugin configuration files and provides a single unified lifecycle:
  * {@link #loadAll()}, {@link #reloadAll()}, and {@link #saveAll()}.
  *
- * <p>Every file routes through {@link ResourceUpdater#update}
- * on load/reload, so missing files are recreated from bundled defaults — including after
- * a mid-session delete followed by {@code /clicksorted reload}.
+ * <p>{@link GroupsConfig} and {@link ItemsConfig} route through
+ * {@link net.kccricket.kcmclib.config.ResourceUpdater#update} on load/reload, so their files are
+ * recreated from bundled defaults if missing — including after a mid-session delete followed by
+ * {@code /clicksorted reload}.
  */
 public class ConfigManager {
 

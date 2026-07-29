@@ -48,7 +48,7 @@ import java.util.List;
  * adds it to the blacklist — by material if it has no custom display name, or by display
  * name if it does.
  */
-public class BlacklistGuiHolder implements ClickSortedHolder {
+public final class BlacklistGuiHolder implements ClickSortedHolder {
 
     /** A single blacklist entry, either a material or a display-name string. */
     public sealed interface Entry permits MaterialEntry, NameEntry {}

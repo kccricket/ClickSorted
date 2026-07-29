@@ -31,7 +31,6 @@ import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.text.MessageUtil;
 import net.kccricket.kcmclib.text.lang.Localized;
-import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
