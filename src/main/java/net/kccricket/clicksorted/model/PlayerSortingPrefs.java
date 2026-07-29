@@ -23,6 +23,7 @@ import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent.Change;
 import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent.LockedSlotChange;
 import net.kccricket.clicksorted.events.PlayerPreferenceChangeEvent.ValueChange;
 import net.kccricket.clicksorted.events.Preference;
+import net.kccricket.kcmclib.pdc.PdcStringSet;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -34,8 +35,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class PlayerSortingPrefs {
@@ -278,65 +277,6 @@ public class PlayerSortingPrefs {
             if (add) set.add(player, value); else set.remove(player, value);
         }
         return result;
-    }
-
-    /** A PDC-backed set of {@code T} serialized as a delimited string under one {@link NamespacedKey}. */
-    private static final class PdcStringSet<T> {
-        private final NamespacedKey key;
-        private final String delimiter;
-        private final Function<String, T> parse;   // returns null to skip an unparseable token
-        private final Function<T, String> format;
-        private final Supplier<Set<T>> newSet;     // factory for the mutable working set
-
-        PdcStringSet(NamespacedKey key, String delimiter,
-                     Function<String, T> parse, Function<T, String> format,
-                     Supplier<Set<T>> newSet) {
-            this.key = key;
-            this.delimiter = delimiter;
-            this.parse = parse;
-            this.format = format;
-            this.newSet = newSet;
-        }
-
-        Set<T> get(Player player) {
-            String stored = player.getPersistentDataContainer().get(key, PersistentDataType.STRING);
-            if (stored == null || stored.isBlank()) return Set.of();
-            Set<T> result = newSet.get();
-            for (String token : stored.split(delimiter)) {
-                T v = parse.apply(token);
-                if (v != null) result.add(v);
-            }
-            return result.isEmpty() ? Set.of() : Set.copyOf(result);
-        }
-
-        /** Atomic read-modify-write add; reads current PDC state at call time. */
-        void add(Player player, T value) {
-            Set<T> current = newSet.get();
-            current.addAll(get(player));
-            current.add(value);
-            store(player, current);
-        }
-
-        /** Atomic read-modify-write remove; reads current PDC state at call time. */
-        void remove(Player player, T value) {
-            Set<T> current = newSet.get();
-            current.addAll(get(player));
-            current.remove(value);
-            store(player, current);
-        }
-
-        void clear(Player player) {
-            player.getPersistentDataContainer().remove(key);
-        }
-
-        private void store(Player player, Set<T> values) {
-            if (values.isEmpty()) {
-                player.getPersistentDataContainer().remove(key);
-            } else {
-                String joined = values.stream().map(format).collect(Collectors.joining(delimiter));
-                player.getPersistentDataContainer().set(key, PersistentDataType.STRING, joined);
-            }
-        }
     }
 
     public Set<Integer> getLockedSlots(Player player) {
