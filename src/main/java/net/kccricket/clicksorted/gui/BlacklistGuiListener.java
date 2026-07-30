@@ -15,7 +15,7 @@ package net.kccricket.clicksorted.gui;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.text.ItemNames;
-import net.kccricket.clicksorted.text.MessageUtil;
+import net.kccricket.clicksorted.text.PreferenceMessages;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -84,7 +84,7 @@ public class BlacklistGuiListener implements Listener {
             }
             PreferenceResult result = removeEntry(player, entry);
             if (result.cancelled()) {
-                MessageUtil.preferenceBlocked(player, result);
+                PreferenceMessages.preferenceBlocked(plugin, player, result);
             }
             holder.refresh();
 
@@ -108,7 +108,7 @@ public class BlacklistGuiListener implements Listener {
             }
             PreferenceResult result = addItem(player, item);
             if (result.cancelled()) {
-                MessageUtil.preferenceBlocked(player, result);
+                PreferenceMessages.preferenceBlocked(plugin, player, result);
             }
             holder.refresh();
         }

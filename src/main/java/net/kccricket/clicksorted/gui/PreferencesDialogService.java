@@ -82,9 +82,14 @@ public class PreferencesDialogService implements Listener {
         player.getScheduler().run(plugin, task -> PreferencesDialog.open(plugin, player, pending), null);
     }
 
-    /** Avoid leaking a stash entry across sessions if the player disconnects mid-flow. */
+    /**
+     * Avoid leaking a stash entry across sessions if the player disconnects mid-flow. Also clears
+     * this player's {@link net.kccricket.kcmclib.text.Messenger} rate-limit state, so that map
+     * doesn't grow for the lifetime of the server.
+     */
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         stash.remove(event.getPlayer().getUniqueId());
+        plugin.messages().forget(event.getPlayer());
     }
 }

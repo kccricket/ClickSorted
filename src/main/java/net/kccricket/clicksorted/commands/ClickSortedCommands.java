@@ -22,8 +22,8 @@ import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
-import net.kccricket.clicksorted.text.MessageUtil;
-import net.kccricket.kcmclib.text.lang.Localized;
+import net.kccricket.clicksorted.text.PreferenceMessages;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -59,8 +59,7 @@ public class ClickSortedCommands {
                     }
                     if (!player.hasPermission(Permissions.PERM_MASTER)
                             || !player.hasPermission("clicksorted.commands.sort.enabled")) {
-                        MessageUtil.errorMessage(player,
-                                plugin.getConfigManager().lang(player.locale()).getColoredMessage("noPermission"));
+                        plugin.messages().to(player).error().send("noPermission");
                         return Command.SINGLE_SUCCESS;
                     }
                     applyEnabledSetting(plugin, player, !plugin.getSortingPrefs().getEnabled(player));
@@ -166,12 +165,11 @@ public class ClickSortedCommands {
     }
 
     private static void applyEnabledSetting(ClickSortedPlugin plugin, Player player, boolean enabled) {
-        if (blockedAndReported(player, plugin.getSortingPrefs().setEnabled(player, enabled))) {
+        if (blockedAndReported(plugin, player, plugin.getSortingPrefs().setEnabled(player, enabled))) {
             return;
         }
-        MessageUtil.statusMessage(player,
-                plugin.getConfigManager().lang(player.locale()).getColoredMessage("setEnabledStatus",
-                        Placeholder.unparsed("status", enabledLabel(enabled))));
+        plugin.messages().to(player).status().send("setEnabledStatus",
+                Placeholder.unparsed("status", enabledLabel(enabled)));
     }
 
     /**
@@ -179,9 +177,9 @@ public class ClickSortedCommands {
      * without messaging when the result was not cancelled. Owns the cancel-report half of every
      * setter call site so the idiom can't be half-applied.
      */
-    private static boolean blockedAndReported(Player player, PreferenceResult result) {
+    private static boolean blockedAndReported(ClickSortedPlugin plugin, Player player, PreferenceResult result) {
         if (!result.cancelled()) return false;
-        MessageUtil.preferenceBlocked(player, result);
+        PreferenceMessages.preferenceBlocked(plugin, player, result);
         return true;
     }
 
@@ -192,10 +190,9 @@ public class ClickSortedCommands {
      */
     private static void reportBlacklistResult(ClickSortedPlugin plugin, Player player, PreferenceResult result,
             String appliedKey, String unchangedKey, String placeholder, String value) {
-        if (blockedAndReported(player, result)) return;
-        MessageUtil.statusMessage(player,
-                plugin.getConfigManager().lang(player.locale()).getColoredMessage(result.applied() ? appliedKey : unchangedKey,
-                        Placeholder.unparsed(placeholder, value)));
+        if (blockedAndReported(plugin, player, result)) return;
+        plugin.messages().to(player).status().send(result.applied() ? appliedKey : unchangedKey,
+                Placeholder.unparsed(placeholder, value));
     }
 
     // -------------------------------------------------------------------------
@@ -222,10 +219,9 @@ public class ClickSortedCommands {
 
     /** Send the shared "invalid value" error naming {@code raw} and the {@code valid} options. */
     private static void sendInvalidValue(ClickSortedPlugin plugin, Player player, String raw, String valid) {
-        MessageUtil.errorMessage(player,
-                plugin.getConfigManager().lang(player.locale()).getColoredMessage("invalidValue",
-                        Placeholder.unparsed("value", raw),
-                        Placeholder.unparsed("valid", valid)));
+        plugin.messages().to(player).error().send("invalidValue",
+                Placeholder.unparsed("value", raw),
+                Placeholder.unparsed("valid", valid));
     }
 
     private static final String BOOLEAN_VALUES = "yes, no";
@@ -257,12 +253,11 @@ public class ClickSortedCommands {
                                 return Command.SINGLE_SUCCESS;
                             }
                             PreferenceResult result = setter.apply(player, value);
-                            if (blockedAndReported(player, result)) {
+                            if (blockedAndReported(plugin, player, result)) {
                                 return Command.SINGLE_SUCCESS;
                             }
-                            MessageUtil.statusMessage(player,
-                                    plugin.getConfigManager().lang(player.locale()).getColoredMessage(langKey,
-                                            Placeholder.unparsed(placeholder, value.toString())));
+                            plugin.messages().to(player).status().send(langKey,
+                                    Placeholder.unparsed(placeholder, value.toString()));
                             return Command.SINGLE_SUCCESS;
                         }));
     }
@@ -324,18 +319,16 @@ public class ClickSortedCommands {
                             try {
                                 SortingMethod method = SortingMethod.valueOf(arg.toUpperCase());
                                 if (!method.isAvailable()) {
-                                    MessageUtil.errorMessage(player,
-                                            plugin.getConfigManager().lang(player.locale()).getColoredMessage("sortingMethodNotAvailable",
-                                                    Placeholder.unparsed("method", method.toString())));
+                                    plugin.messages().to(player).error().send("sortingMethodNotAvailable",
+                                            Placeholder.unparsed("method", method.toString()));
                                     return Command.SINGLE_SUCCESS;
                                 }
                                 PreferenceResult result = plugin.getSortingPrefs().setSortingMethod(player, method);
-                                if (blockedAndReported(player, result)) {
+                                if (blockedAndReported(plugin, player, result)) {
                                     return Command.SINGLE_SUCCESS;
                                 }
-                                MessageUtil.statusMessage(player,
-                                        plugin.getConfigManager().lang(player.locale()).getColoredMessage("setSortingMethodTo",
-                                                Placeholder.unparsed("method", method.toString())));
+                                plugin.messages().to(player).status().send("setSortingMethodTo",
+                                        Placeholder.unparsed("method", method.toString()));
                             } catch (IllegalArgumentException ignored) {
                                 sendInvalidValue(plugin, player, arg,
                                         validList(SortingMethod.values(), SortingMethod::isAvailable));
@@ -362,13 +355,12 @@ public class ClickSortedCommands {
                             try {
                                 ClickMethod method = ClickMethod.valueOf(arg.toUpperCase());
                                 PreferenceResult result = plugin.getSortingPrefs().setClickMethod(player, method);
-                                if (blockedAndReported(player, result)) {
+                                if (blockedAndReported(plugin, player, result)) {
                                     return Command.SINGLE_SUCCESS;
                                 }
-                                MessageUtil.statusMessage(player,
-                                        plugin.getConfigManager().lang(player.locale()).getColoredMessage("setClickMethodTo",
-                                                Placeholder.unparsed("method", method.toString()),
-                                                Placeholder.unparsed("instruction", method.getInstruction(player.locale()))));
+                                plugin.messages().to(player).status().send("setClickMethodTo",
+                                        Placeholder.unparsed("method", method.toString()),
+                                        Placeholder.unparsed("instruction", method.getInstruction(player.locale())));
                                 // Methods that govern hover (SINGLE_CLICK, CONTROL_DROP) force the player's
                                 // hover preference to the only usable value, messaging them on any change.
                                 PreferenceRepair.enforceHover(plugin, player, method);
@@ -423,17 +415,15 @@ public class ClickSortedCommands {
         ClickMethod clickMethod = plugin.getSortingPrefs().getClickMethod(player);
         if (clickMethod.requiredSortOverItems().isPresent()) {
             // The active click method governs hover; refuse to change the stored value and explain why.
-            MessageUtil.statusMessage(player,
-                    plugin.getConfigManager().lang(player.locale()).getColoredMessage("hoverGovernedByClickMethod",
-                            Placeholder.unparsed("method", clickMethod.name())));
+            plugin.messages().to(player).status().send("hoverGovernedByClickMethod",
+                    Placeholder.unparsed("method", clickMethod.name()));
             return;
         }
-        if (blockedAndReported(player, plugin.getSortingPrefs().setSortOverItems(player, enabled))) {
+        if (blockedAndReported(plugin, player, plugin.getSortingPrefs().setSortOverItems(player, enabled))) {
             return;
         }
-        MessageUtil.statusMessage(player,
-                plugin.getConfigManager().lang(player.locale()).getColoredMessage("setSortOverItemsStatus",
-                        Placeholder.unparsed("status", enabledLabel(enabled))));
+        plugin.messages().to(player).status().send("setSortOverItemsStatus",
+                Placeholder.unparsed("status", enabledLabel(enabled)));
     }
 
     private static final java.util.Set<String> ON_WORDS = java.util.Set.of("enable", "on", "true", "yes");
@@ -453,8 +443,7 @@ public class ClickSortedCommands {
         if (ctx.getSource().getExecutor() instanceof Player player) {
             return player;
         }
-        MessageUtil.errorMessage(ctx.getSource().getSender(),
-                plugin.getConfigManager().lang().getColoredMessage("notFromConsole"));
+        plugin.messages().to(ctx.getSource().getSender()).error().send("notFromConsole");
         return null;
     }
 
@@ -519,15 +508,14 @@ public class ClickSortedCommands {
         // Stop at the first veto: running the second setter after the first was cancelled would
         // fire a spurious event, and (worse) reporting "blocked" after one half already persisted
         // makes chat contradict the actual state.
-        if (blockedAndReported(player, plugin.getSortingPrefs().setBundlePackInInventory(player, enabled))) {
+        if (blockedAndReported(plugin, player, plugin.getSortingPrefs().setBundlePackInInventory(player, enabled))) {
             return;
         }
-        if (blockedAndReported(player, plugin.getSortingPrefs().setBundlePackInContainers(player, enabled))) {
+        if (blockedAndReported(plugin, player, plugin.getSortingPrefs().setBundlePackInContainers(player, enabled))) {
             return;
         }
-        MessageUtil.statusMessage(player,
-                plugin.getConfigManager().lang(player.locale()).getColoredMessage("setBundlePackEnabledStatus",
-                        Placeholder.unparsed("status", enabledLabel(enabled))));
+        plugin.messages().to(player).status().send("setBundlePackEnabledStatus",
+                Placeholder.unparsed("status", enabledLabel(enabled)));
     }
 
     /** A {@code /clicksorted bundle <literal> <yes|no>} boolean toggle persisting via {@code setter}. */
@@ -536,12 +524,11 @@ public class ClickSortedCommands {
             java.util.function.BiFunction<Player, Boolean, PreferenceResult> setter) {
         return Commands.literal(literal)
                 .then(boolStateArg(plugin, (player, state) -> {
-                    if (blockedAndReported(player, setter.apply(player, state))) {
+                    if (blockedAndReported(plugin, player, setter.apply(player, state))) {
                         return;
                     }
-                    MessageUtil.statusMessage(player,
-                            plugin.getConfigManager().lang(player.locale()).getColoredMessage(langKey,
-                                    Placeholder.unparsed("status", enabledLabel(state))));
+                    plugin.messages().to(player).status().send(langKey,
+                            Placeholder.unparsed("status", enabledLabel(state)));
                 }));
     }
 
@@ -595,12 +582,11 @@ public class ClickSortedCommands {
                                 }
                             }
                             PreferenceResult result = plugin.getSortingPrefs().setBundleStackLimit(player, limit);
-                            if (blockedAndReported(player, result)) {
+                            if (blockedAndReported(plugin, player, result)) {
                                 return Command.SINGLE_SUCCESS;
                             }
-                            MessageUtil.statusMessage(player,
-                                    plugin.getConfigManager().lang(player.locale()).getColoredMessage("setBundleStackLimitStatus",
-                                            Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
+                            plugin.messages().to(player).status().send("setBundleStackLimitStatus",
+                                    Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off"));
                             return Command.SINGLE_SUCCESS;
                         }));
     }
@@ -608,15 +594,14 @@ public class ClickSortedCommands {
     /** Print the player's current bundle-packing settings, including the blacklist. */
     static void sendBundleStatus(ClickSortedPlugin plugin, Player player) {
         var prefs = plugin.getSortingPrefs();
-        var lang = plugin.getConfigManager().lang(player.locale());
-        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleInInventory",
-                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInInventory(player)))));
-        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleInContainers",
-                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInContainers(player)))));
+        plugin.messages().to(player).status().send("statusBundleInInventory",
+                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInInventory(player))));
+        plugin.messages().to(player).status().send("statusBundleInContainers",
+                Placeholder.unparsed("status", enabledLabel(prefs.getBundlePackInContainers(player))));
         int limit = prefs.getBundleStackLimit(player);
-        MessageUtil.statusMessage(player, lang.getColoredMessage("statusBundleStackLimit",
-                Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off")));
-        printBlacklistSection(player, lang, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
+        plugin.messages().to(player).status().send("statusBundleStackLimit",
+                Placeholder.unparsed("limit", limit > 0 ? String.valueOf(limit) : "off"));
+        printBlacklistSection(plugin, player, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
                 "statusBundleBlacklistEmpty", "statusBundleBlacklistMaterials", "statusBundleBlacklistNames");
     }
 
@@ -630,28 +615,27 @@ public class ClickSortedCommands {
     }
 
     static void sendBlacklistStatus(ClickSortedPlugin plugin, Player player) {
-        var lang = plugin.getConfigManager().lang(player.locale());
         var prefs = plugin.getSortingPrefs();
-        printBlacklistSection(player, lang, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
+        printBlacklistSection(plugin, player, prefs.getBundleBlacklist(player), prefs.getBundleBlacklistNames(player),
                 "setBundleBlacklistEmpty", "setBundleBlacklistMaterialsList", "setBundleBlacklistNamesList");
     }
 
-    private static void printBlacklistSection(Player player, Localized lang,
+    private static void printBlacklistSection(ClickSortedPlugin plugin, Player player,
             Set<Material> materials, Set<String> names,
             String emptyKey, String materialsKey, String namesKey) {
         if (materials.isEmpty() && names.isEmpty()) {
-            MessageUtil.statusMessage(player, lang.getColoredMessage(emptyKey));
+            plugin.messages().to(player).status().send(emptyKey);
             return;
         }
         if (!materials.isEmpty()) {
             String list = materials.stream().map(Material::name).sorted().collect(Collectors.joining(", "));
-            MessageUtil.statusMessage(player, lang.getColoredMessage(materialsKey,
-                    Placeholder.unparsed("list", list)));
+            plugin.messages().to(player).status().send(materialsKey,
+                    Placeholder.unparsed("list", list));
         }
         if (!names.isEmpty()) {
             String list = names.stream().sorted().collect(Collectors.joining(", "));
-            MessageUtil.statusMessage(player, lang.getColoredMessage(namesKey,
-                    Placeholder.unparsed("list", list)));
+            plugin.messages().to(player).status().send(namesKey,
+                    Placeholder.unparsed("list", list));
         }
     }
 
@@ -778,13 +762,12 @@ public class ClickSortedCommands {
                                 return Command.SINGLE_SUCCESS;
                             }
                             PreferenceResult result = plugin.getSortingPrefs().clearBundleBlacklist(player);
-                            if (blockedAndReported(player, result)) {
+                            if (blockedAndReported(plugin, player, result)) {
                                 return Command.SINGLE_SUCCESS;
                             }
                             // APPLIED and UNCHANGED (already empty) both report "cleared" — matches the
                             // prior unconditional behavior, which never distinguished the two.
-                            MessageUtil.statusMessage(player,
-                                    plugin.getConfigManager().lang(player.locale()).getColoredMessage("setBundleBlacklistCleared"));
+                            plugin.messages().to(player).status().send("setBundleBlacklistCleared");
                             return Command.SINGLE_SUCCESS;
                         }));
     }
@@ -803,25 +786,24 @@ public class ClickSortedCommands {
                         return Command.SINGLE_SUCCESS;
                     }
                     var prefs = plugin.getSortingPrefs();
-                    var lang = plugin.getConfigManager().lang(player.locale());
                     boolean enabled = prefs.getEnabled(player);
                     ClickMethod clickMethod = prefs.getClickMethod(player);
                     SortingMethod sortMethod = prefs.getSortingMethod(player);
                     StartCorner startCorner = prefs.getStartCorner(player);
                     FillAxis fillAxis = prefs.getFillAxis(player);
                     boolean hover = prefs.getSortOverItems(player);
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusEnabled",
-                            Placeholder.unparsed("status", enabledLabel(enabled))));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusClickMethod",
-                            Placeholder.unparsed("method", clickMethod.toString())));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusSortMethod",
-                            Placeholder.unparsed("method", sortMethod.toString())));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusStartCorner",
-                            Placeholder.unparsed("corner", startCorner.toString())));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusFillAxis",
-                            Placeholder.unparsed("axis", fillAxis.toString())));
-                    MessageUtil.statusMessage(player, lang.getColoredMessage("statusHover",
-                            Placeholder.unparsed("status", enabledLabel(hover))));
+                    plugin.messages().to(player).status().send("statusEnabled",
+                            Placeholder.unparsed("status", enabledLabel(enabled)));
+                    plugin.messages().to(player).status().send("statusClickMethod",
+                            Placeholder.unparsed("method", clickMethod.toString()));
+                    plugin.messages().to(player).status().send("statusSortMethod",
+                            Placeholder.unparsed("method", sortMethod.toString()));
+                    plugin.messages().to(player).status().send("statusStartCorner",
+                            Placeholder.unparsed("corner", startCorner.toString()));
+                    plugin.messages().to(player).status().send("statusFillAxis",
+                            Placeholder.unparsed("axis", fillAxis.toString()));
+                    plugin.messages().to(player).status().send("statusHover",
+                            Placeholder.unparsed("status", enabledLabel(hover)));
                     sendBundleStatus(plugin, player);
                     return Command.SINGLE_SUCCESS;
                 });
@@ -840,14 +822,12 @@ public class ClickSortedCommands {
                     } catch (MigrationException e) {
                         Log.severe("Config migration failed on reload; keeping previous configuration.", e);
                         Throwable root = e.getCause() != null ? e.getCause() : e;
-                        MessageUtil.statusMessage(ctx.getSource().getSender(),
-                                plugin.getConfigManager().lang().getColoredMessage("configReloadFailed",
-                                        Placeholder.unparsed("reason", String.valueOf(root.getMessage()))));
+                        plugin.messages().to(ctx.getSource().getSender()).status().send("configReloadFailed",
+                                Placeholder.unparsed("reason", String.valueOf(root.getMessage())));
                         return Command.SINGLE_SUCCESS;
                     }
                     plugin.getUpdateChecker().restart();
-                    MessageUtil.statusMessage(ctx.getSource().getSender(),
-                            plugin.getConfigManager().lang().getColoredMessage("configReloaded"));
+                    plugin.messages().to(ctx.getSource().getSender()).status().send("configReloaded");
                     return Command.SINGLE_SUCCESS;
                 });
     }
@@ -862,8 +842,8 @@ public class ClickSortedCommands {
                 .executes(ctx -> {
                     for (String key : plugin.getConfig().getKeys(true)) {
                         if (!plugin.getConfig().isConfigurationSection(key)) {
-                            MessageUtil.rawMessage(ctx.getSource().getSender(),
-                                    key + " = " + plugin.getConfig().get(key));
+                            plugin.messages().to(ctx.getSource().getSender()).raw()
+                                    .send(Component.text(key + " = " + plugin.getConfig().get(key)));
                         }
                     }
                     return Command.SINGLE_SUCCESS;
@@ -880,9 +860,8 @@ public class ClickSortedCommands {
                 .executes(ctx -> {
                     DebugLevel next = Log.getDebugLevel() == DebugLevel.OFF ? DebugLevel.DEBUG : DebugLevel.OFF;
                     Log.setDebugLevel(next);
-                    MessageUtil.statusMessage(ctx.getSource().getSender(),
-                            plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
-                                    Placeholder.unparsed("level", next.name())));
+                    plugin.messages().to(ctx.getSource().getSender()).status().send("setDebugLevelTo",
+                            Placeholder.unparsed("level", next.name()));
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(Commands.argument("level", StringArgumentType.word())
@@ -892,13 +871,11 @@ public class ClickSortedCommands {
                             try {
                                 DebugLevel level = DebugLevel.valueOf(arg.toUpperCase());
                                 Log.setDebugLevel(level);
-                                MessageUtil.statusMessage(ctx.getSource().getSender(),
-                                        plugin.getConfigManager().lang().getColoredMessage("setDebugLevelTo",
-                                                Placeholder.unparsed("level", level.name())));
+                                plugin.messages().to(ctx.getSource().getSender()).status().send("setDebugLevelTo",
+                                        Placeholder.unparsed("level", level.name()));
                             } catch (IllegalArgumentException ignored) {
-                                MessageUtil.errorMessage(ctx.getSource().getSender(),
-                                        plugin.getConfigManager().lang().getColoredMessage("invalidDebugLevel",
-                                                Placeholder.unparsed("level", arg)));
+                                plugin.messages().to(ctx.getSource().getSender()).error().send("invalidDebugLevel",
+                                        Placeholder.unparsed("level", arg));
                             }
                             return Command.SINGLE_SUCCESS;
                         }));
@@ -928,20 +905,20 @@ public class ClickSortedCommands {
      */
     private static int runBenchmark(ClickSortedPlugin plugin, CommandSourceStack src, int iterations) {
         var sender = src.getSender();
-        MessageUtil.statusMessage(sender, "Running ClickSorted benchmark (" + iterations
-                + " iterations)—the server will pause briefly…");
+        plugin.messages().to(sender).status().send(Component.text("Running ClickSorted benchmark (" + iterations
+                + " iterations)—the server will pause briefly…"));
 
         BundleBenchmark.Result result = BundleBenchmark.run(iterations);
 
-        reportStats(sender, "sortAndMerge", result.sort());
-        reportStats(sender, "bundle repack", result.repack());
+        reportStats(plugin, sender, "sortAndMerge", result.sort());
+        reportStats(plugin, sender, "bundle repack", result.repack());
         return Command.SINGLE_SUCCESS;
     }
 
-    private static void reportStats(org.bukkit.command.CommandSender sender, String label, BundleBenchmark.Stats s) {
-        MessageUtil.statusMessage(sender, String.format(
+    private static void reportStats(ClickSortedPlugin plugin, org.bukkit.command.CommandSender sender, String label, BundleBenchmark.Stats s) {
+        plugin.messages().to(sender).status().send(Component.text(String.format(
                 "%s: min %.1f / median %.1f / p95 %.1f / max %.1f µs/op (n=%d, %.1f ms total)",
                 label, s.minUs(), s.medianUs(), s.p95Us(), s.maxUs(), s.iterations(),
-                s.totalNanos() / 1_000_000.0));
+                s.totalNanos() / 1_000_000.0)));
     }
 }

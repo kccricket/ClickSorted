@@ -14,7 +14,7 @@ package net.kccricket.clicksorted.gui;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.kcmclib.text.lang.Localized;
-import net.kccricket.clicksorted.text.MessageUtil;
+import net.kccricket.kcmclib.text.Components;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -83,7 +83,7 @@ public final class BlacklistGuiHolder implements ClickSortedHolder {
         this.plugin = plugin;
         this.player = player;
         Localized lang = plugin.getConfigManager().lang(player.locale());
-        this.inventory = Bukkit.createInventory(this, GUI_SIZE, lang.getColoredMessage("blacklistGuiTitle"));
+        this.inventory = Bukkit.createInventory(this, GUI_SIZE, lang.render("blacklistGuiTitle"));
         this.page = 0;
         refresh();
     }
@@ -208,7 +208,7 @@ public final class BlacklistGuiHolder implements ClickSortedHolder {
         // Non-item materials (e.g. a stale entry stored before validation) have no ItemMeta; show the
         // bare item rather than throwing and breaking the whole GUI.
         if (meta != null) {
-            meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
+            meta.lore(Components.toLore(lang.render("blacklistEntryLore")));
             item.setItemMeta(meta);
         }
         return item;
@@ -223,7 +223,7 @@ public final class BlacklistGuiHolder implements ClickSortedHolder {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name).decoration(TextDecoration.ITALIC, false));
         meta.setEnchantmentGlintOverride(true);
-        meta.lore(MessageUtil.toLore(lang.getColoredMessage("blacklistEntryLore")));
+        meta.lore(Components.toLore(lang.render("blacklistEntryLore")));
         item.setItemMeta(meta);
         return item;
     }
@@ -231,7 +231,7 @@ public final class BlacklistGuiHolder implements ClickSortedHolder {
     private static ItemStack buildArrow(Localized lang, boolean next) {
         ItemStack arrow = new ItemStack(Material.ARROW);
         ItemMeta meta = arrow.getItemMeta();
-        meta.displayName(lang.getColoredMessage(next ? "blacklistArrowNext" : "blacklistArrowPrev"));
+        meta.displayName(lang.render(next ? "blacklistArrowNext" : "blacklistArrowPrev"));
         arrow.setItemMeta(meta);
         return arrow;
     }

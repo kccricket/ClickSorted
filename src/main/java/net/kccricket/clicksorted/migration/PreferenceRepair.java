@@ -18,7 +18,6 @@ import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
-import net.kccricket.clicksorted.text.MessageUtil;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -86,11 +85,10 @@ public final class PreferenceRepair {
             return;
         }
         pdc.remove(key);
-        var lang = plugin.getConfigManager().lang(player.locale());
-        MessageUtil.statusMessage(player, lang.getColoredMessage("prefResetInvalid",
+        plugin.messages().to(player).status().send("prefResetInvalid",
                 Placeholder.unparsed("pref", pref.label()),
                 Placeholder.unparsed("value", stored),
-                Placeholder.unparsed("default", currentDefault(plugin, player, pref))));
+                Placeholder.unparsed("default", currentDefault(plugin, player, pref)));
     }
 
     /** The name of the value the read path resolves to now that {@code pref}'s key has been removed. */
@@ -119,10 +117,9 @@ public final class PreferenceRepair {
                 if (!result.applied()) {
                     return;
                 }
-                var lang = plugin.getConfigManager().lang(player.locale());
-                MessageUtil.statusMessage(player, lang.getColoredMessage("hoverForcedByClickMethod",
+                plugin.messages().to(player).status().send("hoverForcedByClickMethod",
                         Placeholder.unparsed("status", required ? "ENABLED" : "DISABLED"),
-                        Placeholder.unparsed("method", method.name())));
+                        Placeholder.unparsed("method", method.name()));
             }
         });
     }

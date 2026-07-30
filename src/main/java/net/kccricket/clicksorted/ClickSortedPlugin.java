@@ -25,8 +25,7 @@ import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.security.ActionThrottle;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
 import net.kccricket.clicksorted.sort.InventorySortService;
-import net.kccricket.kcmclib.text.CooldownMessenger;
-import net.kccricket.clicksorted.text.MessageUtil;
+import net.kccricket.kcmclib.text.Messenger;
 import net.kccricket.kcmclib.update.ModrinthUpdateChecker;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bstats.bukkit.Metrics;
@@ -36,7 +35,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.List;
 
 public class ClickSortedPlugin extends JavaPlugin {
-    private final CooldownMessenger messenger = new CooldownMessenger();
+    private Messenger messenger;
     private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
     private ConfigManager configManager;
@@ -66,7 +65,7 @@ public class ClickSortedPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        MessageUtil.init(configManager);
+        messenger = new Messenger(configManager);
 
         if (getConfig().getBoolean("enable_metrics", true)) {
             metrics = new Metrics(this, 31833);
@@ -111,7 +110,6 @@ public class ClickSortedPlugin extends JavaPlugin {
         if (configManager != null) {
             configManager.saveAll();
         }
-        MessageUtil.init(null);
         instance = null;
     }
 
@@ -119,7 +117,12 @@ public class ClickSortedPlugin extends JavaPlugin {
         return instance;
     }
 
-    public CooldownMessenger getMessenger() {
+    /**
+     * The single entry point for sending a message to a player or console — see
+     * {@link Messenger}'s class javadoc. Built in {@link #onEnable} once {@link #configManager}
+     * exists (it reads lang live through it, so there is nothing to re-init on reload).
+     */
+    public Messenger messages() {
         return messenger;
     }
 

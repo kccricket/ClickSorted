@@ -15,7 +15,7 @@ package net.kccricket.clicksorted.gui;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.kcmclib.text.lang.Localized;
 import net.kccricket.clicksorted.sort.ProtectedSlots;
-import net.kccricket.clicksorted.text.MessageUtil;
+import net.kccricket.kcmclib.text.Components;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -58,7 +58,7 @@ public final class LockGuiHolder implements ClickSortedHolder {
     public LockGuiHolder(ClickSortedPlugin plugin, Player player) {
         Localized lang = plugin.getConfigManager().lang(player.locale());
         this.inventory = Bukkit.createInventory(this, GUI_SIZE,
-                lang.getColoredMessage("lockGuiTitle"));
+                lang.render("lockGuiTitle"));
 
         // Build admin-slot snapshot covering both config and permission channels for this player.
         this.admin = ProtectedSlots.forSort(player, plugin.getConfigManager().main());
@@ -116,10 +116,10 @@ public final class LockGuiHolder implements ClickSortedHolder {
 
         ItemStack pane = new ItemStack(locked ? Material.BARRIER : Material.LIME_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage(locked ? "lockPaneLocked" : "lockPaneUnlocked"));
-        meta.lore(MessageUtil.toLore(
-                lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
-                lang.getColoredMessage(locked ? "lockPaneLockedLore" : "lockPaneUnlockedLore")));
+        meta.displayName(lang.render(locked ? "lockPaneLocked" : "lockPaneUnlocked"));
+        meta.lore(Components.toLore(
+                lang.render(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
+                lang.render(locked ? "lockPaneLockedLore" : "lockPaneUnlockedLore")));
         pane.setItemMeta(meta);
         return pane;
     }
@@ -136,10 +136,10 @@ public final class LockGuiHolder implements ClickSortedHolder {
 
         ItemStack pane = new ItemStack(Material.IRON_BARS);
         ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("lockPaneAdmin"));
-        meta.lore(MessageUtil.toLore(
-                lang.getColoredMessage(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
-                lang.getColoredMessage("lockPaneAdminLore")));
+        meta.displayName(lang.render("lockPaneAdmin"));
+        meta.lore(Components.toLore(
+                lang.render(slotLangKey, Placeholder.unparsed("number", String.valueOf(displayNumber))),
+                lang.render("lockPaneAdminLore")));
         pane.setItemMeta(meta);
         return pane;
     }

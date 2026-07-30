@@ -29,7 +29,7 @@ import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
-import net.kccricket.clicksorted.text.MessageUtil;
+import net.kccricket.clicksorted.text.PreferenceMessages;
 import net.kccricket.kcmclib.text.lang.Localized;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
@@ -153,7 +153,7 @@ public final class PreferencesDialog {
                 .toList();
 
         Dialog dialog = Dialog.create(factory -> factory.empty()
-                .base(DialogBase.builder(lang.getColoredMessage("dialogTitle"))
+                .base(DialogBase.builder(lang.render("dialogTitle"))
                         .inputs(inputs)
                         .build())
                 .type(DialogType.multiAction(buttons).build()));
@@ -254,7 +254,7 @@ public final class PreferencesDialog {
 
     /** Translates one plain-value {@link InputSpec} into the Paper dialog input it describes. */
     private static DialogInput toPaperInput(InputSpec spec, Localized lang) {
-        Component label = lang.getColoredMessage(spec.element().langKey());
+        Component label = lang.render(spec.element().langKey());
         return switch (spec.kind()) {
             case BOOL -> DialogInput.bool(spec.element().key(), label, spec.boolInitial(), "true", "false");
             case SINGLE_OPTION -> {
@@ -274,7 +274,7 @@ public final class PreferencesDialog {
 
     /** Translates one {@link ButtonSpec} into the Paper action button, wiring its click callback. */
     private static ActionButton toPaperButton(ButtonSpec spec, ClickSortedPlugin plugin, Localized lang) {
-        Component label = lang.getColoredMessage(spec.element().langKey());
+        Component label = lang.render(spec.element().langKey());
         return switch (spec.element()) {
             case LOCK_BUTTON -> ActionButton.builder(label)
                     .action(DialogAction.customClick((view, audience) -> {
@@ -367,49 +367,48 @@ public final class PreferencesDialog {
      */
     public static void applyResponse(ClickSortedPlugin plugin, Player player, PendingPrefs values) {
         PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-        Localized lang = plugin.getConfigManager().lang(player.locale());
 
         if (values.clickMethod() != null) {
-            if (reportIfBlocked(player, prefs.setClickMethod(player, values.clickMethod()))) {
+            if (reportIfBlocked(plugin, player, prefs.setClickMethod(player, values.clickMethod()))) {
                 return;
             }
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setClickMethodTo",
+            plugin.messages().to(player).status().send("setClickMethodTo",
                     Placeholder.unparsed("method", values.clickMethod().toString()),
-                    Placeholder.unparsed("instruction", values.clickMethod().getInstruction(player.locale()))));
+                    Placeholder.unparsed("instruction", values.clickMethod().getInstruction(player.locale())));
             PreferenceRepair.enforceHover(plugin, player, values.clickMethod());
             player.updateCommands();
         }
 
         if (values.enabled() != null) {
-            if (reportIfBlocked(player, prefs.setEnabled(player, values.enabled()))) {
+            if (reportIfBlocked(plugin, player, prefs.setEnabled(player, values.enabled()))) {
                 return;
             }
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setEnabledStatus",
-                    Placeholder.unparsed("status", label(values.enabled()))));
+            plugin.messages().to(player).status().send("setEnabledStatus",
+                    Placeholder.unparsed("status", label(values.enabled())));
         }
 
         if (values.sortingMethod() != null) {
-            if (reportIfBlocked(player, prefs.setSortingMethod(player, values.sortingMethod()))) {
+            if (reportIfBlocked(plugin, player, prefs.setSortingMethod(player, values.sortingMethod()))) {
                 return;
             }
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setSortingMethodTo",
-                    Placeholder.unparsed("method", values.sortingMethod().toString())));
+            plugin.messages().to(player).status().send("setSortingMethodTo",
+                    Placeholder.unparsed("method", values.sortingMethod().toString()));
         }
 
         if (values.startCorner() != null) {
-            if (reportIfBlocked(player, prefs.setStartCorner(player, values.startCorner()))) {
+            if (reportIfBlocked(plugin, player, prefs.setStartCorner(player, values.startCorner()))) {
                 return;
             }
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setStartCornerTo",
-                    Placeholder.unparsed("corner", values.startCorner().toString())));
+            plugin.messages().to(player).status().send("setStartCornerTo",
+                    Placeholder.unparsed("corner", values.startCorner().toString()));
         }
 
         if (values.fillAxis() != null) {
-            if (reportIfBlocked(player, prefs.setFillAxis(player, values.fillAxis()))) {
+            if (reportIfBlocked(plugin, player, prefs.setFillAxis(player, values.fillAxis()))) {
                 return;
             }
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setFillAxisTo",
-                    Placeholder.unparsed("axis", values.fillAxis().toString())));
+            plugin.messages().to(player).status().send("setFillAxisTo",
+                    Placeholder.unparsed("axis", values.fillAxis().toString()));
         }
 
         if (values.sortOverItems() != null) {
@@ -418,28 +417,28 @@ public final class PreferencesDialog {
             // whenever the *seeded* click method governs hover, but a click-method change applied
             // just above in this same batch can newly govern it.
             if (prefs.getClickMethod(player).requiredSortOverItems().isEmpty()) {
-                if (reportIfBlocked(player, prefs.setSortOverItems(player, values.sortOverItems()))) {
+                if (reportIfBlocked(plugin, player, prefs.setSortOverItems(player, values.sortOverItems()))) {
                     return;
                 }
-                MessageUtil.statusMessage(player, lang.getColoredMessage("setSortOverItemsStatus",
-                        Placeholder.unparsed("status", label(values.sortOverItems()))));
+                plugin.messages().to(player).status().send("setSortOverItemsStatus",
+                        Placeholder.unparsed("status", label(values.sortOverItems())));
             }
         }
 
         if (values.bundleInInventory() != null) {
-            if (reportIfBlocked(player, prefs.setBundlePackInInventory(player, values.bundleInInventory()))) {
+            if (reportIfBlocked(plugin, player, prefs.setBundlePackInInventory(player, values.bundleInInventory()))) {
                 return;
             }
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundlePackInInventoryStatus",
-                    Placeholder.unparsed("status", label(values.bundleInInventory()))));
+            plugin.messages().to(player).status().send("setBundlePackInInventoryStatus",
+                    Placeholder.unparsed("status", label(values.bundleInInventory())));
         }
 
         if (values.bundleInContainers() != null) {
-            if (reportIfBlocked(player, prefs.setBundlePackInContainers(player, values.bundleInContainers()))) {
+            if (reportIfBlocked(plugin, player, prefs.setBundlePackInContainers(player, values.bundleInContainers()))) {
                 return;
             }
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundlePackInContainersStatus",
-                    Placeholder.unparsed("status", label(values.bundleInContainers()))));
+            plugin.messages().to(player).status().send("setBundlePackInContainersStatus",
+                    Placeholder.unparsed("status", label(values.bundleInContainers())));
         }
 
         if (values.bundleStackLimit() != null) {
@@ -447,11 +446,11 @@ public final class PreferencesDialog {
             // ClickSortedCommands#buildBundleStackLimit so a huge value can't behave as "no limit"
             // while the status message still reports the raw number.
             int clamped = Math.min(64, Math.max(0, values.bundleStackLimit()));
-            if (reportIfBlocked(player, prefs.setBundleStackLimit(player, clamped))) {
+            if (reportIfBlocked(plugin, player, prefs.setBundleStackLimit(player, clamped))) {
                 return;
             }
-            MessageUtil.statusMessage(player, lang.getColoredMessage("setBundleStackLimitStatus",
-                    Placeholder.unparsed("limit", clamped > 0 ? String.valueOf(clamped) : "off")));
+            plugin.messages().to(player).status().send("setBundleStackLimitStatus",
+                    Placeholder.unparsed("limit", clamped > 0 ? String.valueOf(clamped) : "off"));
         }
     }
 
@@ -460,11 +459,11 @@ public final class PreferencesDialog {
     }
 
     /** Reports a listener-vetoed change and returns {@code true}; {@code false} if not cancelled. */
-    private static boolean reportIfBlocked(Player player, PreferenceResult result) {
+    private static boolean reportIfBlocked(ClickSortedPlugin plugin, Player player, PreferenceResult result) {
         if (!result.cancelled()) {
             return false;
         }
-        MessageUtil.preferenceBlocked(player, result);
+        PreferenceMessages.preferenceBlocked(plugin, player, result);
         return true;
     }
 }

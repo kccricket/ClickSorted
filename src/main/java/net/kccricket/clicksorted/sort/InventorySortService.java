@@ -22,7 +22,6 @@ import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.security.Permissions;
-import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
@@ -182,7 +181,7 @@ public class InventorySortService {
             // cancelling listener can't spam chat on rapid clicking.
             var reason = sortEvent.getCancelReason();
             if (reason != null) {
-                plugin.getMessenger().message(p, "sortCancelReason", 3, MessageUtil.withPrefix(p, reason));
+                plugin.messages().to(p).status().throttle("sortCancelReason", 3).send(reason);
             }
             return false;
         }
@@ -230,7 +229,7 @@ public class InventorySortService {
                 : SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
-            MessageUtil.errorMessage(p, plugin.getConfigManager().lang(p.locale()).getColoredMessage("invOverFlow"));
+            plugin.messages().to(p).error().send("invOverFlow");
             return false;
         }
 
@@ -440,7 +439,7 @@ public class InventorySortService {
         if (!overflow.isEmpty()) {
             // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
             // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
-            MessageUtil.alertMessage(p, plugin.getConfigManager().lang(p.locale()).getColoredMessage("dropItems"));
+            plugin.messages().to(p).alert().send("dropItems");
             for (ItemStack item : overflow) {
                 Log.debug("dropping " + item + " by player " + p.getName());
                 p.getWorld().dropItemNaturally(p.getLocation(), item);

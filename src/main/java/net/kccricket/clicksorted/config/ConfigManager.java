@@ -1,6 +1,7 @@
 package net.kccricket.clicksorted.config;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.kcmclib.text.LangProvider;
 import net.kccricket.kcmclib.text.lang.Localized;
 
 import java.util.Locale;
@@ -13,8 +14,11 @@ import java.util.Locale;
  * {@link net.kccricket.kcmclib.config.ResourceUpdater#update} on load/reload, so their files are
  * recreated from bundled defaults if missing — including after a mid-session delete followed by
  * {@code /clicksorted reload}.
+ *
+ * <p>Implements {@link LangProvider} so {@link net.kccricket.kcmclib.text.Messenger} can resolve
+ * lang keys without depending on this plugin-specific type.
  */
-public class ConfigManager {
+public class ConfigManager implements LangProvider {
 
     private final MainConfig main;
     private final GroupsConfig groups;
@@ -57,8 +61,10 @@ public class ConfigManager {
     public ItemsConfig items() { return items; }
 
     /** The default-locale-bound message handle — console output and any non-player sender. */
+    @Override
     public Localized lang() { return lang.defaultLocale(); }
 
     /** The message handle bound to {@code locale} — used for player-facing call sites. */
+    @Override
     public Localized lang(Locale locale) { return lang.forLocale(locale); }
 }

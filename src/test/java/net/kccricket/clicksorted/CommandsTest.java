@@ -380,7 +380,7 @@ class CommandsTest extends AbstractClickSortedTest {
 
     @Test
     void statusMessageIsPrefixedWithPluginTag() {
-        String prefix = plugin.getConfigManager().lang().getMessage("prefix", "");
+        String prefix = plugin.getConfigManager().lang().raw("prefix", "");
         assumeFalse(prefix.isEmpty(), "prefix key is empty — nothing to assert");
 
         PlayerMock player = server.addPlayer("Alice");

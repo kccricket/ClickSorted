@@ -45,7 +45,7 @@ public class LangConfig implements ManagedConfig, MessageSource {
     private static final String DIR = "lang";
 
     private final ClickSortedPlugin plugin;
-    // Reassigned on load/reload; read on Folia region threads via getMessage/getColoredMessage,
+    // Reassigned on load/reload; read on Folia region threads via raw/render,
     // so publish via volatile (matches GroupsConfig/ItemsConfig).
     private volatile LocaleMessages messages = new LocaleMessages(Map.of(), Map.of(), Locale.US);
 
@@ -141,13 +141,13 @@ public class LangConfig implements ManagedConfig, MessageSource {
     }
 
     @Override
-    public String getMessage(Locale locale, String path) {
-        return messages.getMessage(locale, path);
+    public String raw(Locale locale, String path) {
+        return messages.raw(locale, path);
     }
 
     @Override
-    public Component getColoredMessage(Locale locale, String path, TagResolver... resolvers) {
-        return messages.getColoredMessage(locale, path, resolvers);
+    public Component render(Locale locale, String path, TagResolver... resolvers) {
+        return messages.render(locale, path, resolvers);
     }
 
     @Override

@@ -59,12 +59,12 @@ public enum ClickMethod {
     public String getInstruction(Locale locale) {
         var lang = ClickSortedPlugin.getInstance().getConfigManager().lang(locale);
         return switch (this) {
-            case SINGLE_CLICK -> lang.getMessage("instructionSingle");
-            case DOUBLE_CLICK -> lang.getMessage("instructionDouble");
-            case SWAP -> lang.getMessage("instructionSwap");
-            case CONTROL_DROP -> lang.getMessage("instructionControlDrop");
-            case SHIFT_LEFT_CLICK -> lang.getMessage("instructionShiftLeftClick");
-            case SHIFT_RIGHT_CLICK -> lang.getMessage("instructionShiftRightClick");
+            case SINGLE_CLICK -> lang.raw("instructionSingle");
+            case DOUBLE_CLICK -> lang.raw("instructionDouble");
+            case SWAP -> lang.raw("instructionSwap");
+            case CONTROL_DROP -> lang.raw("instructionControlDrop");
+            case SHIFT_LEFT_CLICK -> lang.raw("instructionShiftLeftClick");
+            case SHIFT_RIGHT_CLICK -> lang.raw("instructionShiftRightClick");
         };
     }
 
