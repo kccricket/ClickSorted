@@ -347,6 +347,45 @@ class CommandsTest extends AbstractClickSortedTest {
                 "Non-op player should not be able to reload");
     }
 
+    // --- admin visibility: the "admin" literal itself must be gated by the OR of its
+    // children's own permissions, not left wide open (see ClickSortedCommands.buildAdmin) ---
+
+    @Test
+    void adminSubtreeUnreachableWithNoAdminPermissions() {
+        PlayerMock player = server.addPlayer("Bob");
+        // Not op, no explicit admin.commands.* permission.
+        drainMessages(player);
+
+        assertDoesNotThrow(() -> server.dispatchCommand(player, "clicksorted admin reload"));
+        assertDoesNotThrow(() -> server.dispatchCommand(player, "clicksorted admin debug TRACE"));
+
+        assertFalse(anyMessageContains(player, "MSG.configReloaded"));
+        assertFalse(anyMessageContains(player, "MSG.setDebugLevelTo"));
+    }
+
+    @Test
+    void adminSubtreeReachableWithOnlyReloadPermission() {
+        PlayerMock player = server.addPlayer("Bob");
+        player.addAttachment(plugin, "clicksorted.admin.commands.reload", true);
+        drainMessages(player);
+
+        assertDoesNotThrow(() -> server.dispatchCommand(player, "clicksorted admin reload"));
+
+        assertMessageSent(drainMessageList(player), "MSG.configReloaded");
+    }
+
+    @Test
+    void adminParentVisibilityDoesNotBypassASiblingsOwnPermission() {
+        PlayerMock player = server.addPlayer("Bob");
+        player.addAttachment(plugin, "clicksorted.admin.commands.reload", true);
+        // Deliberately NOT granted: clicksorted.admin.commands.debug
+        drainMessages(player);
+
+        assertDoesNotThrow(() -> server.dispatchCommand(player, "clicksorted admin debug TRACE"));
+
+        assertFalse(anyMessageContains(player, "MSG.setDebugLevelTo"));
+    }
+
     // --- admin debug (op-only) ---
 
     @Test

@@ -21,6 +21,7 @@ import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.security.Permissions;
+import net.kccricket.kcmclib.commands.Suggest;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.PreferenceMessages;
 import net.kyori.adventure.text.Component;
@@ -29,7 +30,6 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -94,11 +94,35 @@ public class ClickSortedCommands {
     }
 
     // -------------------------------------------------------------------------
-    // /clicksorted admin — groups diagnostic/admin subcommands
+    // /clicksorted admin — groups diagnostic/admin subcommands. Guarded by the OR of every
+    // child's own .requires predicate (canReload/canGetcfg/canDebug/canBenchmark below): a
+    // sender granted only one child node (e.g. clicksorted.admin.commands.reload) must still be
+    // able to reach that child. Without this, Brigadier still syncs "admin" to every player
+    // (it only prunes a literal whose own predicate fails, not one whose children all failed),
+    // so a plain player would see "admin" offered in tab completion with nothing reachable
+    // beneath it.
     // -------------------------------------------------------------------------
+
+    private static boolean canReload(CommandSourceStack src) {
+        return src.getSender().hasPermission(Permissions.PERM_ADMIN_RELOAD);
+    }
+
+    private static boolean canGetcfg(CommandSourceStack src) {
+        return src.getSender().hasPermission(Permissions.PERM_ADMIN_CONFIG);
+    }
+
+    private static boolean canDebug(CommandSourceStack src) {
+        return src.getSender().hasPermission(Permissions.PERM_ADMIN_DEBUG);
+    }
+
+    private static boolean canBenchmark(ClickSortedPlugin plugin, CommandSourceStack src) {
+        return plugin.getConfigManager().main().getEnableBenchmark()
+                && src.getSender().hasPermission(Permissions.PERM_ADMIN_BENCHMARK);
+    }
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildAdmin(ClickSortedPlugin plugin) {
         return Commands.literal("admin")
+                .requires(src -> canReload(src) || canGetcfg(src) || canDebug(src) || canBenchmark(plugin, src))
                 .then(buildDebug(plugin))
                 .then(buildGetcfg(plugin))
                 .then(buildReload(plugin))
@@ -240,7 +264,7 @@ public class ClickSortedCommands {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(permission))
                 .then(Commands.argument(argName, StringArgumentType.word())
-                        .suggests((ctx, builder) -> suggestEnum(builder, values, v -> true))
+                        .suggests((ctx, builder) -> Suggest.enumValues(builder, values, v -> true))
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -266,30 +290,11 @@ public class ClickSortedCommands {
      * Materials offered as completions for the bundle-blacklist {@code add} argument: non-legacy
      * materials that have an item form (so a bare block-only material such as {@code WATER}, which
      * cannot be a bundle entry and has no {@link org.bukkit.inventory.meta.ItemMeta}, is excluded).
-     * Note that block materials with an item form (e.g. {@code DIRT}) still qualify.
+     * Note that block materials with an item form (e.g. {@code DIRT}) still qualify. Namespaced IDs
+     * (e.g. {@code minecraft:dirt}) are produced and memoized by {@link Suggest#materialNames}.
      */
     static final java.util.function.Predicate<Material> SUGGESTABLE_MATERIAL =
             mat -> !mat.isLegacy() && mat.isItem();
-
-    private static final List<String> SUGGESTABLE_MATERIAL_NAMES = java.util.Arrays.stream(Material.values())
-            .filter(SUGGESTABLE_MATERIAL)
-            .map(m -> m.name().toLowerCase(Locale.ROOT))
-            .toList();
-
-    /**
-     * Suggests the lower-cased names of {@code values} that pass {@code include} and prefix-match the
-     * current (case-insensitive) input. Shared by every enum-valued argument's {@code suggests} hook.
-     */
-    static <E extends Enum<E>> java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestEnum(
-            com.mojang.brigadier.suggestion.SuggestionsBuilder builder, E[] values, java.util.function.Predicate<E> include) {
-        String input = builder.getRemaining().toUpperCase();
-        for (E value : values) {
-            if (include.test(value) && value.name().startsWith(input)) {
-                builder.suggest(value.name().toLowerCase());
-            }
-        }
-        return builder.buildFuture();
-    }
 
     /** The matching enum constant for {@code raw} (case-insensitive), or {@code null} if none match. */
     private static <E extends Enum<E>> E parseEnum(E[] values, String raw) {
@@ -309,7 +314,7 @@ public class ClickSortedCommands {
         return Commands.literal("method")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.sort.method"))
                 .then(Commands.argument("method", StringArgumentType.word())
-                        .suggests((ctx, builder) -> suggestEnum(builder, SortingMethod.values(), SortingMethod::isAvailable))
+                        .suggests((ctx, builder) -> Suggest.enumValues(builder, SortingMethod.values(), SortingMethod::isAvailable))
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -345,7 +350,7 @@ public class ClickSortedCommands {
         return Commands.literal("method")
                 .requires(src -> src.getSender().hasPermission("clicksorted.commands.click.method"))
                 .then(Commands.argument("method", StringArgumentType.word())
-                        .suggests((ctx, builder) -> suggestEnum(builder, ClickMethod.values(), m -> true))
+                        .suggests((ctx, builder) -> Suggest.enumValues(builder, ClickMethod.values(), m -> true))
                         .executes(ctx -> {
                             Player player = requirePlayer(plugin, ctx);
                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -650,14 +655,10 @@ public class ClickSortedCommands {
                         .executes(ctx -> openBlacklistGui(plugin, ctx)))
                 .then(Commands.literal("add")
                         .then(Commands.literal("material")
-                                .then(Commands.argument("material", StringArgumentType.word())
-                                        .suggests((ctx, b) -> {
-                                            String prefix = b.getRemaining().toLowerCase(Locale.ROOT);
-                                            SUGGESTABLE_MATERIAL_NAMES.forEach(name -> {
-                                                if (name.startsWith(prefix)) b.suggest(name);
-                                            });
-                                            return b.buildFuture();
-                                        })
+                                // greedyString, not word(): namespaced IDs (minecraft:dirt) contain
+                                // a colon, which Brigadier's word()/unquoted string() do not accept.
+                                .then(Commands.argument("material", StringArgumentType.greedyString())
+                                        .suggests((ctx, b) -> Suggest.prefixed(b, Suggest.materialNames(SUGGESTABLE_MATERIAL)))
                                         .executes(ctx -> {
                                             Player player = requirePlayer(plugin, ctx);
                                             if (player == null || throttled(plugin, ctx.getSource())) {
@@ -697,11 +698,14 @@ public class ClickSortedCommands {
                                         }))))
                 .then(Commands.literal("remove")
                         .then(Commands.literal("material")
-                                .then(Commands.argument("material", StringArgumentType.word())
+                                // greedyString to match "add material" — see the comment there.
+                                .then(Commands.argument("material", StringArgumentType.greedyString())
                                         .suggests((ctx, b) -> {
                                             if (ctx.getSource().getExecutor() instanceof Player player) {
-                                                plugin.getSortingPrefs().getBundleBlacklist(player)
-                                                        .forEach(mat -> b.suggest(mat.name().toLowerCase()));
+                                                List<String> namespaced = plugin.getSortingPrefs().getBundleBlacklist(player).stream()
+                                                        .map(mat -> mat.getKey().toString())
+                                                        .toList();
+                                                return Suggest.prefixed(b, namespaced);
                                             }
                                             return b.buildFuture();
                                         })
@@ -815,7 +819,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildReload(ClickSortedPlugin plugin) {
         return Commands.literal("reload")
-                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.reload"))
+                .requires(ClickSortedCommands::canReload)
                 .executes(ctx -> {
                     try {
                         plugin.getConfigManager().reloadAll();
@@ -838,7 +842,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildGetcfg(ClickSortedPlugin plugin) {
         return Commands.literal("config")
-                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.config"))
+                .requires(ClickSortedCommands::canGetcfg)
                 .executes(ctx -> {
                     for (String key : plugin.getConfig().getKeys(true)) {
                         if (!plugin.getConfig().isConfigurationSection(key)) {
@@ -856,7 +860,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildDebug(ClickSortedPlugin plugin) {
         return Commands.literal("debug")
-                .requires(src -> src.getSender().hasPermission("clicksorted.admin.commands.debug"))
+                .requires(ClickSortedCommands::canDebug)
                 .executes(ctx -> {
                     DebugLevel next = Log.getDebugLevel() == DebugLevel.OFF ? DebugLevel.DEBUG : DebugLevel.OFF;
                     Log.setDebugLevel(next);
@@ -865,7 +869,7 @@ public class ClickSortedCommands {
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(Commands.argument("level", StringArgumentType.word())
-                        .suggests((ctx, builder) -> suggestEnum(builder, DebugLevel.values(), l -> true))
+                        .suggests((ctx, builder) -> Suggest.enumValues(builder, DebugLevel.values(), l -> true))
                         .executes(ctx -> {
                             String arg = StringArgumentType.getString(ctx, "level");
                             try {
@@ -891,8 +895,7 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildBenchmark(ClickSortedPlugin plugin) {
         return Commands.literal("benchmark")
-                .requires(src -> plugin.getConfigManager().main().getEnableBenchmark()
-                        && src.getSender().hasPermission("clicksorted.admin.commands.benchmark"))
+                .requires(src -> canBenchmark(plugin, src))
                 .executes(ctx -> runBenchmark(plugin, ctx.getSource(), BENCH_DEFAULT_ITERATIONS))
                 .then(Commands.argument("iterations", IntegerArgumentType.integer(BENCH_MIN_ITERATIONS, BENCH_MAX_ITERATIONS))
                         .executes(ctx -> runBenchmark(plugin, ctx.getSource(),

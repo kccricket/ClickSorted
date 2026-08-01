@@ -23,6 +23,19 @@ public class Permissions {
     public static final String PERM_MASTER = "clicksorted";
 
     // -------------------------------------------------------------------------
+    // /clicksorted admin subcommand nodes
+    // -------------------------------------------------------------------------
+
+    /** Allow use of {@code /clicksorted admin reload}. */
+    public static final String PERM_ADMIN_RELOAD = "clicksorted.admin.commands.reload";
+    /** Allow use of {@code /clicksorted admin config}. */
+    public static final String PERM_ADMIN_CONFIG = "clicksorted.admin.commands.config";
+    /** Allow use of {@code /clicksorted admin debug}. */
+    public static final String PERM_ADMIN_DEBUG = "clicksorted.admin.commands.debug";
+    /** Allow use of {@code /clicksorted admin benchmark} (also requires {@code enable_benchmark} in config.yml). */
+    public static final String PERM_ADMIN_BENCHMARK = "clicksorted.admin.commands.benchmark";
+
+    // -------------------------------------------------------------------------
     // Admin-enforced "do not touch" blacklist permission-node prefixes
     // -------------------------------------------------------------------------
 

@@ -15,6 +15,7 @@ package net.kccricket.clicksorted.commands;
 import com.mojang.brigadier.suggestion.Suggestion;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import net.kccricket.kcmclib.commands.Suggest;
 import org.bukkit.Material;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for the command-suggestion helpers in {@link ClickSortedCommands}.
+ * Tests for the command-suggestion helpers in {@link ClickSortedCommands}, exercised through the
+ * same {@link Suggest} calls the {@code bundle blacklist add material} argument actually uses
+ * (production stopped calling a local {@code suggestEnum} directly some time ago — this test now
+ * follows that same path instead of a dead one).
  *
  * <p>Requires a MockBukkit server because {@link Material#isItem()} (used by
  * {@link ClickSortedCommands#SUGGESTABLE_MATERIAL}) routes through the server's unsafe-values
@@ -45,32 +49,31 @@ class ClickSortedCommandsTest {
         MockBukkit.unmock();
     }
 
-    /** Run {@code suggestEnum} over all materials with the real add-command predicate. */
     private static List<String> suggestMaterials(String input) throws Exception {
         SuggestionsBuilder builder = new SuggestionsBuilder(input, 0);
-        Suggestions suggestions = ClickSortedCommands
-                .suggestEnum(builder, Material.values(), ClickSortedCommands.SUGGESTABLE_MATERIAL)
-                .get();
+        Suggestions suggestions = Suggest.prefixed(builder,
+                Suggest.materialNames(ClickSortedCommands.SUGGESTABLE_MATERIAL)).get();
         return suggestions.getList().stream().map(Suggestion::getText).toList();
     }
 
     @Test
-    void suggestionsIncludeBothBlockItemAndPureItem() throws Exception {
+    void suggestionsAreNamespacedAndIncludeBothBlockItemAndPureItem() throws Exception {
         List<String> suggestions = suggestMaterials("");
 
         // DIRT is a placeable block but still has an item form, so it must be suggested.
-        assertTrue(suggestions.contains("dirt"),
-                "Block-type material DIRT (which has an item form) should be suggested");
+        assertTrue(suggestions.contains("minecraft:dirt"),
+                "Block-type material DIRT (which has an item form) should be suggested, namespaced");
         // WOODEN_SWORD is a pure item.
-        assertTrue(suggestions.contains("wooden_sword"),
-                "Item-type material WOODEN_SWORD should be suggested");
+        assertTrue(suggestions.contains("minecraft:wooden_sword"),
+                "Item-type material WOODEN_SWORD should be suggested, namespaced");
+        assertFalse(suggestions.contains("dirt"), "bare (non-namespaced) names must not be suggested");
     }
 
     @Test
     void suggestionsExcludeNonItemMaterials() throws Exception {
         // WATER is block-only: it has no item form and would NPE the blacklist GUI, so the
         // predicate must keep it out of completions.
-        assertFalse(suggestMaterials("").contains("water"),
+        assertFalse(suggestMaterials("").contains("minecraft:water"),
                 "Non-item material WATER should not be suggested");
     }
 }
