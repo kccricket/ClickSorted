@@ -85,6 +85,7 @@ permissions:
       clicksorted.admin.commands.config: true
       clicksorted.admin.commands.debug: true
       clicksorted.admin.commands.benchmark: true
+      clicksorted.admin.commands.selftest: true
   clicksorted.admin.commands.reload:
     description: Allow use of /clicksorted admin reload
     default: op
@@ -96,6 +97,9 @@ permissions:
     default: op
   clicksorted.admin.commands.benchmark:
     description: Allow use of /clicksorted admin benchmark
+    default: op
+  clicksorted.admin.commands.selftest:
+    description: Allow use of /clicksorted admin selftest
     default: op
   clicksorted.throttle.bypass:
     description: Exempt from the per-player action throttle (action_cooldown_ms)

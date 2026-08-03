@@ -1,5 +1,6 @@
 package net.kccricket.clicksorted;
 
+import net.kccricket.clicksorted.selftest.ItemCensus;
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
@@ -12,11 +13,9 @@ import org.bukkit.inventory.meta.BundleMeta;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Seeded conservation fuzz test: the strongest structural guard against item duplication and loss.
@@ -42,38 +41,6 @@ class ConservationFuzzTest extends AbstractClickSortedTest {
     private static final Material[] STACKABLE = {
             Material.STONE, Material.DIRT, Material.COBBLESTONE, Material.SAND, Material.OAK_LOG
     };
-
-    /**
-     * Count all leaf (non-BUNDLE) materials across all inventory slots, including materials
-     * stored inside BUNDLEs. BUNDLEs themselves are containers, not items; their slot presence
-     * is tracked as part of the conservation invariant separately.
-     */
-    private Map<Material, Integer> countLeafItems(Inventory inv) {
-        Map<Material, Integer> counts = new HashMap<>();
-        for (ItemStack item : inv.getContents()) {
-            if (item == null || item.getType() == Material.AIR) continue;
-            if (item.getType() == Material.BUNDLE) {
-                BundleMeta meta = (BundleMeta) item.getItemMeta();
-                for (ItemStack bundleItem : meta.getItems()) {
-                    if (bundleItem != null && bundleItem.getType() != Material.AIR) {
-                        counts.merge(bundleItem.getType(), bundleItem.getAmount(), Integer::sum);
-                    }
-                }
-            } else {
-                counts.merge(item.getType(), item.getAmount(), Integer::sum);
-            }
-        }
-        return counts;
-    }
-
-    /** Count BUNDLE items in the inventory (should be conserved across all paths). */
-    private int countBundles(Inventory inv) {
-        int n = 0;
-        for (ItemStack item : inv.getContents()) {
-            if (item != null && item.getType() == Material.BUNDLE) n++;
-        }
-        return n;
-    }
 
     /**
      * Generate a random 27-slot chest inventory.
@@ -136,8 +103,7 @@ class ConservationFuzzTest extends AbstractClickSortedTest {
 
         for (int i = 0; i < iterations; i++) {
             Inventory chest = generateRandomInventory(rng);
-            Map<Material, Integer> leafBefore = countLeafItems(chest);
-            int bundlesBefore = countBundles(chest);
+            ItemCensus before = ItemCensus.of(chest.getContents());
 
             // Three paths, cycled by iteration index.
             int path = i % 3;
@@ -163,10 +129,9 @@ class ConservationFuzzTest extends AbstractClickSortedTest {
             triggerSort(player, view);
 
             String ctx = "iteration=" + i + " path=" + path + " seed=0xC1EA3_5EEDL";
-            assertEquals(leafBefore, countLeafItems(chest),
-                    "Item conservation violated: " + ctx);
-            assertEquals(bundlesBefore, countBundles(chest),
-                    "Bundle count changed (bundle created or destroyed): " + ctx);
+            ItemCensus after = ItemCensus.of(chest.getContents());
+            assertTrue(before.matches(after),
+                    "Item conservation violated: " + ctx + "\n" + before.diff(after));
         }
     }
 }

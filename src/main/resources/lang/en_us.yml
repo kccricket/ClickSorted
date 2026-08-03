@@ -146,13 +146,15 @@ configReloadFailed: "<red>Configuration reload failed: <reason>. The previous co
 invOverFlow: "Inventory overflow — items were not sorted."
 dropItems: "Some items couldn't fit and were dropped!"
 
-# Sort-trigger instructions (shown as part of the sortBy message via <instruction>)
-instructionSingle: "Left-click an empty slot to sort."
-instructionDouble: "Double-click any slot to sort."
-instructionSwap: "Press the offhand-swap key to sort."
-instructionControlDrop: "Press Ctrl+Q (drop key) over a slot to sort."
-instructionShiftLeftClick: "Shift-left-click a slot to sort."
-instructionShiftRightClick: "Shift-right-click a slot to sort."
+# Sort-trigger instructions (shown as part of the sortBy message via <instruction>, and reused
+# verbatim by the self-test LIVE phase's action-bar prompts — kept plain text, no MiniMessage tags,
+# so they compose cleanly inside another rendered template).
+instructionSingle: "Left-click an empty slot (with nothing on your cursor) to sort."
+instructionDouble: "Double-click a slot to sort (first click any item to pick it up onto your cursor, then double-click any slot)."
+instructionSwap: "Press the offhand-swap key (default F) over any slot to sort."
+instructionControlDrop: "Press Ctrl+Q (drop key) over an occupied slot to sort."
+instructionShiftLeftClick: "Shift-left-click an occupied slot to sort."
+instructionShiftRightClick: "Shift-right-click an occupied slot to sort."
 
 # Error shown when a player-only command is run from the console
 notFromConsole: "This command can only be used by a player."
@@ -192,3 +194,53 @@ dialogSave: "<!italic>Save"
 dialogCancel: "<!italic>Cancel"
 dialogOpenLockGui: "<!italic>Locked Slots…"
 dialogOpenBlacklistGui: "<!italic>Bundle Blacklist…"
+
+# Self-test (/clicksorted admin selftest) — a version-compatibility check, not just a correctness
+# check: `algo` runs pure algorithm calls (weak signal — no Paper-API dependency), `probe` runs
+# capability probes and prints a version fingerprint (console-runnable, no player needed), `sim`
+# dispatches a synthetic event through the real listeners, and `start [quick|full]` drives an
+# interactive LIVE phase of real click gestures that stages and restores the tester's real
+# inventory and preferences. During LIVE, every cycle's instruction — terse but explicit about both
+# the inventory area to click in (chest/main storage/hotbar) and, via the underlying click-method
+# instruction, whether the target slot must be empty or occupied — is sent identically to chat once
+# per cycle and to the action bar above the hotbar (refreshed every couple seconds so it never
+# fades, since chat scrolls out of view but the action bar doesn't). Pass/fail lines are keyed by
+# that cycle's id (its "code" — the same id string that appears in LiveCycles.java/SelfTestCases.java,
+# greppable by a dev or pasteable to an AI); failure *reasons* are deliberately withheld from chat
+# until the end-of-run summary so a long run doesn't scroll past them mid-test.
+selfTestNoneRunning: "<gray>No self-test is currently running for you."
+selfTestAlreadyRunning: "<red>A self-test is already running for you — use /clicksorted admin selftest stop to end it first."
+# Placeholder: <reason>
+selfTestStartFailed: "<red>Self-test could not start: <reason>. A compatibility fingerprint follows — see the server console for the full stack trace."
+selfTestStarted: "<green>Self-test started.<white> Use /clicksorted admin selftest stop to abort at any time."
+selfTestStopped: "<gray>Self-test stopped; your inventory and preferences have been restored."
+selfTestBackupRestored: "<yellow>Restored your pre-self-test inventory and preferences from an interrupted run."
+# Placeholders: <cycle>, <total>, <code>, <instruction>
+selfTestStatus: "<gray>Cycle <aqua><cycle></aqua>/<total> <gray>[<code>]<white> <instruction>"
+# Placeholders: <cycle>, <total>, <code>, <instruction> — sent identically to selfTestActionBarInstruction below.
+selfTestCyclePrompt: "<aqua>Cycle <cycle>/<total></aqua> <gray>[<code>]<white> <instruction>"
+# Placeholders: <cycle>, <total>, <code>, <instruction> — the persistent action-bar prompt, refreshed every ~2s for the current cycle.
+selfTestActionBarInstruction: "<yellow>[<cycle>/<total> <code>]<white> <instruction>"
+# Terse area prefixes for a LIVE instruction — kept plain text, no MiniMessage tags (see LiveCycles).
+selfTestAreaChest: "In chest:"
+selfTestAreaMainStorage: "In main storage (not hotbar):"
+selfTestAreaHotbar: "In hotbar (packing must not apply):"
+# The 6 sweep-cycle instructions (one per ClickMethod), fully self-contained rather than composed
+# with the generic instruction* keys above: the sweep's dummy chest holds exactly two staged item
+# stacks and nothing else, so "an occupied slot" or "any item" must name those two stacks explicitly
+# — a generic gameplay hint like instructionDouble's "any item" would otherwise read as "any item
+# anywhere on screen," including the tester's own real inventory below the chest, which would sort
+# for real instead of the throwaway test fixture.
+selfTestInstructionSingle: "In chest: left-click an empty slot (empty cursor)."
+selfTestInstructionDouble: "In chest: click one of the 2 stacks to pick it up, then double-click any chest slot."
+selfTestInstructionSwap: "In chest: swap-offhand (default F) on any slot."
+selfTestInstructionControlDrop: "In chest: Ctrl+Q (drop key) on one of the 2 occupied slots."
+selfTestInstructionShiftLeftClick: "In chest: shift-left-click one of the 2 occupied slots."
+selfTestInstructionShiftRightClick: "In chest: shift-right-click one of the 2 occupied slots."
+# Placeholder: <code> — the LiveCycle id, e.g. "live-locked-slot"; greppable in LiveCycles.java or SelfTestCases.java.
+selfTestCyclePass: "<green>✔ <code><white> passed."
+# Placeholder: <code>
+selfTestCycleFail: "<red>✘ <code><white> failed — see the summary at the end for details."
+# Placeholders: <passed>, <total>
+selfTestFinished: "<green>Self-test finished:<white> <passed>/<total> cycle(s) passed. Everything has been restored."
+selfTestTimedOut: "<red>Self-test cycle timed out with no matching click — stopping and restoring your inventory."

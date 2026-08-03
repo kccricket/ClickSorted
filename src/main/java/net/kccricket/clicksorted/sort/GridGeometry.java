@@ -39,8 +39,8 @@ public record GridGeometry(int base, int width, int rows) {
     private static final int MOUNT_CHEST_ROWS = 3;
     /** Column count of a donkey/mule chest. */
     private static final int PACK_HORSE_CHEST_COLUMNS = 5;
-    /** Leading equipment slots (saddle + armor/decor) that precede any mount's storage area. */
-    private static final int MOUNT_EQUIPMENT_SLOTS = 2;
+    /** Leading equipment slots (saddle + armor/decor) that precede any mount's storage area. Package-visible so {@code selftest.CapabilityProbes} can cross-check it rather than duplicating the value. */
+    static final int MOUNT_EQUIPMENT_SLOTS = 2;
 
     /**
      * The index of the first storage slot for a holder: the slots after a mount's leading equipment

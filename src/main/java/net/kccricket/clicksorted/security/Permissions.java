@@ -34,6 +34,8 @@ public class Permissions {
     public static final String PERM_ADMIN_DEBUG = "clicksorted.admin.commands.debug";
     /** Allow use of {@code /clicksorted admin benchmark} (also requires {@code enable_benchmark} in config.yml). */
     public static final String PERM_ADMIN_BENCHMARK = "clicksorted.admin.commands.benchmark";
+    /** Allow use of {@code /clicksorted admin selftest} (also requires {@code enable_selftest} in config.yml). */
+    public static final String PERM_ADMIN_SELFTEST = "clicksorted.admin.commands.selftest";
 
     // -------------------------------------------------------------------------
     // Admin-enforced "do not touch" blacklist permission-node prefixes

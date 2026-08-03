@@ -23,6 +23,8 @@ import net.kccricket.clicksorted.migration.Migrations;
 import net.kccricket.clicksorted.migration.PlayerMigrationListener;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.security.ActionThrottle;
+import net.kccricket.clicksorted.selftest.SelfTestListener;
+import net.kccricket.clicksorted.selftest.SelfTestManager;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
 import net.kccricket.clicksorted.sort.InventorySortService;
 import net.kccricket.kcmclib.text.Messenger;
@@ -44,6 +46,7 @@ public class ClickSortedPlugin extends JavaPlugin {
     private Migrations migrations;
     private ModrinthUpdateChecker updateChecker;
     private PreferencesDialogService preferencesDialogService;
+    private SelfTestManager selfTestManager;
 
     private static ClickSortedPlugin instance = null;
 
@@ -87,6 +90,9 @@ public class ClickSortedPlugin extends JavaPlugin {
 
         sortService = new InventorySortService(this);
         preferencesDialogService = new PreferencesDialogService(this);
+        // Constructed once, never per-reload (mirrors ActionThrottle/PreferencesDialogService), so a
+        // reload can't orphan a running LIVE session — see Migrations.migrate/reload handling below.
+        selfTestManager = new SelfTestManager(this);
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new InventoryClickListener(this, sortService), this);
@@ -94,6 +100,7 @@ public class ClickSortedPlugin extends JavaPlugin {
         pm.registerEvents(new BlacklistGuiListener(this), this);
         pm.registerEvents(new PlayerMigrationListener(this), this);
         pm.registerEvents(preferencesDialogService, this);
+        pm.registerEvents(new SelfTestListener(this, selfTestManager), this);
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(ClickSortedCommands.build(this), "Manage the ClickSorted plugin"));
@@ -101,6 +108,9 @@ public class ClickSortedPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (selfTestManager != null) {
+            selfTestManager.abortAll();
+        }
         if (updateChecker != null) {
             updateChecker.stop();
         }
@@ -154,5 +164,9 @@ public class ClickSortedPlugin extends JavaPlugin {
     /** @return the stash/restore service backing the {@code /clicksorted menu} preferences dialog */
     public PreferencesDialogService getPreferencesDialogService() {
         return preferencesDialogService;
+    }
+
+    public SelfTestManager getSelfTestManager() {
+        return selfTestManager;
     }
 }

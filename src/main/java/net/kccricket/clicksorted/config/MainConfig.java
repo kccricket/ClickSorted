@@ -203,6 +203,10 @@ public class MainConfig implements ManagedConfig {
                 "Master switch for /clicksorted admin benchmark, an in-situ sort/repack timing test —",
                 "it runs synchronously on the main thread and briefly pauses the server. Requires",
                 "clicksorted.admin.commands.benchmark as well. Leave this false on production servers."));
+        cfg.setComments("enable_selftest", List.of(
+                "Master switch for /clicksorted admin selftest, an in-game correctness self-test that",
+                "stages and restores the tester's real inventory and preferences. Requires",
+                "clicksorted.admin.commands.selftest as well. Leave this false on production servers."));
         cfg.setComments("sortable_inventories", List.of(
                 "Inventory types that players are allowed to sort.",
                 "Values must be valid Bukkit InventoryType names (case-sensitive).",
@@ -362,6 +366,15 @@ public class MainConfig implements ManagedConfig {
      */
     public boolean getEnableBenchmark() {
         return plugin.getConfig().getBoolean("enable_benchmark", false);
+    }
+
+    /**
+     * Master switch for {@code /clicksorted admin selftest} — off by default, since a run stages
+     * and restores the tester's real inventory. An admin has to opt in on top of holding
+     * {@code clicksorted.admin.commands.selftest}.
+     */
+    public boolean getEnableSelftest() {
+        return plugin.getConfig().getBoolean("enable_selftest", false);
     }
 
     /**

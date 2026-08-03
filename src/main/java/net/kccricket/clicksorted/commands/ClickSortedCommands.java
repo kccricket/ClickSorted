@@ -22,6 +22,9 @@ import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.security.Permissions;
 import net.kccricket.kcmclib.commands.Suggest;
+import net.kccricket.clicksorted.selftest.CompatibilityReport;
+import net.kccricket.clicksorted.selftest.SelfTestManager;
+import net.kccricket.clicksorted.selftest.SelfTestReport;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
 import net.kccricket.clicksorted.text.PreferenceMessages;
 import net.kyori.adventure.text.Component;
@@ -120,13 +123,20 @@ public class ClickSortedCommands {
                 && src.getSender().hasPermission(Permissions.PERM_ADMIN_BENCHMARK);
     }
 
+    private static boolean canSelftest(ClickSortedPlugin plugin, CommandSourceStack src) {
+        return plugin.getConfigManager().main().getEnableSelftest()
+                && src.getSender().hasPermission(Permissions.PERM_ADMIN_SELFTEST);
+    }
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildAdmin(ClickSortedPlugin plugin) {
         return Commands.literal("admin")
-                .requires(src -> canReload(src) || canGetcfg(src) || canDebug(src) || canBenchmark(plugin, src))
+                .requires(src -> canReload(src) || canGetcfg(src) || canDebug(src) || canBenchmark(plugin, src)
+                        || canSelftest(plugin, src))
                 .then(buildDebug(plugin))
                 .then(buildGetcfg(plugin))
                 .then(buildReload(plugin))
-                .then(buildBenchmark(plugin));
+                .then(buildBenchmark(plugin))
+                .then(buildSelftest(plugin));
     }
 
     // -------------------------------------------------------------------------
@@ -821,6 +831,10 @@ public class ClickSortedCommands {
         return Commands.literal("reload")
                 .requires(ClickSortedCommands::canReload)
                 .executes(ctx -> {
+                    // A running LIVE self-test session must never survive a reload — abort and
+                    // restore before the config (and thus enable_selftest) is swapped out from
+                    // under it.
+                    plugin.getSelfTestManager().abortAll();
                     try {
                         plugin.getConfigManager().reloadAll();
                     } catch (MigrationException e) {
@@ -923,5 +937,91 @@ public class ClickSortedCommands {
                 "%s: min %.1f / median %.1f / p95 %.1f / max %.1f µs/op (n=%d, %.1f ms total)",
                 label, s.minUs(), s.medianUs(), s.p95Us(), s.maxUs(), s.iterations(),
                 s.totalNanos() / 1_000_000.0)));
+    }
+
+    // -------------------------------------------------------------------------
+    // /clicksorted admin selftest — algo|probe|sim|start [quick|full]|next|status|stop
+    // -------------------------------------------------------------------------
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildSelftest(ClickSortedPlugin plugin) {
+        return Commands.literal("selftest")
+                .requires(src -> canSelftest(plugin, src))
+                .then(Commands.literal("algo")
+                        .executes(ctx -> {
+                            SelfTestReport report = plugin.getSelfTestManager().runAlgo();
+                            reportToSender(plugin, ctx.getSource().getSender(), report);
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                .then(Commands.literal("probe")
+                        .executes(ctx -> {
+                            CompatibilityReport report = plugin.getSelfTestManager().runProbes();
+                            reportProbesToSender(plugin, ctx.getSource().getSender(), report);
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                .then(Commands.literal("sim")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            SelfTestReport report = plugin.getSelfTestManager().runSim(player);
+                            reportToSender(plugin, player, report);
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                .then(Commands.literal("start")
+                        .executes(ctx -> startLive(plugin, ctx, false))
+                        .then(Commands.literal("quick").executes(ctx -> startLive(plugin, ctx, true)))
+                        .then(Commands.literal("full").executes(ctx -> startLive(plugin, ctx, false))))
+                .then(Commands.literal("next")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null || throttled(plugin, ctx.getSource())) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            plugin.getSelfTestManager().skipCurrent(player);
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                .then(Commands.literal("status")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            plugin.getSelfTestManager().status(player);
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                .then(Commands.literal("stop")
+                        .executes(ctx -> {
+                            Player player = requirePlayer(plugin, ctx);
+                            if (player == null) {
+                                return Command.SINGLE_SUCCESS;
+                            }
+                            plugin.getSelfTestManager().stopLive(player);
+                            return Command.SINGLE_SUCCESS;
+                        }));
+    }
+
+    /** {@link SelfTestReport#summarize()} already groups by category with an id/code on every line — no need to duplicate its entries in a separate loop first. */
+    private static void reportToSender(ClickSortedPlugin plugin, org.bukkit.command.CommandSender sender, SelfTestReport report) {
+        plugin.messages().to(sender).status().send(Component.text(report.summarize()));
+    }
+
+    /** {@link CompatibilityReport#summarize()} already lists every probe by id/code — no need to duplicate the non-PRESENT ones in a separate loop first. */
+    private static void reportProbesToSender(ClickSortedPlugin plugin, org.bukkit.command.CommandSender sender, CompatibilityReport report) {
+        plugin.messages().to(sender).status().send(Component.text(report.summarize()));
+    }
+
+    private static int startLive(ClickSortedPlugin plugin, CommandContext<CommandSourceStack> ctx, boolean quick) {
+        Player player = requirePlayer(plugin, ctx);
+        if (player == null || throttled(plugin, ctx.getSource())) {
+            return Command.SINGLE_SUCCESS;
+        }
+        SelfTestManager.StartResult result = plugin.getSelfTestManager().startLive(player, quick);
+        if (result == SelfTestManager.StartResult.ALREADY_RUNNING) {
+            plugin.messages().to(player).status().send("selfTestAlreadyRunning");
+        }
+        // STARTED already sent the intro banner from within startLive (so it precedes the first
+        // cycle's prompt); FAILED already messaged the player (error + compatibility fingerprint).
+        return Command.SINGLE_SUCCESS;
     }
 }
