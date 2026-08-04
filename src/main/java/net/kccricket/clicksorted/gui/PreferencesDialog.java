@@ -372,10 +372,14 @@ public final class PreferencesDialog {
             if (reportIfBlocked(plugin, player, prefs.setClickMethod(player, values.clickMethod()))) {
                 return;
             }
+            // Use the batch's own submitted hover value (if present) rather than the pre-submission
+            // PDC read: the sortOverItems block below applies later in this same method, so reading
+            // prefs.getSortOverItems(player) here would show stale hover wording whenever both
+            // fields change in the same Save.
+            boolean effectiveHover = values.sortOverItems() != null ? values.sortOverItems() : prefs.getSortOverItems(player);
             plugin.messages().to(player).status().send("setClickMethodTo",
                     Placeholder.unparsed("method", values.clickMethod().toString()),
-                    Placeholder.unparsed("instruction", values.clickMethod().getInstruction(
-                            player.locale(), prefs.getSortOverItems(player))));
+                    Placeholder.unparsed("instruction", values.clickMethod().getInstruction(player.locale(), effectiveHover)));
             PreferenceRepair.enforceHover(plugin, player, values.clickMethod());
             player.updateCommands();
         }

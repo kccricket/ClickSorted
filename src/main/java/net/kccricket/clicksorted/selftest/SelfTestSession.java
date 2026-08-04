@@ -136,44 +136,73 @@ final class SelfTestSession {
         prefs.setLockedSlots(player, Set.of());
     }
 
-    /** Restores everything to the pre-test snapshot, releases any LIVE-cycle permission grant, and deletes the crash backup. */
+    /**
+     * Restores everything to the pre-test snapshot, releases any LIVE-cycle permission grant, and
+     * deletes the crash backup — but only once every restore step below has actually run. Each step
+     * is independently guarded via {@link #attempt} so one throwing (e.g. a version-incompatible
+     * API call — exactly the failure class this subsystem exists to probe for, already handled the
+     * same way elsewhere in {@code SelfTestManager}/{@code SelfTestRunner}) doesn't skip the rest;
+     * the backup is deliberately kept (not deleted) if any step failed, so
+     * {@link #restoreOrphanedBackup} can still recover the tester's real state on next join.
+     */
     void restoreAndClear() {
-        try {
-            if (testChest != null) {
-                player.closeInventory();
-                testChest = null;
-            }
-            PlayerInventory inv = player.getInventory();
-            inv.setContents(savedContents);
-            inv.setArmorContents(savedArmor);
-            inv.setItemInOffHand(savedOffHand);
-            player.setItemOnCursor(savedCursor);
-            inv.setHeldItemSlot(savedHeldSlot);
-            player.setGameMode(savedGameMode);
+        boolean ok = true;
+        if (testChest != null) {
+            ok &= attempt("close test chest", player::closeInventory);
+            testChest = null;
+        }
+        PlayerInventory inv = player.getInventory();
+        ok &= attempt("restore inventory contents", () -> inv.setContents(savedContents));
+        ok &= attempt("restore armor", () -> inv.setArmorContents(savedArmor));
+        ok &= attempt("restore offhand", () -> inv.setItemInOffHand(savedOffHand));
+        ok &= attempt("restore cursor", () -> player.setItemOnCursor(savedCursor));
+        ok &= attempt("restore held slot", () -> inv.setHeldItemSlot(savedHeldSlot));
+        ok &= attempt("restore game mode", () -> player.setGameMode(savedGameMode));
 
-            PlayerSortingPrefs prefs = plugin.getSortingPrefs();
-            prefs.setEnabled(player, savedEnabled);
-            prefs.setClickMethod(player, savedClickMethod);
-            prefs.setSortingMethod(player, savedSortingMethod);
-            prefs.setStartCorner(player, savedStartCorner);
-            prefs.setFillAxis(player, savedFillAxis);
-            prefs.setSortOverItems(player, savedSortOverItems);
-            prefs.setBundlePackInInventory(player, savedBundleInInventory);
-            prefs.setBundlePackInContainers(player, savedBundleInContainers);
-            prefs.setBundleStackLimit(player, savedBundleStackLimit);
-            prefs.setLockedSlots(player, savedLockedSlots); // bulk setter — no event, always applies
-        } finally {
-            if (liveAttachment != null) {
-                player.removeAttachment(liveAttachment);
-                liveAttachment = null;
-            }
-            if (actionBarTask != null) {
-                actionBarTask.cancel();
-                actionBarTask = null;
-            }
+        PlayerSortingPrefs prefs = plugin.getSortingPrefs();
+        ok &= attempt("restore enabled", () -> prefs.setEnabled(player, savedEnabled));
+        ok &= attempt("restore click method", () -> prefs.setClickMethod(player, savedClickMethod));
+        ok &= attempt("restore sorting method", () -> prefs.setSortingMethod(player, savedSortingMethod));
+        ok &= attempt("restore start corner", () -> prefs.setStartCorner(player, savedStartCorner));
+        ok &= attempt("restore fill axis", () -> prefs.setFillAxis(player, savedFillAxis));
+        ok &= attempt("restore sort-over-items", () -> prefs.setSortOverItems(player, savedSortOverItems));
+        ok &= attempt("restore bundle-in-inventory", () -> prefs.setBundlePackInInventory(player, savedBundleInInventory));
+        ok &= attempt("restore bundle-in-containers", () -> prefs.setBundlePackInContainers(player, savedBundleInContainers));
+        ok &= attempt("restore bundle stack limit", () -> prefs.setBundleStackLimit(player, savedBundleStackLimit));
+        // bulk setter — no event, always applies
+        ok &= attempt("restore locked slots", () -> prefs.setLockedSlots(player, savedLockedSlots));
+
+        if (liveAttachment != null) {
+            player.removeAttachment(liveAttachment);
+            liveAttachment = null;
+        }
+        if (actionBarTask != null) {
+            actionBarTask.cancel();
+            actionBarTask = null;
+        }
+
+        if (ok) {
             if (!backupFile.delete() && backupFile.exists()) {
                 Log.warning("Could not delete self-test backup file " + backupFile + " — remove it by hand.");
             }
+        } else {
+            Log.severe("Self-test restore for " + player.getName() + " did not fully complete — keeping "
+                    + backupFile + " for recovery on next join; see the errors above for which step(s) failed.");
+        }
+    }
+
+    /**
+     * Runs {@code step}, logging and returning {@code false} instead of propagating on failure — so
+     * one failing restore step never prevents the rest of {@link #restoreAndClear} from running.
+     */
+    private boolean attempt(String description, Runnable step) {
+        try {
+            step.run();
+            return true;
+        } catch (RuntimeException | LinkageError e) {
+            Log.severe("Self-test restore step '" + description + "' failed for " + player.getName()
+                    + ": " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+            return false;
         }
     }
 

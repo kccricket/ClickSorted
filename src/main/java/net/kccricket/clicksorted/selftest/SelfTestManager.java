@@ -308,7 +308,7 @@ public final class SelfTestManager {
             sessions.remove(session.player().getUniqueId());
             try {
                 session.restoreAndClear();
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 Log.warning("Failed to restore self-test session for " + session.player().getName()
                         + " during abortAll — restore their inventory/preferences manually.", e);
             }
