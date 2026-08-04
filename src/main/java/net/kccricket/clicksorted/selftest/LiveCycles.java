@@ -115,28 +115,33 @@ public final class LiveCycles {
         return plugin.getConfigManager().lang(locale).raw(key, "");
     }
 
-    /** "In chest: <method's own instruction>" — SWAP has no ambiguity about which slot/item, so the generic instruction composes safely; used by the two chest-based scenario cycles (blacklist, bundle-pack). */
+    /**
+     * "In chest: <method's own instruction>" — SWAP has no ambiguity about which slot/item, so the
+     * generic instruction composes safely; used by the two chest-based scenario cycles (blacklist,
+     * bundle-pack). {@code true} for the hover arg: {@link SelfTestSession#applyTestSettings} forces
+     * sort-over-items on for every LIVE cycle, so the hover-on wording is always the accurate one here.
+     */
     private static Instructor inChest(ClickMethod method) {
-        return (plugin, locale) -> lang(plugin, locale, "selfTestAreaChest") + " " + method.getInstruction(locale);
+        return (plugin, locale) -> lang(plugin, locale, "selfTestAreaChest") + " " + method.getInstruction(locale, true);
     }
 
     /** "In main storage (not hotbar): <method's own instruction>" — the region/lock scenario cycles (SWAP only). */
     private static Instructor inMainStorage(ClickMethod method) {
-        return (plugin, locale) -> lang(plugin, locale, "selfTestAreaMainStorage") + " " + method.getInstruction(locale);
+        return (plugin, locale) -> lang(plugin, locale, "selfTestAreaMainStorage") + " " + method.getInstruction(locale, true);
     }
 
     /** "In hotbar (packing must not apply): <method's own instruction>" — the hotbar-no-pack scenario cycle (SWAP only). */
     private static Instructor inHotbar(ClickMethod method) {
-        return (plugin, locale) -> lang(plugin, locale, "selfTestAreaHotbar") + " " + method.getInstruction(locale);
+        return (plugin, locale) -> lang(plugin, locale, "selfTestAreaHotbar") + " " + method.getInstruction(locale, true);
     }
 
     /**
      * The sweep's per-method instruction, from a dedicated {@code selfTestInstruction<Method>} lang
      * key rather than composed from the generic {@code instruction*} keys: the sweep's dummy chest
-     * holds exactly two staged item stacks and nothing else, so "an occupied slot" or "pick up an
-     * item" must name those two stacks explicitly, not read as "anywhere on screen" — which would
-     * include the tester's own real inventory below the chest and sort it for real. See lang file
-     * comment above {@code selfTestInstructionSingle}.
+     * holds exactly two staged item stacks and nothing else, so "an occupied slot" must name those
+     * two stacks explicitly, not read as "anywhere on screen" — which would include the tester's own
+     * real inventory below the chest and sort it for real. See lang file comment above
+     * {@code selfTestInstructionSingle}.
      */
     private static Instructor sweepInstruction(ClickMethod method) {
         String key = switch (method) {

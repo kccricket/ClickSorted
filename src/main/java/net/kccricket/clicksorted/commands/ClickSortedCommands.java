@@ -9,6 +9,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.gui.BlacklistGuiHolder;
+import net.kccricket.clicksorted.gui.DialogSupport;
 import net.kccricket.clicksorted.gui.LockGuiHolder;
 import net.kccricket.clicksorted.gui.PreferencesDialog;
 import net.kccricket.kcmclib.logging.DebugLevel;
@@ -84,7 +85,8 @@ public class ClickSortedCommands {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildMenu(ClickSortedPlugin plugin) {
         return Commands.literal("menu")
-                .requires(src -> src.getSender().hasPermission(Permissions.PERM_MASTER)
+                .requires(src -> DialogSupport.AVAILABLE
+                        && src.getSender().hasPermission(Permissions.PERM_MASTER)
                         && src.getSender().hasPermission("clicksorted.commands.menu"))
                 .executes(ctx -> {
                     Player player = requirePlayer(plugin, ctx);
@@ -375,7 +377,8 @@ public class ClickSortedCommands {
                                 }
                                 plugin.messages().to(player).status().send("setClickMethodTo",
                                         Placeholder.unparsed("method", method.toString()),
-                                        Placeholder.unparsed("instruction", method.getInstruction(player.locale())));
+                                        Placeholder.unparsed("instruction", method.getInstruction(
+                                                player.locale(), plugin.getSortingPrefs().getSortOverItems(player))));
                                 // Methods that govern hover (SINGLE_CLICK, CONTROL_DROP) force the player's
                                 // hover preference to the only usable value, messaging them on any change.
                                 PreferenceRepair.enforceHover(plugin, player, method);
@@ -833,8 +836,10 @@ public class ClickSortedCommands {
                 .executes(ctx -> {
                     // A running LIVE self-test session must never survive a reload — abort and
                     // restore before the config (and thus enable_selftest) is swapped out from
-                    // under it.
-                    plugin.getSelfTestManager().abortAll();
+                    // under it. selfTestManager is null when the subsystem was never enabled.
+                    if (plugin.getSelfTestManager() != null) {
+                        plugin.getSelfTestManager().abortAll();
+                    }
                     try {
                         plugin.getConfigManager().reloadAll();
                     } catch (MigrationException e) {
@@ -844,6 +849,8 @@ public class ClickSortedCommands {
                                 Placeholder.unparsed("reason", String.valueOf(root.getMessage())));
                         return Command.SINGLE_SUCCESS;
                     }
+                    // enable_selftest may have just changed — (de)activate the subsystem to match.
+                    plugin.refreshSelfTest();
                     plugin.getUpdateChecker().restart();
                     plugin.messages().to(ctx.getSource().getSender()).status().send("configReloaded");
                     return Command.SINGLE_SUCCESS;

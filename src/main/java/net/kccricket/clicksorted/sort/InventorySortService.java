@@ -140,12 +140,14 @@ public class InventorySortService {
         Inventory inv = target.inv();
         int slot = event.getSlot();
 
-        // DOUBLE_CLICK gesture repair: the first click of the double-click already lifted the clicked
-        // stack onto the cursor and emptied the slot; the listener cancels the event to suppress the
-        // vanilla gather, which would otherwise strand that stack on the cursor. Put it back into its
-        // origin slot (only when that slot is empty — the expected post-first-click state) so the sort
-        // below folds it in and the cursor ends empty. Done here, past the permission/target checks, so
-        // it never fires for a click that wouldn't actually sort.
+        // DOUBLE_CLICK gesture repair: a double-click on an occupied slot has vanilla lift that
+        // slot's stack onto the cursor before the event we see fires, leaving the slot empty; the
+        // listener cancels the event to suppress the vanilla gather, which would otherwise strand
+        // that stack on the cursor. Put it back into its origin slot (only when that slot is empty —
+        // the expected post-lift state) so the sort below folds it in and the cursor ends empty. A
+        // double-click on an already-empty slot arrives with an empty cursor and no lifted stack, so
+        // this is a no-op there — no pickup step is required to trigger a sort. Done here, past the
+        // permission/target checks, so it never fires for a click that wouldn't actually sort.
         if (event.getClick() == ClickType.DOUBLE_CLICK) {
             ItemStack cursor = event.getCursor();
             ItemStack atSlot = inv.getItem(slot);

@@ -374,7 +374,8 @@ public final class PreferencesDialog {
             }
             plugin.messages().to(player).status().send("setClickMethodTo",
                     Placeholder.unparsed("method", values.clickMethod().toString()),
-                    Placeholder.unparsed("instruction", values.clickMethod().getInstruction(player.locale())));
+                    Placeholder.unparsed("instruction", values.clickMethod().getInstruction(
+                            player.locale(), prefs.getSortOverItems(player))));
             PreferenceRepair.enforceHover(plugin, player, values.clickMethod());
             player.updateCommands();
         }

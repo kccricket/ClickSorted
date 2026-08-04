@@ -1,4 +1,5 @@
 import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.jvm.toolchain.JavaLanguageVersion
 
 plugins {
     java
@@ -11,6 +12,17 @@ plugins {
 
 group = project.property("group") as String
 version = project.property("version") as String
+
+// Pins compileJava/compileTestJava/test to Java 25 regardless of the invoking JDK (JAVA_HOME) —
+// Gradle resolves (or, via the foojay resolver in settings.gradle.kts, auto-downloads) a matching
+// JDK itself. This is separate from the `options.release.set(21)` below, which controls emitted
+// bytecode level, not which JDK actually runs javac/the test JVM; it's also separate from
+// runServer's own javaLauncher further down, which intentionally does NOT inherit this toolchain.
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
 
 // Game versions supported by this release, kept in gradle.properties (comma-separated).
 // Append new versions there when compatibility is verified — no other changes needed.
@@ -38,7 +50,7 @@ sourceSets {
 
 dependencies {
     // paper-api is provided by the server at runtime — compile against it but don't bundle it
-    compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
+    compileOnly("io.papermc.paper:paper-api:26.2.build.+")
 
     // KcMcLib is a composite-build submodule (see settings.gradle.kts); its classes are bundled
     // into the fat jar via Shadow like any other `implementation` dependency, no relocation needed
@@ -171,8 +183,18 @@ tasks.register<JavaExec>("generateItemNames") {
 }
 
 // Run a local Paper dev server with the plugin already loaded.
-// Usage: ./gradlew runServer [-PmcVersion=1.21.6]
+// Usage: ./gradlew runServer [-PmcVersion=1.21.6] [-PrunServerJava=21]
 tasks.runServer {
+    // Independent of the java{} toolchain above (Java 25, for compileJava/test): an old Minecraft
+    // version like 1.20.6 needs an older JDK to actually launch the server jar. The runserver
+    // plugin validates against *this task's own* javaLauncher (JavaExec#getJavaVersion(), resolved
+    // from the launcher if set), not JAVA_HOME or the Gradle daemon's JVM — so this must be set
+    // before serverType(...) below, which is what triggers that check. Override per-run for a
+    // version needing a different JDK, e.g. -PrunServerJava=17.
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(
+            (project.findProperty("runServerJava") as String?)?.toInt() ?: 21))
+    })
     serverType(org.bxteam.runserver.ServerType.PAPER)
     serverVersion((project.findProperty("mcVersion") as String?) ?: "26.2")
     acceptMojangEula()

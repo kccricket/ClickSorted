@@ -15,6 +15,7 @@ package net.kccricket.clicksorted;
 import net.kccricket.clicksorted.commands.ClickSortedCommands;
 import net.kccricket.clicksorted.config.ConfigManager;
 import net.kccricket.clicksorted.gui.BlacklistGuiListener;
+import net.kccricket.clicksorted.gui.DialogSupport;
 import net.kccricket.clicksorted.gui.LockGuiListener;
 import net.kccricket.clicksorted.gui.PreferencesDialogService;
 import net.kccricket.kcmclib.logging.Log;
@@ -31,6 +32,7 @@ import net.kccricket.kcmclib.text.Messenger;
 import net.kccricket.kcmclib.update.ModrinthUpdateChecker;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bstats.bukkit.Metrics;
+import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -47,6 +49,7 @@ public class ClickSortedPlugin extends JavaPlugin {
     private ModrinthUpdateChecker updateChecker;
     private PreferencesDialogService preferencesDialogService;
     private SelfTestManager selfTestManager;
+    private SelfTestListener selfTestListener;
 
     private static ClickSortedPlugin instance = null;
 
@@ -89,21 +92,47 @@ public class ClickSortedPlugin extends JavaPlugin {
         updateChecker.restart();
 
         sortService = new InventorySortService(this);
-        preferencesDialogService = new PreferencesDialogService(this);
-        // Constructed once, never per-reload (mirrors ActionThrottle/PreferencesDialogService), so a
-        // reload can't orphan a running LIVE session — see Migrations.migrate/reload handling below.
-        selfTestManager = new SelfTestManager(this);
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new InventoryClickListener(this, sortService), this);
         pm.registerEvents(new LockGuiListener(this), this);
         pm.registerEvents(new BlacklistGuiListener(this), this);
         pm.registerEvents(new PlayerMigrationListener(this), this);
-        pm.registerEvents(preferencesDialogService, this);
-        pm.registerEvents(new SelfTestListener(this, selfTestManager), this);
+
+        // Dialog API (io.papermc.paper.dialog.Dialog) post-dates this plugin's api-version floor —
+        // see DialogSupport. Not constructed/registered at all on a server too old for it; /clicksorted
+        // menu is separately gated the same way in ClickSortedCommands.
+        if (DialogSupport.AVAILABLE) {
+            preferencesDialogService = new PreferencesDialogService(this);
+            pm.registerEvents(preferencesDialogService, this);
+        }
+
+        refreshSelfTest();
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(ClickSortedCommands.build(this), "Manage the ClickSorted plugin"));
+    }
+
+    /**
+     * Lazily constructs/tears down the self-test subsystem ({@link SelfTestManager} +
+     * {@link SelfTestListener}) to match the current {@code enable_selftest} config value — off by
+     * default, since a run stages and restores the tester's real inventory, so most servers should
+     * never even load this code. Called once from {@link #onEnable} and again after every
+     * {@code /clicksorted admin reload} (the flag can change at runtime); idempotent when the
+     * subsystem is already in the desired state.
+     */
+    public void refreshSelfTest() {
+        boolean shouldRun = configManager.main().getEnableSelftest();
+        if (shouldRun && selfTestManager == null) {
+            selfTestManager = new SelfTestManager(this);
+            selfTestListener = new SelfTestListener(this, selfTestManager);
+            getServer().getPluginManager().registerEvents(selfTestListener, this);
+        } else if (!shouldRun && selfTestManager != null) {
+            selfTestManager.abortAll();
+            HandlerList.unregisterAll(selfTestListener);
+            selfTestListener = null;
+            selfTestManager = null;
+        }
     }
 
     @Override
@@ -161,11 +190,24 @@ public class ClickSortedPlugin extends JavaPlugin {
         return updateChecker;
     }
 
-    /** @return the stash/restore service backing the {@code /clicksorted menu} preferences dialog */
+    /**
+     * @return the stash/restore service backing the {@code /clicksorted menu} preferences dialog,
+     *         or {@code null} on a server without the Dialog API ({@link DialogSupport#AVAILABLE}
+     *         false) — every caller of this getter is itself only reachable from inside an
+     *         already-open dialog, which can't happen on such a server since {@code menu} is gated
+     *         the same way.
+     */
     public PreferencesDialogService getPreferencesDialogService() {
         return preferencesDialogService;
     }
 
+    /**
+     * @return the self-test manager, or {@code null} when {@code enable_selftest} is off (the
+     *         default) — see {@link #refreshSelfTest()}. Every {@code /clicksorted admin selftest}
+     *         subcommand is gated behind the same flag (see {@code canSelftest} in
+     *         {@code ClickSortedCommands}), so this is only reachable non-null there; callers
+     *         outside that gated subtree must null-check.
+     */
     public SelfTestManager getSelfTestManager() {
         return selfTestManager;
     }

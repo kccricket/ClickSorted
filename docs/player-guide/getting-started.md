@@ -10,12 +10,14 @@ The available trigger modes are:
 
 | Trigger mode | How to sort |
 |---|---|
-| **swap** *(default)* | Hover over any slot and press the swap-offhand key (`F`, usually). |
-| **double_click** | Double-click any slot. |
+| **swap** *(default)* | Press the swap-offhand key (`F`, usually) over an **empty** slot. |
+| **double_click** | Double-click an **empty** slot. |
 | **single_click** | Left-click an **empty** slot. |
-| **control_drop** | Press the drop key (`Ctrl+Q`) over a slot. |
-| **shift_left_click** | Shift-left-click a slot. |
-| **shift_right_click** | Shift-right-click a slot. |
+| **control_drop** | Press the drop key (`Ctrl+Q`) over an **occupied** slot. |
+| **shift_left_click** | Shift-left-click an **empty** slot. |
+| **shift_right_click** | Shift-right-click an **empty** slot. |
+
+Every mode except **single_click** and **control_drop** (which each force a fixed setting) also works over an **occupied** slot if you turn on allow-on-hover — see [`click allow-on-hover`](commands.md). With it off (the default), those modes only sort an empty slot.
 
 Change your trigger with `/clicksorted click method <mode>`.
 

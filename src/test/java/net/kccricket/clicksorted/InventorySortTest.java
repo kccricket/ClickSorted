@@ -448,6 +448,81 @@ class InventorySortTest extends AbstractClickSortedTest {
                 "DOUBLE_CLICK must cancel so the vanilla gather-to-cursor is suppressed");
     }
 
+    // --- Hover-neutral methods (SWAP, DOUBLE_CLICK, shift-click) sort an empty slot with hover off ---
+    //
+    // These four all leave sort-over-items to the player's preference (ClickMethod.requiredSortOverItems()
+    // is empty for each), so with hover off they must still sort a genuinely empty slot — the test harness's
+    // own default is sort-over-items ON (test-config.yml, unlike production's config.yml default of off), so
+    // hover is forced off explicitly below to exercise the real default gate.
+
+    @Test
+    void swapOnEmptySlotSortsWithHoverOff() {
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SWAP);
+        plugin.getSortingPrefs().setSortOverItems(player, false);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.SWAP_OFFHAND, 2);
+
+        assertEquals(15, countByMaterial(chest).getOrDefault(Material.STONE, 0), "STONE stacks should merge to 15");
+        assertTrue(event.isCancelled(), "SWAP sort must cancel the vanilla offhand swap");
+    }
+
+    @Test
+    void doubleClickOnEmptySlotSortsWithHoverOff() {
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.DOUBLE_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, false);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.DOUBLE_CLICK, 2);
+
+        assertEquals(15, countByMaterial(chest).getOrDefault(Material.STONE, 0), "STONE stacks should merge to 15");
+        assertTrue(event.isCancelled(), "DOUBLE_CLICK sort must cancel the vanilla gather-to-cursor");
+    }
+
+    @Test
+    void shiftLeftClickOnEmptySlotSortsWithHoverOff() {
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SHIFT_LEFT_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, false);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.SHIFT_LEFT, 2);
+
+        assertEquals(15, countByMaterial(chest).getOrDefault(Material.STONE, 0), "STONE stacks should merge to 15");
+        assertTrue(event.isCancelled(), "Shift-left sort must cancel the originating shift-move");
+    }
+
+    @Test
+    void shiftRightClickOnEmptySlotSortsWithHoverOff() {
+        PlayerMock player = addOpPlayer("Alice");
+        plugin.getSortingPrefs().setClickMethod(player, ClickMethod.SHIFT_RIGHT_CLICK);
+        plugin.getSortingPrefs().setSortOverItems(player, false);
+
+        Inventory chest = server.createInventory(null, InventoryType.CHEST);
+        chest.setItem(0, stack(Material.STONE, 5));
+        chest.setItem(1, stack(Material.STONE, 10));
+        InventoryView view = player.openInventory(chest);
+
+        InventoryClickEvent event = fireClick(view, ClickType.SHIFT_RIGHT, 2);
+
+        assertEquals(15, countByMaterial(chest).getOrDefault(Material.STONE, 0), "STONE stacks should merge to 15");
+        assertTrue(event.isCancelled(), "Shift-right sort must cancel the originating shift-move");
+    }
+
     @Test
     void occupiedSlotSingleClickDoesNotSortEvenWithHoverOn() {
         // SINGLE_CLICK treats sort-over-items as always off: a LEFT click on an occupied slot must let

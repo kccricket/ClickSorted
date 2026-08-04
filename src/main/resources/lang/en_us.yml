@@ -149,12 +149,23 @@ dropItems: "Some items couldn't fit and were dropped!"
 # Sort-trigger instructions (shown as part of the sortBy message via <instruction>, and reused
 # verbatim by the self-test LIVE phase's action-bar prompts — kept plain text, no MiniMessage tags,
 # so they compose cleanly inside another rendered template).
+#
+# SINGLE_CLICK and CONTROL_DROP each force a specific allow-on-hover setting (see
+# ClickMethod.requiredSortOverItems), so they have one key apiece. The other four methods leave
+# hover to the player's own preference, so each has a plain key (hover off — the default — sorts an
+# empty slot only) and a "…Hover" key (hover on — sorts any slot); ClickMethod.getInstruction picks
+# between them based on the player's actual setting, so the text shown always matches what will
+# really sort.
 instructionSingle: "Left-click an empty slot (with nothing on your cursor) to sort."
-instructionDouble: "Double-click a slot to sort (first click any item to pick it up onto your cursor, then double-click any slot)."
-instructionSwap: "Press the offhand-swap key (default F) over any slot to sort."
 instructionControlDrop: "Press Ctrl+Q (drop key) over an occupied slot to sort."
-instructionShiftLeftClick: "Shift-left-click an occupied slot to sort."
-instructionShiftRightClick: "Shift-right-click an occupied slot to sort."
+instructionSwap: "Press the offhand-swap key (default F) over an empty slot to sort."
+instructionSwapHover: "Press the offhand-swap key (default F) over any slot to sort."
+instructionDouble: "Double-click an empty slot to sort."
+instructionDoubleHover: "Double-click any slot to sort."
+instructionShiftLeftClick: "Shift-left-click an empty slot to sort."
+instructionShiftLeftClickHover: "Shift-left-click any slot to sort."
+instructionShiftRightClick: "Shift-right-click an empty slot to sort."
+instructionShiftRightClickHover: "Shift-right-click any slot to sort."
 
 # Error shown when a player-only command is run from the console
 notFromConsole: "This command can only be used by a player."
@@ -227,12 +238,14 @@ selfTestAreaMainStorage: "In main storage (not hotbar):"
 selfTestAreaHotbar: "In hotbar (packing must not apply):"
 # The 6 sweep-cycle instructions (one per ClickMethod), fully self-contained rather than composed
 # with the generic instruction* keys above: the sweep's dummy chest holds exactly two staged item
-# stacks and nothing else, so "an occupied slot" or "any item" must name those two stacks explicitly
-# — a generic gameplay hint like instructionDouble's "any item" would otherwise read as "any item
-# anywhere on screen," including the tester's own real inventory below the chest, which would sort
-# for real instead of the throwaway test fixture.
+# stacks and nothing else, so "an occupied slot" must name those two stacks explicitly — a generic
+# gameplay hint like instructionControlDrop's "an occupied slot" would otherwise read as "anywhere
+# on screen," including the tester's own real inventory below the chest, which would sort for real
+# instead of the throwaway test fixture. Hover (sort-over-items) is forced on for every LIVE cycle
+# (SelfTestSession.applyTestSettings), so these all use the "any slot" phrasing unconditionally —
+# unlike the generic instruction*/instruction*Hover key pairs above.
 selfTestInstructionSingle: "In chest: left-click an empty slot (empty cursor)."
-selfTestInstructionDouble: "In chest: click one of the 2 stacks to pick it up, then double-click any chest slot."
+selfTestInstructionDouble: "In chest: double-click any slot."
 selfTestInstructionSwap: "In chest: swap-offhand (default F) on any slot."
 selfTestInstructionControlDrop: "In chest: Ctrl+Q (drop key) on one of the 2 occupied slots."
 selfTestInstructionShiftLeftClick: "In chest: shift-left-click one of the 2 occupied slots."

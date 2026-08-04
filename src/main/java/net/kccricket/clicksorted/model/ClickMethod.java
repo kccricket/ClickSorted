@@ -22,6 +22,16 @@ public enum ClickMethod {
         };
     }
 
+    /**
+     * The hover setting actually in force for this method: its own override if it has one
+     * ({@link #requiredSortOverItems()}), else the player's preference. The runtime gate
+     * ({@code InventoryClickListener}) and {@link #getInstruction} both read this, so the
+     * instruction text can never drift from what actually sorts.
+     */
+    public boolean effectiveSortOverItems(boolean playerPref) {
+        return requiredSortOverItems().orElse(playerPref);
+    }
+
     /** Returns true when this method forces a specific hover setting, hiding the allow-on-hover command. */
     public boolean governsHover() {
         return this == SINGLE_CLICK || this == CONTROL_DROP;
@@ -56,15 +66,20 @@ public enum ClickMethod {
         };
     }
 
-    public String getInstruction(Locale locale) {
+    /**
+     * @param playerSortOverItems the player's own allow-on-hover preference; ignored for methods
+     *                            that force a specific hover setting ({@link #requiredSortOverItems()})
+     */
+    public String getInstruction(Locale locale, boolean playerSortOverItems) {
         var lang = ClickSortedPlugin.getInstance().getConfigManager().lang(locale);
+        boolean hover = effectiveSortOverItems(playerSortOverItems);
         return switch (this) {
             case SINGLE_CLICK -> lang.raw("instructionSingle");
-            case DOUBLE_CLICK -> lang.raw("instructionDouble");
-            case SWAP -> lang.raw("instructionSwap");
             case CONTROL_DROP -> lang.raw("instructionControlDrop");
-            case SHIFT_LEFT_CLICK -> lang.raw("instructionShiftLeftClick");
-            case SHIFT_RIGHT_CLICK -> lang.raw("instructionShiftRightClick");
+            case DOUBLE_CLICK -> lang.raw(hover ? "instructionDoubleHover" : "instructionDouble");
+            case SWAP -> lang.raw(hover ? "instructionSwapHover" : "instructionSwap");
+            case SHIFT_LEFT_CLICK -> lang.raw(hover ? "instructionShiftLeftClickHover" : "instructionShiftLeftClick");
+            case SHIFT_RIGHT_CLICK -> lang.raw(hover ? "instructionShiftRightClickHover" : "instructionShiftRightClick");
         };
     }
 

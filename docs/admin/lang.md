@@ -186,16 +186,24 @@ override[token] → override[lang] → override[default_locale]
 
 ### Sort trigger instructions
 
-These strings are substituted as `<instruction>` in `setClickMethodTo`.
+These strings are substituted as `<instruction>` in `setClickMethodTo`. `single_click` and
+`control_drop` each force a specific allow-on-hover setting, so they have one key apiece. The other
+four trigger modes leave allow-on-hover to the player's own preference, so each has a plain key
+(hover off — the default — sorts an empty slot only) and a `…Hover` key (hover on — sorts any
+slot); the plugin picks whichever matches the player's actual setting.
 
 | Key | Default text |
 |---|---|
-| `instructionSingle` | `Left-click an empty slot to sort.` |
-| `instructionDouble` | `Double-click any slot to sort.` |
-| `instructionSwap` | `Press the offhand-swap key to sort.` |
-| `instructionControlDrop` | `Press Ctrl+Q (drop key) over a slot to sort.` |
-| `instructionShiftLeftClick` | `Shift-left-click a slot to sort.` |
-| `instructionShiftRightClick` | `Shift-right-click a slot to sort.` |
+| `instructionSingle` | `Left-click an empty slot (with nothing on your cursor) to sort.` |
+| `instructionControlDrop` | `Press Ctrl+Q (drop key) over an occupied slot to sort.` |
+| `instructionSwap` | `Press the offhand-swap key (default F) over an empty slot to sort.` |
+| `instructionSwapHover` | `Press the offhand-swap key (default F) over any slot to sort.` |
+| `instructionDouble` | `Double-click an empty slot to sort.` |
+| `instructionDoubleHover` | `Double-click any slot to sort.` |
+| `instructionShiftLeftClick` | `Shift-left-click an empty slot to sort.` |
+| `instructionShiftLeftClickHover` | `Shift-left-click any slot to sort.` |
+| `instructionShiftRightClick` | `Shift-right-click an empty slot to sort.` |
+| `instructionShiftRightClickHover` | `Shift-right-click any slot to sort.` |
 
 ### Console / player-only
 
