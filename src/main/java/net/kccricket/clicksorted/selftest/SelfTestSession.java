@@ -147,10 +147,11 @@ final class SelfTestSession {
      */
     void restoreAndClear() {
         boolean ok = true;
-        if (testChest != null) {
-            ok &= attempt("close test chest", player::closeInventory);
-            testChest = null;
-        }
+        // Unconditional, not just when testChest is set: SIM cases open their own Inventory
+        // locally (never registered on the session), so gating this on testChest left the
+        // client's GUI from the last SIM case open after the run finished.
+        ok &= attempt("close test chest", player::closeInventory);
+        testChest = null;
         PlayerInventory inv = player.getInventory();
         ok &= attempt("restore inventory contents", () -> inv.setContents(savedContents));
         ok &= attempt("restore armor", () -> inv.setArmorContents(savedArmor));

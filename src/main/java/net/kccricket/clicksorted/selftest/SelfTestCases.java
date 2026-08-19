@@ -520,6 +520,12 @@ public final class SelfTestCases {
         Player player = ctx.player();
         prefs(ctx).setLockedSlots(player, Set.of(9));
 
+        // The click sorts the whole main-storage region (9-35), not just the fixture slots below —
+        // on a live character with a populated inventory, leftover real items in 12-35 would get
+        // pulled into the merge and could land in slot 10, breaking the fixed slot-10 assertion.
+        for (int slot = 12; slot <= 35; slot++) {
+            player.getInventory().setItem(slot, null);
+        }
         player.getInventory().setItem(9, named(Material.STONE, "locked", 7));
         player.getInventory().setItem(10, named(Material.STONE, "m", 5));
         player.getInventory().setItem(11, named(Material.STONE, "m", 3));
