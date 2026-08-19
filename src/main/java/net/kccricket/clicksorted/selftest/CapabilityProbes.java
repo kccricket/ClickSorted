@@ -77,6 +77,7 @@ public final class CapabilityProbes {
         probes.add(mountStorageOffset());
         probes.add(sortableInventoryTypes());
         probes.add(clickTypeConstants());
+        probes.add(customModelDataComponent());
         return List.copyOf(probes);
     }
 
@@ -180,6 +181,20 @@ public final class CapabilityProbes {
                         return CapabilityProbe.Result.present("Entity#getScheduler() -> " + m.getReturnType().getName());
                     } catch (NoSuchMethodException e) {
                         return CapabilityProbe.Result.absent("Entity#getScheduler() not present on this server");
+                    }
+                });
+    }
+
+    private static CapabilityProbe customModelDataComponent() {
+        return of("custom-model-data-component",
+                "Whether ItemMeta.hasCustomModelDataComponent() exists (Paper 1.21.2+) — TreemapPacker "
+                        + "falls back to the deprecated hasCustomModelData() when it doesn't.",
+                plugin -> {
+                    try {
+                        ItemMeta.class.getMethod("hasCustomModelDataComponent");
+                        return CapabilityProbe.Result.present("hasCustomModelDataComponent() resolves");
+                    } catch (NoSuchMethodException e) {
+                        return CapabilityProbe.Result.absent("falling back to hasCustomModelData()");
                     }
                 });
     }
