@@ -1,10 +1,30 @@
 import org.gradle.api.attributes.java.TargetJvmVersion
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 
+// Pins vulnerable transitive dependencies pulled in by the publish/package plugins below (Shadow's
+// bundled log4j-core, fixed by the 9.6.1 version pin below, still drags in an unpatched okio;
+// Minotaur's okhttp and hangar-publish-plugin's httpclient5 pin older releases outright) to the
+// versions Dependabot flagged, without waiting on upstream plugin releases. Build-time only — none
+// of this ships in the plugin jar, which bundles just KcMcLib and bStats (see the `dependencies`
+// block below).
+buildscript {
+    configurations.classpath {
+        resolutionStrategy {
+            force(
+                "org.apache.httpcomponents.client5:httpclient5:5.6.3",
+                "org.apache.httpcomponents.core5:httpcore5:5.4.3",
+                "org.apache.httpcomponents.core5:httpcore5-h2:5.4.3",
+                "com.squareup.okio:okio:3.4.0",
+                "com.squareup.okio:okio-jvm:3.4.0"
+            )
+        }
+    }
+}
+
 plugins {
     java
     jacoco
-    id("com.gradleup.shadow") version "9.4.3"
+    id("com.gradleup.shadow") version "9.6.1"
     id("org.bxteam.runserver") version "1.2.2"
     id("com.modrinth.minotaur") version "2.9.0"
     id("io.papermc.hangar-publish-plugin") version "0.1.4"
