@@ -1,3 +1,62 @@
+# ClickSorted 2.3.0
+
+Release date: 2026-09-03
+
+ClickSorted 2.3.0 adds an in-game self-test and compatibility-diagnostics tool, lowers the minimum supported server back down to Paper 1.20.6, and extracts the plugin's internal utility code into a shared library.
+
+## Highlights
+
+- **New `/clicksorted admin selftest`** — an in-game correctness and version-compatibility self-test, for admins validating an update against their exact Paper build before trusting it on a live server.
+- **Broadened compatibility** — minimum supported server lowered back to Paper/Folia **1.20.6** (from the 1.21.6 floor introduced in 2.2.0). The `/clicksorted menu` dialog automatically disables itself on servers older than 1.21.6 (no Dialog API); every other feature works down to 1.20.6.
+- Internal plugin-agnostic utility code (config/migration engine, logging, localisation, rate limiting, permission helpers, update checking, Adventure Component helpers) was extracted into a new shared library, **KcMcLib**, consumed as a git submodule. No behavior change for players or admins.
+
+## Breaking Changes
+
+- **`/clicksorted admin benchmark` now also requires `enable_benchmark: true` in `config.yml`** (new key, default `false`), matching the existing `enable_selftest`-style gate — previously the `clicksorted.admin.commands.benchmark` permission alone was enough. Admins who use the benchmark command need to add this key.
+- **Internal Java API reshuffle, for third-party plugin developers only.** Several non-event internal classes (the migration engine, config lifecycle, logging, the `MessageSource`/`Localized` message facade, rate limiting, permission helpers, the Modrinth update checker, and Adventure Component helpers) moved out of `net.kccricket.clicksorted.*` into the new `net.kccricket.kcmclib.*` namespace, and `MessageSource`/`Localized`'s `getColoredMessage`/`getMessage` were renamed to `render`/`raw`. The public event API — `InventorySortEvent`, `PlayerPreferenceChangeEvent`, `Preference`, and the `PlayerSortingPrefs` setters — is unchanged; only code that directly imported the moved internal classes needs updating.
+
+## New Features
+
+### In-game self-test & compatibility diagnostics
+
+`/clicksorted admin selftest` (permission `clicksorted.admin.commands.selftest`, default `op`; also requires the new `enable_selftest` config key, default `false`, since a run stages and restores the tester's real inventory and preferences) runs the plugin's algorithm and integration checks against the server it's actually installed on:
+
+- `selftest algo` — pure algorithm checks, no Paper API surface involved.
+- `selftest probe` — runs the capability-probe suite alone, a quick compatibility fingerprint of the running server.
+- `selftest sim` — synthetic events dispatched through the real listeners.
+- `selftest start [quick|full]` — an interactive LIVE session that walks the tester through real click-method gestures (`quick`) or the full set of region/lock/blacklist/bundle scenarios (`full`), restoring their inventory and preferences from a crash-safe backup afterward; `selftest next`/`status`/`stop` control an in-progress session.
+
+Failures are grouped into SANITY/INTEGRATION/ENDTOEND categories so a weak-signal algorithm hiccup can't masquerade as a real version-compatibility break — only ENDTOEND failures (real client gestures) carry full compatibility signal. Intended for admins/testers checking a plugin update, not routine play.
+
+## Bug Fixes
+
+- Self-test LIVE session restore could lose the crash-safety backup if any single restore step failed — exactly the kind of version-incompatibility failure this subsystem exists to catch — stranding the tester's real inventory and preferences with no recovery path. Each restore step now runs independently, and the backup is only cleared once every step has actually run.
+- `/clicksorted menu` could show stale "hover" wording on its click-method status line when a single Save changed both the click method and the allow-on-hover preference together.
+- Fixed a permission leak where the `/clicksorted admin` command node was visible in tab-complete to every player, even though none of its subcommands were actually usable without their own permission.
+- `/clicksorted bundle blacklist add|remove material` tab-completion now suggests namespaced material IDs (e.g. `minecraft:dirt`), matching what the command actually accepts, instead of a drifted, un-namespaced local implementation.
+- A bundle that contained another bundle was treated as completely full, so ClickSorted would never pack anything into it — a nested bundle was charged an entire bundle's capacity instead of vanilla's one-sixteenth plus whatever it holds. Bundle weight now matches vanilla exactly, including beehives/bee nests holding bees (a whole bundle, previously undercounted — the undercount could let a bundle be packed past its real capacity and rejected on reload) and items with a custom stack size.
+- TREEMAP sorting crashed on every pre-1.21.2 server — a call to the newer `hasCustomModelDataComponent()` API had no fallback for the plugin's own stated 1.20.6 floor. It now falls back to the older `hasCustomModelData()` check on servers where the newer API doesn't exist.
+
+## Other Improvements
+
+- Trigger instructions (chat messages and self-test prompts) now reflect the player's actual allow-on-hover setting instead of always describing the plain, non-hover gesture.
+- `config.yml` now warns on reload/load about any key it doesn't recognize (a leftover from an old config version, or a typo) instead of silently ignoring it.
+- New maintainer-only `./gradlew generateItemNames` tool regenerates the item display-name/sort-key table from the current Paper API; not bundled into the plugin jar.
+
+## Compatibility
+
+✔️ Paper/Folia 1.20.6 – 26.2.x
+✔️ Java 21+
+
+## Upgrading
+
+1. Stop your server.
+2. Replace the old jar in `plugins/` with this release.
+3. If you use `/clicksorted admin benchmark`, add `enable_benchmark: true` to `config.yml`.
+4. Start your server.
+
+---
+
 # ClickSorted 2.2.0
 
 Release date: 2026-07-07

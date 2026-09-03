@@ -15,8 +15,11 @@ package net.kccricket.clicksorted.sort;
 import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.SortKey;
 import org.bukkit.Material;
+import org.bukkit.block.Beehive;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.BundleMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.*;
 
@@ -33,10 +36,14 @@ import java.util.*;
  *
  * <p>Invariants:
  * <ul>
- *   <li>Each bundle's total weight stays ≤ 64 (item weight = 64 / maxStackSize per item).</li>
+ *   <li>Each bundle's total weight stays ≤ {@link #BUNDLE_WEIGHT_CAPACITY}. Weight follows vanilla:
+ *       an ordinary item costs {@code 64 / maxStackSize} (honouring a per-item {@code max_stack_size}
+ *       component where set), a nested bundle costs {@link #NESTED_BUNDLE_WEIGHT} plus its own
+ *       contents' weight, and a beehive or bee nest holding bees costs a whole bundle.</li>
  *   <li>Distinct-entry count stays ≤ {@code entryCap} per bundle (0 = weight-only limit).</li>
  *   <li>Remainders heavier than {@link #MAX_PACK_WEIGHT} are never bundled (inefficient trade).</li>
- *   <li>Ineligible bundle contents (non-stackable, nested shulkers) are never pooled or moved.</li>
+ *   <li>Ineligible bundle contents (non-stackable, nested shulkers, nested bundles, bee-filled
+ *       beehives/nests) are never pooled or moved — they are priced but always retained in place.</li>
  *   <li>Bundles (policy) and shulker boxes (hard limit) are never packed into bundles.</li>
  *   <li>A bundle whose own material or display name is blocked by the blacklist is never used as a
  *       bin: its contents are not unpacked and no new items are packed into it.</li>
@@ -44,8 +51,30 @@ import java.util.*;
  */
 public final class BundlePacker {
 
-    /** Total weight a single bundle can hold (item weight = {@code 64 / maxStackSize} per item). */
+    /** Total weight a single bundle can hold. See {@link #stackWeight} for how an item's weight is computed. */
     public static final int BUNDLE_WEIGHT_CAPACITY = 64;
+
+    /**
+     * Weight a nested bundle costs on top of its own contents' weight — vanilla's
+     * {@code BUNDLE_IN_BUNDLE_WEIGHT} fraction of {@code 1/16}, on this class's 64-unit scale.
+     */
+    public static final int NESTED_BUNDLE_WEIGHT = BUNDLE_WEIGHT_CAPACITY / 16;
+
+    /**
+     * Deepest bundle nesting priced exactly; each level already costs at least
+     * {@link #NESTED_BUNDLE_WEIGHT}, so beyond this depth the true weight is already ≥ capacity.
+     * Anything nested deeper (only reachable via hand-crafted NBT, not normal play) is charged as a
+     * full bundle rather than recursed into further, mirroring vanilla's {@code BundleItem} collapsing
+     * an unrepresentable weight to "full".
+     */
+    private static final int MAX_NEST_DEPTH = BUNDLE_WEIGHT_CAPACITY / NESTED_BUNDLE_WEIGHT;
+
+    /**
+     * Ceiling for a single stack's computed weight — far above {@link #BUNDLE_WEIGHT_CAPACITY} but low
+     * enough that summing every entry a bundle could ever hold cannot overflow an {@code int}. Only
+     * reachable via a pathological (hand-crafted NBT) amount or nesting; ordinary play never approaches it.
+     */
+    private static final int MAX_STACK_WEIGHT = BUNDLE_WEIGHT_CAPACITY * BUNDLE_WEIGHT_CAPACITY;
 
     /**
      * Upper weight bound for a remainder to be bundle-eligible. Spending more than half a bundle's
@@ -110,9 +139,7 @@ public final class BundlePacker {
         // Split each total into full stacks plus a single remainder.
         Map<SortKey, TypePlan> plans = new LinkedHashMap<>();
         for (Map.Entry<SortKey, Long> e : loosePool.entrySet()) {
-            int maxStack = samples.get(e.getKey()).getType().getMaxStackSize();
-            if (maxStack <= 0) maxStack = 64;
-            plans.put(e.getKey(), new TypePlan(maxStack, e.getValue()));
+            plans.put(e.getKey(), new TypePlan(samples.get(e.getKey()), e.getValue()));
         }
 
         // Place bundleable remainders lightest-first (best-fit, origin-bundle preference).
@@ -199,17 +226,86 @@ public final class BundlePacker {
     }
 
     /**
-     * Weight a single ItemStack occupies inside a bundle.
-     * Formula: {@code amount × (64 / maxStackSize)}, integer division.
+     * Weight a single ItemStack occupies inside a bundle, mirroring vanilla's
+     * {@code BundleContents#getWeight}: a nested bundle costs {@link #NESTED_BUNDLE_WEIGHT} plus its
+     * own contents' weight (its contents are never unpacked to compute this — they stay opaque), a
+     * beehive or bee nest currently holding bees costs a whole bundle, and everything else costs
+     * {@code amount × (64 / maxStackSize)} — honouring a per-item {@code max_stack_size} component
+     * where one is set, exactly as vanilla does.
      */
     public static int stackWeight(ItemStack is) {
-        return weight(is.getAmount(), is.getType().getMaxStackSize());
+        return weightOf(is, is.getAmount(), 0);
+    }
+
+    /** {@link #stackWeight}, but for an arbitrary {@code amount} of {@code sample}'s item/meta. */
+    private static int weightOf(ItemStack sample, int amount) {
+        return weightOf(sample, amount, 0);
+    }
+
+    private static int weightOf(ItemStack sample, int amount, int depth) {
+        if (sample == null || amount <= 0) return 0;
+        Material mat = sample.getType();
+        if (isBundle(mat)) {
+            // Depth guard: only reachable via hand-crafted NBT, never normal play. Charge as full
+            // rather than recurse further, mirroring vanilla collapsing an unrepresentable weight to
+            // "full" (BundleItem#getWeightSafe).
+            if (depth >= MAX_NEST_DEPTH) {
+                return saturate((long) amount * BUNDLE_WEIGHT_CAPACITY);
+            }
+            int contents = NESTED_BUNDLE_WEIGHT;
+            if (sample.getItemMeta() instanceof BundleMeta bm) {
+                for (ItemStack inner : bm.getItems()) {
+                    if (inner != null) contents += weightOf(inner, inner.getAmount(), depth + 1);
+                }
+            }
+            // A single bundle can never occupy more than one full bundle's worth of its parent's
+            // capacity, however it was actually filled — clamp per unit before multiplying by amount.
+            return saturate((long) amount * Math.min(contents, BUNDLE_WEIGHT_CAPACITY));
+        }
+        if (isBeeFilled(sample)) {
+            return saturate((long) amount * BUNDLE_WEIGHT_CAPACITY);
+        }
+        return weight(amount, maxStackOf(sample));
     }
 
     /** Bundle weight {@code amount} of a stack occupies given its {@code maxStack} size. */
     private static int weight(int amount, int maxStack) {
         if (maxStack <= 0) return BUNDLE_WEIGHT_CAPACITY;
-        return amount * BUNDLE_WEIGHT_CAPACITY / maxStack;
+        return saturate((long) amount * BUNDLE_WEIGHT_CAPACITY / maxStack);
+    }
+
+    /** Clamp a computed weight into {@code [0, MAX_STACK_WEIGHT]}, tolerating a pathological input. */
+    private static int saturate(long w) {
+        return (int) Math.min(MAX_STACK_WEIGHT, Math.max(0L, w));
+    }
+
+    /**
+     * True for a beehive/bee nest whose stored block state currently holds at least one bee —
+     * vanilla charges it a whole bundle regardless of how many bees, rather than the material's
+     * ordinary per-item weight. The material check runs first since reading the block state snapshot
+     * is comparatively costly and must not run for every ordinary item.
+     */
+    private static boolean isBeeFilled(ItemStack is) {
+        Material mat = is.getType();
+        if (mat != Material.BEEHIVE && mat != Material.BEE_NEST) return false;
+        return is.getItemMeta() instanceof BlockStateMeta bsm
+                && bsm.hasBlockState()
+                && bsm.getBlockState() instanceof Beehive hive
+                && hive.getEntityCount() > 0;
+    }
+
+    /**
+     * Max stack size for {@code is}: the per-item {@code max_stack_size} component when one is set
+     * (what vanilla's bundle-weight formula divides by), otherwise the item's Material default.
+     */
+    private static int maxStackOf(ItemStack is) {
+        ItemMeta meta = is.getItemMeta();
+        if (meta != null && meta.hasMaxStackSize()) {
+            int n = meta.getMaxStackSize();
+            if (n > 0) return n;
+        }
+        int n = is.getType().getMaxStackSize();
+        return n > 0 ? n : BUNDLE_WEIGHT_CAPACITY;
     }
 
     /** Number of distinct item types/meta among a list of stacks. */
@@ -236,15 +332,19 @@ public final class BundlePacker {
      *
      * <p>Shulker boxes cannot go in bundles (Minecraft hard limit). Bundles are excluded by
      * policy — keeping them empty as containers is more useful than nesting them. Non-stackable
-     * items (maxStackSize ≤ 1) consume an entire bundle for a single item with no net slot
-     * saving, so they are also excluded.
+     * items (maxStackSize ≤ 1, honouring a per-item {@code max_stack_size} component where one is
+     * set) consume an entire bundle for a single item with no net slot saving, so they are also
+     * excluded. A beehive or bee nest currently holding bees is excluded too — it already costs a
+     * whole bundle (see {@link #stackWeight}) and could never actually be repacked, so pooling it
+     * would only unpack it from wherever it already sits for no benefit.
      */
     public static boolean canBundle(ItemStack is) {
         if (is == null) return false;
         Material mat = is.getType();
         if (isBundle(mat)) return false;
         if (mat.name().contains("SHULKER_BOX")) return false;
-        if (mat.getMaxStackSize() <= 1) return false;
+        if (maxStackOf(is) <= 1) return false;
+        if (isBeeFilled(is)) return false;
         return true;
     }
 
@@ -269,11 +369,14 @@ public final class BundlePacker {
         final boolean bundleable;
         boolean remPlaced;
 
-        TypePlan(int maxStack, long total) {
-            this.maxStack = maxStack;
+        // sample is never a bundle or a bee-filled hive (canBundle excludes both from loosePool), so
+        // remWeight only ever needs weightOf's ordinary-item case in practice; it still goes through
+        // the shared dispatcher so this stays true even if canBundle's exclusions ever change.
+        TypePlan(ItemStack sample, long total) {
+            this.maxStack = maxStackOf(sample);
             this.fullStacks = total / maxStack;
             this.remAmt = (int) (total % maxStack);
-            this.remWeight = weight(remAmt, maxStack);
+            this.remWeight = weightOf(sample, remAmt);
             this.bundleable = remAmt > 0 && remWeight <= MAX_PACK_WEIGHT;
         }
     }
@@ -321,7 +424,7 @@ public final class BundlePacker {
 
         /** Whether a remainder of {@code weight} fits within both the weight and entry-cap limits. */
         boolean canAccept(int weight, int entryCap) {
-            if (64 - usedWeight < weight) return false;
+            if (BUNDLE_WEIGHT_CAPACITY - usedWeight < weight) return false;
             if (entryCap > 0 && distinct >= entryCap) return false;
             return true;
         }

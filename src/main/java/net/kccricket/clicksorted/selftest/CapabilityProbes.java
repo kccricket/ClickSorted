@@ -13,17 +13,21 @@ package net.kccricket.clicksorted.selftest;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
+import net.kccricket.clicksorted.sort.BundlePacker;
 import net.kccricket.clicksorted.sort.GridGeometry;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Beehive;
+import org.bukkit.entity.Bee;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Llama;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.BundleMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -75,6 +79,7 @@ public final class CapabilityProbes {
         probes.add(itemStackBytesRoundtrip());
         probes.add(entityScheduler());
         probes.add(mountStorageOffset());
+        probes.add(beeFilledBeehiveWeight());
         probes.add(sortableInventoryTypes());
         probes.add(clickTypeConstants());
         probes.add(customModelDataComponent());
@@ -227,6 +232,52 @@ public final class CapabilityProbes {
                     } finally {
                         llama.remove();
                     }
+                });
+    }
+
+    private static CapabilityProbe beeFilledBeehiveWeight() {
+        return of("bee-filled-beehive-weight",
+                "Spawns and immediately removes a Bee to build a bee-occupied beehive item, verifying "
+                        + "BundlePacker prices it as a whole bundle (vanilla's rule) rather than the ordinary "
+                        + "per-item stack-size formula — the one BundlePacker weight path unit tests can't "
+                        + "exercise under MockBukkit, since constructing a live Bee there throws "
+                        + "UnimplementedOperationException.",
+                plugin -> {
+                    List<World> worlds = Bukkit.getWorlds();
+                    if (worlds.isEmpty()) {
+                        return CapabilityProbe.Result.absent("no loaded world to spawn a probe bee in");
+                    }
+                    World world = worlds.get(0);
+                    ItemStack hive = new ItemStack(Material.BEEHIVE, 1);
+                    if (!(hive.getItemMeta() instanceof BlockStateMeta meta)) {
+                        return CapabilityProbe.Result.absent("BEEHIVE has no BlockStateMeta on this server");
+                    }
+                    if (!(meta.getBlockState() instanceof Beehive state)) {
+                        return CapabilityProbe.Result.absent("BEEHIVE block state is not a Beehive");
+                    }
+
+                    Bee bee = world.spawn(world.getSpawnLocation(), Bee.class);
+                    try {
+                        state.addEntity(bee);
+                    } finally {
+                        bee.remove();
+                    }
+                    meta.setBlockState(state);
+                    hive.setItemMeta(meta);
+
+                    // Re-read from the item, not from `state` — this is the exact round-trip
+                    // BundlePacker.isBeeFilled performs, so it also proves the occupant survives it.
+                    if (!(hive.getItemMeta() instanceof BlockStateMeta after)
+                            || !(after.getBlockState() instanceof Beehive round) || round.getEntityCount() == 0) {
+                        return CapabilityProbe.Result.unexpected("bee occupant did not survive the ItemMeta round-trip");
+                    }
+                    int weight = BundlePacker.stackWeight(hive);
+                    if (weight != BundlePacker.BUNDLE_WEIGHT_CAPACITY) {
+                        return CapabilityProbe.Result.unexpected("bee-filled beehive weighs " + weight
+                                + ", expected " + BundlePacker.BUNDLE_WEIGHT_CAPACITY + " (a whole bundle)");
+                    }
+                    return CapabilityProbe.Result.present("bee-filled beehive weighs " + weight
+                            + " (whole bundle), matching vanilla");
                 });
     }
 

@@ -29,7 +29,7 @@ Tune it to taste with commands:
 - `/clicksorted bundle enabled` — enabled or disable packing stacks into your bundles on click.
 - `/clicksorted bundle blacklist` — open a GUI to exclude specific item types or display names from bundle packing.
 - `/clicksorted status` — see your current settings.
-- `/clicksorted menu` — open a single dialog listing every sorting preference at once, with buttons to launch the slot-lock and bundle-blacklist GUIs. (Bedrock/Geyser clients can't render server dialogs — use the commands above instead.)
+- `/clicksorted menu` — open a single dialog listing every sorting preference at once, with buttons to launch the slot-lock and bundle-blacklist GUIs. Requires Paper's Dialog API (1.21.6+) and is unavailable on older servers or Bedrock/Geyser clients — use the commands above instead.
 
 Fully customisable item groups, messages, and sortable inventory types are available for admins. Admins can also declare a server-wide item blacklist (items that are never sorted or packed) and lock specific player inventory slots across all players.
 
@@ -37,7 +37,7 @@ Messages are stored as sparse per-locale override files under `plugins/ClickSort
 
 ## Requirements
 
-- Paper 1.21.6+
+- Paper or Folia 1.20.6+ (the `/clicksorted menu` dialog UI additionally requires 1.21.6+)
 - No dependencies
 
 ## Documentation

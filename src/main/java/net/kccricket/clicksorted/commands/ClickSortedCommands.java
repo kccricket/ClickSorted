@@ -27,6 +27,7 @@ import net.kccricket.clicksorted.selftest.CompatibilityReport;
 import net.kccricket.clicksorted.selftest.SelfTestManager;
 import net.kccricket.clicksorted.selftest.SelfTestReport;
 import net.kccricket.clicksorted.sort.BundleBenchmark;
+import net.kccricket.clicksorted.sort.BundlePacker;
 import net.kccricket.clicksorted.text.PreferenceMessages;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -590,10 +591,11 @@ public class ClickSortedCommands {
                                 limit = 0; // an off-word disables the entry limit
                             } else {
                                 try {
-                                    // A bundle holds at most 64 weight-units (64 single non-stackable items),
-                                    // so any entry cap above 64 can never bind; clamp so a huge value doesn't
-                                    // silently behave as "no limit" while the status still reports the number.
-                                    limit = Math.min(64, Math.max(0, Integer.parseInt(raw)));
+                                    // A bundle holds at most BUNDLE_WEIGHT_CAPACITY weight-units (that many
+                                    // single non-stackable items), so any entry cap above it can never bind;
+                                    // clamp so a huge value doesn't silently behave as "no limit" while the
+                                    // status still reports the number.
+                                    limit = Math.min(BundlePacker.BUNDLE_WEIGHT_CAPACITY, Math.max(0, Integer.parseInt(raw)));
                                 } catch (NumberFormatException e) {
                                     sendInvalidValue(plugin, player, raw, "a number from 0 to 64, or off");
                                     return Command.SINGLE_SUCCESS;

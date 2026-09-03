@@ -170,8 +170,12 @@ public final class SelfTestCases {
 
         cases.add(of("auto-bundle-pack-conservation", SelfTestCase.Phase.AUTO, ctx -> bundlePackConservation()));
         cases.add(of("auto-bundle-pack-idempotent", SelfTestCase.Phase.AUTO, ctx -> bundlePackIdempotent()));
+        cases.add(of("auto-bundle-in-bundle-capacity", SelfTestCase.Phase.AUTO, ctx -> bundleInBundleCapacity()));
+        cases.add(of("auto-bundle-in-bundle-idempotent", SelfTestCase.Phase.AUTO, ctx -> bundleInBundleIdempotent()));
         cases.add(of("auto-inplace-pack-conservation", SelfTestCase.Phase.AUTO, ctx -> inplacePackConservation()));
         cases.add(of("auto-inplace-pack-idempotent", SelfTestCase.Phase.AUTO, ctx -> inplacePackIdempotent()));
+        cases.add(of("auto-inplace-bundle-in-bundle-conservation", SelfTestCase.Phase.AUTO,
+                ctx -> inplaceBundleInBundleConservation()));
 
         return List.copyOf(cases);
     }
@@ -372,6 +376,51 @@ public final class SelfTestCases {
         return Optional.empty();
     }
 
+    /**
+     * Regression coverage for a bundle whose bin already contains another (nested) bundle: before the
+     * fix, {@code BundlePacker} charged a nested bundle the entire bundle capacity, so the outer bin
+     * looked completely full and a loose remainder was never packed into it.
+     */
+    private static Optional<String> bundleInBundleCapacity() {
+        ItemStack nested = bundleOf(new ArrayList<>(List.of(named(Material.STONE, "a", 10))));
+        ItemStack outer = bundleOf(new ArrayList<>(List.of(nested)));
+        ItemStack loose = named(Material.STONE, "a", 20);
+
+        ItemCensus before = ItemCensus.of(new ItemStack[]{loose, outer});
+        PackPass pass = runBundlePackPass(List.of(loose), List.of(outer), 12);
+        ItemCensus after = ItemCensus.of(concat(pass.leftover(), pass.bundles()));
+
+        Optional<String> cons = SelfTestEvaluator.compareCensus(before, after, List.of());
+        if (cons.isPresent()) return cons;
+        Optional<String> cap = SelfTestEvaluator.bundleCapacityValid(pass.bundles().toArray(new ItemStack[0]), 12);
+        if (cap.isPresent()) return cap;
+
+        int stillLoose = pass.leftover().stream()
+                .filter(is -> is.getType() == Material.STONE)
+                .mapToInt(ItemStack::getAmount).sum();
+        if (stillLoose != 0) {
+            return Optional.of("nested-bundle bin should have absorbed the 20 loose units — bundle-in-bundle "
+                    + "was treated as already full (stillLoose=" + stillLoose + ")");
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<String> bundleInBundleIdempotent() {
+        ItemStack nested = bundleOf(new ArrayList<>(List.of(named(Material.STONE, "a", 10))));
+        ItemStack outer = bundleOf(new ArrayList<>(List.of(nested)));
+        ItemStack loose = named(Material.STONE, "a", 20);
+
+        PackPass pass1 = runBundlePackPass(List.of(loose), List.of(outer), 12);
+        PackPass pass2 = runBundlePackPass(pass1.leftover(), pass1.bundles(), 12);
+
+        ItemCensus c1 = ItemCensus.of(concat(pass1.leftover(), pass1.bundles()));
+        ItemCensus c2 = ItemCensus.of(concat(pass2.leftover(), pass2.bundles()));
+        if (!c1.matches(c2)) {
+            return Optional.of("bundle-in-bundle pack not idempotent:\n" + c1.diff(c2));
+        }
+        return Optional.empty();
+    }
+
     private static Optional<String> inplacePackConservation() {
         ItemStack[] staged = new ItemStack[27];
         staged[0] = named(Material.STONE, "a", 20);
@@ -403,6 +452,34 @@ public final class SelfTestCases {
         for (int s : REGION_27) pass2[s] = r2.placement().get(s);
 
         return SelfTestEvaluator.idempotent(pass1, pass2);
+    }
+
+    /** Same regression as {@link #bundleInBundleCapacity()}, through the sorting-off/packing-on path. */
+    private static Optional<String> inplaceBundleInBundleConservation() {
+        ItemStack[] staged = new ItemStack[27];
+        staged[0] = named(Material.STONE, "a", 20);
+        ItemStack nested = bundleOf(new ArrayList<>(List.of(named(Material.STONE, "a", 10))));
+        staged[1] = bundleOf(new ArrayList<>(List.of(nested)));
+
+        ItemCensus before = ItemCensus.of(staged);
+        InPlacePacker.Result result = InPlacePacker.consolidate(staged, REGION_27, true, 12, BundleBlacklist.EMPTY);
+        ItemStack[] actual = new ItemStack[27];
+        for (int s : REGION_27) actual[s] = result.placement().get(s);
+
+        Optional<String> cons = SelfTestEvaluator.compareCensus(before, ItemCensus.of(actual), result.overflow());
+        if (cons.isPresent()) return cons;
+        Optional<String> cap = SelfTestEvaluator.bundleCapacityValid(actual, 12);
+        if (cap.isPresent()) return cap;
+
+        int looseStone = 0;
+        for (ItemStack is : actual) {
+            if (is != null && is.getType() == Material.STONE) looseStone += is.getAmount();
+        }
+        if (looseStone != 0) {
+            return Optional.of("nested-bundle bin absorbed nothing during in-place packing — treated as "
+                    + "already full (looseStone=" + looseStone + ")");
+        }
+        return Optional.empty();
     }
 
     // -------------------------------------------------------------------------

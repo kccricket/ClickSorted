@@ -107,7 +107,8 @@ public final class Migrations {
      * To add a future structural migration, append here.
      */
     private static final List<ConfigTransform> CONFIG_TRANSFORMS = List.of(
-            Migrations::migrateSortBounds);
+            Migrations::migrateSortBounds,
+            Migrations::migrateSortableInventories);
 
     /**
      * Root-level config paths to drop. These are not in {@code defaults.*} so they fall outside
@@ -257,6 +258,29 @@ public final class Migrations {
 
         Log.debug("migrateSortBounds: player_sort_min=" + min + ", player_sort_max=" + max
                 + " → locked " + sorted);
+        return true;
+    }
+
+    /**
+     * {@code CHEST_MINECART}/{@code HOPPER_MINECART} never resolved to a real Bukkit
+     * {@code InventoryType} — a minecart chest/hopper's inventory reports as plain
+     * {@code CHEST}/{@code HOPPER}, already in the default list — so they were dead entries on
+     * every server that had them. Dropped from the bundled default; this strips them from any
+     * already-deployed {@code sortable_inventories} that still lists them.
+     */
+    private static final List<String> DEAD_SORTABLE_INVENTORY_TYPES = List.of("CHEST_MINECART", "HOPPER_MINECART");
+
+    private static boolean migrateSortableInventories(ConfigurationSection config) {
+        if (!config.contains("sortable_inventories")) {
+            return false;
+        }
+        List<String> current = config.getStringList("sortable_inventories");
+        List<String> filtered = new ArrayList<>(current);
+        if (!filtered.removeAll(DEAD_SORTABLE_INVENTORY_TYPES)) {
+            return false;
+        }
+        config.set("sortable_inventories", filtered);
+        Log.debug("migrateSortableInventories: dropped dead entries " + DEAD_SORTABLE_INVENTORY_TYPES);
         return true;
     }
 

@@ -269,6 +269,47 @@ class MigrationTest extends AbstractClickSortedTest {
                 "No locked_slots.player entry should be created when no migration was needed");
     }
 
+    // --- Structural transform: drop dead CHEST_MINECART/HOPPER_MINECART sortable_inventories entries ---
+
+    @Test
+    void migrateSortableInventories_dropsDeadEntriesAndKeepsRest() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("sortable_inventories", java.util.List.of(
+                "PLAYER", "CHEST", "CHEST_MINECART", "HOPPER", "HOPPER_MINECART"));
+
+        assertTrue(plugin.getMigrations().migrate(cfg));
+        java.util.List<String> after = cfg.getStringList("sortable_inventories");
+        assertEquals(java.util.List.of("PLAYER", "CHEST", "HOPPER"), after,
+                "Dead entries removed, order and remaining entries preserved");
+    }
+
+    @Test
+    void migrateSortableInventories_noDeadEntriesIsNoOp() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("sortable_inventories", java.util.List.of("PLAYER", "CHEST", "HOPPER"));
+
+        assertFalse(plugin.getMigrations().migrate(cfg),
+                "No dead entries present → no change");
+        assertEquals(java.util.List.of("PLAYER", "CHEST", "HOPPER"), cfg.getStringList("sortable_inventories"));
+    }
+
+    @Test
+    void migrateSortableInventories_absentKeyIsNoOp() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        assertFalse(plugin.getMigrations().migrate(cfg), "Absent sortable_inventories → no change");
+        assertFalse(cfg.contains("sortable_inventories"),
+                "No sortable_inventories entry should be created when none was present");
+    }
+
+    @Test
+    void migrateSortableInventories_isIdempotent() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("sortable_inventories", java.util.List.of("PLAYER", "CHEST_MINECART"));
+
+        assertTrue(plugin.getMigrations().migrate(cfg), "First pass must report a change");
+        assertFalse(plugin.getMigrations().migrate(cfg), "Second pass must be a no-op");
+    }
+
     // --- Bundle key renames (bundle_inventory → bundle_in_inventory, bundle_others → bundle_in_containers) ---
 
     @Test

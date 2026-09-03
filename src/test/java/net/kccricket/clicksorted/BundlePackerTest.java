@@ -4,15 +4,19 @@ import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.sort.BundlePacker;
 import org.bukkit.Material;
+import org.bukkit.block.Beehive;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.BundleMeta;
 import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.entity.BeeMock;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,9 +24,16 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link BundlePacker}: weight math, the {@code canBundle} rules, and the pool-and-pack
  * core ({@link BundlePacker#packIntoBundles}) — full stacks returned loose, a ≤32-weight remainder
  * routed to the fullest bundle that fits, a heavier remainder left loose, duplicate consolidation,
- * lightest-first placement, and entry caps.
+ * lightest-first placement, entry caps, nested bundles as bins, and bee-filled beehives.
  *
  * Uses MockBukkit (via AbstractClickSortedTest) because BundleMeta is a server-side object.
+ *
+ * <p>The bee-filled-hive tests ({@code beeHive}, which populates a {@code Beehive} block state via
+ * {@link org.mockbukkit.mockbukkit.entity.BeeMock}) currently self-skip on this MockBukkit version —
+ * bee entity construction throws {@code UnimplementedOperationException}, which JUnit reports as
+ * skipped rather than failed. The bee-less counterparts ({@code *_emptyBeehive_*}) still exercise the
+ * material-gate and {@code hasBlockState} guards unconditionally, so {@code isBeeFilled}'s false path
+ * is covered either way; only the true (bees-present) path depends on MockBukkit's entity support.
  */
 class BundlePackerTest extends AbstractClickSortedTest {
 
@@ -101,6 +112,54 @@ class BundlePackerTest extends AbstractClickSortedTest {
         assertEquals(64, BundlePacker.stackWeight(new ItemStack(Material.COBBLESTONE, 64)));
     }
 
+    @Test
+    void stackWeight_emptyNestedBundle_isSixteenthOfCapacity() {
+        // Vanilla BUNDLE_IN_BUNDLE_WEIGHT = 1/16 of capacity (64/16 = 4), not a whole bundle (64).
+        assertEquals(4, BundlePacker.stackWeight(bundle()));
+    }
+
+    @Test
+    void stackWeight_nestedBundleWithContents_addsContentWeight() {
+        // 4 (nested-bundle cost) + 32 (32 cobblestone at weight 1 each) = 36.
+        assertEquals(36, BundlePacker.stackWeight(bundle(new ItemStack(Material.COBBLESTONE, 32))));
+    }
+
+    @Test
+    void stackWeight_doublyNestedBundle_accumulates() {
+        // Outer: 4 + (inner: 4 + 10) = 18.
+        assertEquals(18, BundlePacker.stackWeight(bundle(bundle(new ItemStack(Material.COBBLESTONE, 10)))));
+    }
+
+    @Test
+    void stackWeight_nestedBundleNeverExceedsCapacity() {
+        // A nested bundle stuffed with a full 64-weight stack would compute to 4 + 64 = 68; clamps to 64.
+        assertEquals(64, BundlePacker.stackWeight(bundle(new ItemStack(Material.COBBLESTONE, 64))));
+    }
+
+    @Test
+    void stackWeight_maxStackSizeComponentHonoured() {
+        // 3 units at a component max-stack-size of 16 → weight 3 × (64/16) = 12, not 3 × (64/64) = 3.
+        ItemStack cobble = new ItemStack(Material.COBBLESTONE, 3);
+        var meta = cobble.getItemMeta();
+        meta.setMaxStackSize(16);
+        cobble.setItemMeta(meta);
+        assertEquals(12, BundlePacker.stackWeight(cobble));
+    }
+
+    @Test
+    void stackWeight_beeFilledBeehive_isCapacity() {
+        // A beehive/bee nest holding bees costs a whole bundle in vanilla, not the material's ordinary
+        // per-item weight (64/64 = 1).
+        assertEquals(64, BundlePacker.stackWeight(beeHive(Material.BEEHIVE, 1)));
+        assertEquals(64, BundlePacker.stackWeight(beeHive(Material.BEE_NEST, 3)));
+    }
+
+    @Test
+    void stackWeight_emptyBeehive_usesMaxStackSize() {
+        // The bee check must not misfire on an ordinary, bee-less hive: back to the material formula.
+        assertEquals(3, BundlePacker.stackWeight(new ItemStack(Material.BEEHIVE, 3)));
+    }
+
     private static int usedWeight(ItemStack bundle) {
         int t = 0;
         for (ItemStack is : ((BundleMeta) bundle.getItemMeta()).getItems())
@@ -124,6 +183,23 @@ class BundlePackerTest extends AbstractClickSortedTest {
             b.setItemMeta(meta);
         }
         return b;
+    }
+
+    /** Build a BEEHIVE/BEE_NEST ItemStack whose stored block state holds {@code beeCount} bees. */
+    private ItemStack beeHive(Material type, int beeCount) {
+        ItemStack hive = new ItemStack(type, 1);
+        if (!(hive.getItemMeta() instanceof BlockStateMeta meta)) {
+            throw new IllegalStateException(type + " has no BlockStateMeta on this server");
+        }
+        if (!(meta.getBlockState() instanceof Beehive state)) {
+            throw new IllegalStateException(type + " block state is not a Beehive");
+        }
+        for (int i = 0; i < beeCount; i++) {
+            state.addEntity(new BeeMock(server, UUID.randomUUID()));
+        }
+        meta.setBlockState(state);
+        hive.setItemMeta(meta);
+        return hive;
     }
 
     // -------------------------------------------------------------------------
@@ -183,6 +259,38 @@ class BundlePackerTest extends AbstractClickSortedTest {
     @Test
     void canBundle_null_false() {
         assertFalse(BundlePacker.canBundle(null));
+    }
+
+    @Test
+    void canBundle_maxStackSizeComponentOne_false() {
+        // Material default stack size is > 1, but a component pins it to 1 (non-stackable).
+        ItemStack cobble = new ItemStack(Material.COBBLESTONE, 1);
+        var meta = cobble.getItemMeta();
+        meta.setMaxStackSize(1);
+        cobble.setItemMeta(meta);
+        assertFalse(BundlePacker.canBundle(cobble));
+    }
+
+    @Test
+    void canBundle_maxStackSizeComponentSixteen_true() {
+        ItemStack cobble = new ItemStack(Material.COBBLESTONE, 1);
+        var meta = cobble.getItemMeta();
+        meta.setMaxStackSize(16);
+        cobble.setItemMeta(meta);
+        assertTrue(BundlePacker.canBundle(cobble));
+    }
+
+    @Test
+    void canBundle_beeFilledBeehive_false() {
+        // Already costs a whole bundle and could never actually be repacked; pooling it would just
+        // unpack it from wherever it currently sits for no benefit.
+        assertFalse(BundlePacker.canBundle(beeHive(Material.BEEHIVE, 1)));
+    }
+
+    @Test
+    void canBundle_emptyBeehive_true() {
+        // The exclusion is bee-conditional, not a material-wide ban on beehives.
+        assertTrue(BundlePacker.canBundle(new ItemStack(Material.BEEHIVE, 1)));
     }
 
     // -------------------------------------------------------------------------
@@ -358,5 +466,92 @@ class BundlePackerTest extends AbstractClickSortedTest {
 
         assertEquals(0, looseSlots(leftover, Material.COBBLESTONE), "Nothing left loose");
         assertEquals(10, bundleAmount(bundles.get(0), Material.COBBLESTONE), "Remainder is inside the colored bundle");
+    }
+
+    // -------------------------------------------------------------------------
+    // packIntoBundles — a bundle containing another bundle is still a usable bin
+    // -------------------------------------------------------------------------
+
+    @Test
+    void pack_bundleContainingBundle_stillAcceptsRemainder() {
+        // The bin holds one empty nested bundle (weight 4 of 64) — before the fix a nested bundle was
+        // charged the full 64, so this bin looked completely full and every remainder stayed loose.
+        List<ItemStack> bundles = new ArrayList<>(List.of(bundle(bundle())));
+        List<ItemStack> leftover = pack(List.of(new ItemStack(Material.DIRT, 20)), bundles, 0);
+
+        assertEquals(0, looseSlots(leftover, Material.DIRT), "Nothing left loose");
+        assertEquals(20, bundleAmount(bundles.get(0), Material.DIRT), "Remainder packed into the outer bundle");
+    }
+
+    @Test
+    void pack_nestedBundleIsNeverPooledOrUnpacked() {
+        // The nested bundle already holds 10 cobblestone; packing 20 more loose cobblestone must not
+        // dissolve the nested bundle's contents into the outer bundle's top-level entries.
+        ItemStack inner = bundle(new ItemStack(Material.COBBLESTONE, 10));
+        List<ItemStack> bundles = new ArrayList<>(List.of(bundle(inner)));
+        pack(List.of(new ItemStack(Material.COBBLESTONE, 20)), bundles, 0);
+
+        ItemStack outer = bundles.get(0);
+        assertEquals(20, bundleAmount(outer, Material.COBBLESTONE),
+                "Only the loose 20 lands as a top-level entry in the outer bundle");
+        List<ItemStack> outerContents = contents(outer);
+        assertEquals(1, outerContents.stream().filter(is -> BundlePacker.isBundle(is.getType())).count(),
+                "The nested bundle is still present, untouched");
+        ItemStack nested = outerContents.stream().filter(is -> BundlePacker.isBundle(is.getType())).findFirst().orElseThrow();
+        assertEquals(10, bundleAmount(nested, Material.COBBLESTONE), "The nested bundle's own contents are unchanged");
+    }
+
+    @Test
+    void pack_fullNestedBundle_blocksFurtherPacking() {
+        // A nested bundle stuffed to capacity (weight 64) leaves the outer bundle with zero room.
+        List<ItemStack> bundles = new ArrayList<>(List.of(bundle(bundle(new ItemStack(Material.COBBLESTONE, 64)))));
+        List<ItemStack> leftover = pack(List.of(new ItemStack(Material.DIRT, 10)), bundles, 0);
+
+        assertEquals(10, looseAmount(leftover, Material.DIRT), "No room left; the fix must not over-admit");
+        assertEquals(0, bundleAmount(bundles.get(0), Material.DIRT), "Outer bundle unchanged");
+    }
+
+    @Test
+    void pack_maxStackSizeComponentLimitsLooseStackSize() {
+        // 40 units of an item whose component caps its stack at 16: 2 full loose stacks of 16 (not 64)
+        // plus an 8-unit remainder (weight 8*(64/16)=32 ≤ MAX_PACK_WEIGHT) that gets bundled.
+        ItemStack sample = new ItemStack(Material.COBBLESTONE, 1);
+        var meta = sample.getItemMeta();
+        meta.setMaxStackSize(16);
+        sample.setItemMeta(meta);
+
+        List<ItemStack> bundles = new ArrayList<>(List.of(bundle()));
+        ItemStack loose = sample.clone();
+        loose.setAmount(40);
+        List<ItemStack> leftover = pack(List.of(loose), bundles, 0);
+
+        assertEquals(2, looseSlots(leftover, Material.COBBLESTONE), "Two full stacks");
+        assertEquals(32, looseAmount(leftover, Material.COBBLESTONE), "2 × 16 = 32 loose");
+        assertEquals(8, bundleAmount(bundles.get(0), Material.COBBLESTONE), "8-unit remainder bundled");
+    }
+
+    @Test
+    void pack_nestedBundleBinIsIdempotent() {
+        // Re-running pack over its own output must be a no-op, including on the newly-reachable
+        // nested-bundle-as-bin path.
+        List<ItemStack> bundles = new ArrayList<>(List.of(bundle(bundle())));
+        List<ItemStack> firstLeftover = pack(List.of(new ItemStack(Material.DIRT, 20)), bundles, 0);
+
+        List<ItemStack> secondLeftover = pack(firstLeftover, bundles, 0);
+
+        assertEquals(0, looseAmount(secondLeftover, Material.DIRT), "Second pass changes nothing");
+        assertEquals(20, bundleAmount(bundles.get(0), Material.DIRT), "Dirt stays put across passes");
+    }
+
+    @Test
+    void pack_beeFilledBeehiveInBundle_isRetainedAndChargedFull() {
+        // A bin already holding a bee-filled hive (weight 64) has no room left, and the hive itself
+        // must survive the pass untouched — the whole point of the retain-not-pool exclusion.
+        List<ItemStack> bundles = new ArrayList<>(List.of(bundle(beeHive(Material.BEEHIVE, 1))));
+        List<ItemStack> leftover = pack(List.of(new ItemStack(Material.DIRT, 10)), bundles, 0);
+
+        assertEquals(10, looseAmount(leftover, Material.DIRT), "No room left in the bin");
+        assertEquals(1, contents(bundles.get(0)).stream().filter(is -> is.getType() == Material.BEEHIVE).count(),
+                "The hive is still present in the bundle");
     }
 }

@@ -29,6 +29,7 @@ import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.PreferenceResult;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
+import net.kccricket.clicksorted.sort.BundlePacker;
 import net.kccricket.clicksorted.text.PreferenceMessages;
 import net.kccricket.kcmclib.text.lang.Localized;
 import net.kyori.adventure.text.Component;
@@ -120,8 +121,8 @@ public final class PreferencesDialog {
     /**
      * One planned dialog input. Only the field matching {@code kind} is populated: {@code boolInitial}
      * for {@link InputKind#BOOL}, {@code options} (already filtered and selection-marked) for
-     * {@link InputKind#SINGLE_OPTION}, {@code numberInitial} (already clamped to [0, 64]) for
-     * {@link InputKind#NUMBER_RANGE}.
+     * {@link InputKind#SINGLE_OPTION}, {@code numberInitial} (already clamped to
+     * {@code [0, BundlePacker.BUNDLE_WEIGHT_CAPACITY]}) for {@link InputKind#NUMBER_RANGE}.
      */
     public record InputSpec(DialogElement element, InputKind kind,
                              Boolean boolInitial, List<OptionSpec> options, Integer numberInitial) {
@@ -219,10 +220,11 @@ public final class PreferencesDialog {
             boolean bundleCont = seed.bundleInContainers() != null ? seed.bundleInContainers() : prefs.getBundlePackInContainers(player);
             inputs.add(new InputSpec(DialogElement.BUNDLE_IN_CONTAINERS, InputKind.BOOL, bundleCont, null, null));
 
-            // Clamp the seed to the input's declared [0, 64] range: prefs.getBundleStackLimit can
-            // return an unclamped config default (defaults.bundle_stack_limit is read raw), and an
-            // out-of-range initial value is rejected by the numberRange builder / breaks the dialog.
-            int stackLimit = Math.min(64, Math.max(0,
+            // Clamp the seed to the input's declared [0, BUNDLE_WEIGHT_CAPACITY] range:
+            // prefs.getBundleStackLimit can return an unclamped config default
+            // (defaults.bundle_stack_limit is read raw), and an out-of-range initial value is rejected
+            // by the numberRange builder / breaks the dialog.
+            int stackLimit = Math.min(BundlePacker.BUNDLE_WEIGHT_CAPACITY, Math.max(0,
                     seed.bundleStackLimit() != null ? seed.bundleStackLimit() : prefs.getBundleStackLimit(player)));
             inputs.add(new InputSpec(DialogElement.BUNDLE_STACK_LIMIT, InputKind.NUMBER_RANGE, null, null, stackLimit));
         }
@@ -265,7 +267,7 @@ public final class PreferencesDialog {
                 }
                 yield DialogInput.singleOption(spec.element().key(), label, entries).build();
             }
-            case NUMBER_RANGE -> DialogInput.numberRange(spec.element().key(), label, 0f, 64f)
+            case NUMBER_RANGE -> DialogInput.numberRange(spec.element().key(), label, 0f, BundlePacker.BUNDLE_WEIGHT_CAPACITY)
                     .step(1f)
                     .initial((float) spec.numberInitial())
                     .build();
@@ -447,10 +449,10 @@ public final class PreferencesDialog {
         }
 
         if (values.bundleStackLimit() != null) {
-            // A bundle holds at most 64 weight-units; clamp exactly like
+            // A bundle holds at most BUNDLE_WEIGHT_CAPACITY weight-units; clamp exactly like
             // ClickSortedCommands#buildBundleStackLimit so a huge value can't behave as "no limit"
             // while the status message still reports the raw number.
-            int clamped = Math.min(64, Math.max(0, values.bundleStackLimit()));
+            int clamped = Math.min(BundlePacker.BUNDLE_WEIGHT_CAPACITY, Math.max(0, values.bundleStackLimit()));
             if (reportIfBlocked(plugin, player, prefs.setBundleStackLimit(player, clamped))) {
                 return;
             }

@@ -81,18 +81,26 @@ blacklist:
 # players with clicksorted.throttle.bypass (default op) are exempt. Set to 0 to disable.
 action_cooldown_ms: 150
 
+# Master switch for /clicksorted admin benchmark, an in-situ sort/repack timing test — it runs
+# synchronously on the main thread and briefly pauses the server. Requires
+# clicksorted.admin.commands.benchmark as well. Leave this false on production servers.
+enable_benchmark: false
+
+# Master switch for /clicksorted admin selftest, an in-game correctness self-test that stages and
+# restores the tester's real inventory and preferences. Requires clicksorted.admin.commands.selftest
+# as well. Leave this false on production servers.
+enable_selftest: false
+
 # List of Bukkit InventoryType names whose containers respond to click-sorting.
 # Remove a type to prevent sorting in that container family.
 # Full list of valid InventoryType names: https://jd.papermc.io/paper/1.21.5/org/bukkit/event/inventory/InventoryType.html
 sortable_inventories:
   - "PLAYER"
   - "CHEST"
-  - "CHEST_MINECART"
   - "ENDER_CHEST"
   - "SHULKER_BOX"
   - "BARREL"
   - "HOPPER"
-  - "HOPPER_MINECART"
   - "DROPPER"
   - "DISPENSER"
 ```

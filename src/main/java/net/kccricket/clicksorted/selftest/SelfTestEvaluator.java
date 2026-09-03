@@ -146,8 +146,8 @@ public final class SelfTestEvaluator {
     }
 
     /**
-     * Fails if any bundle in {@code contents} exceeds the 64-weight capacity or (when
-     * {@code entryCap > 0}) holds more distinct entries than {@code entryCap}.
+     * Fails if any bundle in {@code contents} exceeds {@link BundlePacker#BUNDLE_WEIGHT_CAPACITY} or
+     * (when {@code entryCap > 0}) holds more distinct entries than {@code entryCap}.
      */
     public static Optional<String> bundleCapacityValid(ItemStack[] contents, int entryCap) {
         for (int i = 0; i < contents.length; i++) {
