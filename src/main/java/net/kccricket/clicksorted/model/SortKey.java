@@ -1,6 +1,6 @@
 package net.kccricket.clicksorted.model;
 
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.logging.Log;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;

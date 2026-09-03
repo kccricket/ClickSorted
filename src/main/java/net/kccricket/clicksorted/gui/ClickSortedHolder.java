@@ -12,8 +12,8 @@ package net.kccricket.clicksorted.gui;
  * You should have received a copy of the GNU General Public License along with ClickSorted. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import net.kccricket.clicksorted.text.lang.Localized;
-import net.kccricket.clicksorted.text.MessageUtil;
+import net.kccricket.kcmclib.text.lang.Localized;
+import net.kccricket.kcmclib.text.Components;
 import org.bukkit.Material;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -33,7 +33,7 @@ public interface ClickSortedHolder extends InventoryHolder {
     static ItemStack buildFiller(Localized lang) {
         ItemStack pane = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         ItemMeta meta = pane.getItemMeta();
-        meta.displayName(lang.getColoredMessage("guiFillerName"));
+        meta.displayName(lang.render("guiFillerName"));
         pane.setItemMeta(meta);
         return pane;
     }
@@ -42,8 +42,8 @@ public interface ClickSortedHolder extends InventoryHolder {
     static ItemStack buildHelpBook(Localized lang, String loreKey) {
         ItemStack book = new ItemStack(Material.BOOK);
         ItemMeta meta = book.getItemMeta();
-        meta.displayName(lang.getColoredMessage("guiHelpBookName"));
-        meta.lore(MessageUtil.toLore(lang.getColoredMessage(loreKey)));
+        meta.displayName(lang.render("guiHelpBookName"));
+        meta.lore(Components.toLore(lang.render(loreKey)));
         book.setItemMeta(meta);
         return book;
     }

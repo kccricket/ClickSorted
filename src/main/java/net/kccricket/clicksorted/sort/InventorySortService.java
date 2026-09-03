@@ -15,14 +15,13 @@ package net.kccricket.clicksorted.sort;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.config.MainConfig;
 import net.kccricket.clicksorted.events.InventorySortEvent;
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.model.SortKey;
 import net.kccricket.clicksorted.model.SortingMethod;
 import net.kccricket.clicksorted.model.StartCorner;
 import net.kccricket.clicksorted.security.Permissions;
-import net.kccricket.clicksorted.text.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
@@ -61,7 +60,7 @@ import java.util.stream.Collectors;
  *
  * <p>When both modes are disabled for the player and target, this service returns {@code false}
  * immediately (a complete no-op). The caller ({@link InventoryClickListener}) pre-screens via
- * {@link #hasWork} to avoid unnecessarily entering the throttle/cancel path.
+ * {@code checkWork} to avoid unnecessarily entering the throttle/cancel path.
  */
 public class InventorySortService {
 
@@ -141,12 +140,14 @@ public class InventorySortService {
         Inventory inv = target.inv();
         int slot = event.getSlot();
 
-        // DOUBLE_CLICK gesture repair: the first click of the double-click already lifted the clicked
-        // stack onto the cursor and emptied the slot; the listener cancels the event to suppress the
-        // vanilla gather, which would otherwise strand that stack on the cursor. Put it back into its
-        // origin slot (only when that slot is empty — the expected post-first-click state) so the sort
-        // below folds it in and the cursor ends empty. Done here, past the permission/target checks, so
-        // it never fires for a click that wouldn't actually sort.
+        // DOUBLE_CLICK gesture repair: a double-click on an occupied slot has vanilla lift that
+        // slot's stack onto the cursor before the event we see fires, leaving the slot empty; the
+        // listener cancels the event to suppress the vanilla gather, which would otherwise strand
+        // that stack on the cursor. Put it back into its origin slot (only when that slot is empty —
+        // the expected post-lift state) so the sort below folds it in and the cursor ends empty. A
+        // double-click on an already-empty slot arrives with an empty cursor and no lifted stack, so
+        // this is a no-op there — no pickup step is required to trigger a sort. Done here, past the
+        // permission/target checks, so it never fires for a click that wouldn't actually sort.
         if (event.getClick() == ClickType.DOUBLE_CLICK) {
             ItemStack cursor = event.getCursor();
             ItemStack atSlot = inv.getItem(slot);
@@ -182,7 +183,7 @@ public class InventorySortService {
             // cancelling listener can't spam chat on rapid clicking.
             var reason = sortEvent.getCancelReason();
             if (reason != null) {
-                plugin.getMessenger().message(p, "sortCancelReason", 3, reason);
+                plugin.messages().to(p).status().throttle("sortCancelReason", 3).send(reason);
             }
             return false;
         }
@@ -230,7 +231,7 @@ public class InventorySortService {
                 : SortEngine.sortAndMerge(inv.getContents(), sortableSlots, sortMethod);
 
         if (sortableSlots.size() < sortedItems.size() && !plugin.getConfig().getBoolean("drop_excess")) {
-            MessageUtil.errorMessage(p, plugin.getConfigManager().lang(p.locale()).getColoredMessage("invOverFlow"));
+            plugin.messages().to(p).error().send("invOverFlow");
             return false;
         }
 
@@ -440,7 +441,7 @@ public class InventorySortService {
         if (!overflow.isEmpty()) {
             // This *shouldn't* happen, but there is a possibility if some other plugin has been messing
             // with max stack sizes, and we end up with an overflowing inventory after merging stacks.
-            MessageUtil.alertMessage(p, plugin.getConfigManager().lang(p.locale()).getColoredMessage("dropItems"));
+            plugin.messages().to(p).alert().send("dropItems");
             for (ItemStack item : overflow) {
                 Log.debug("dropping " + item + " by player " + p.getName());
                 p.getWorld().dropItemNaturally(p.getLocation(), item);

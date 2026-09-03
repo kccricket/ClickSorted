@@ -13,8 +13,14 @@ package net.kccricket.clicksorted.migration;
  */
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.config.MainConfig;
+import net.kccricket.kcmclib.migration.FileMigration;
+import net.kccricket.kcmclib.migration.FileMigrationContext;
+import net.kccricket.kcmclib.migration.Migration;
+import net.kccricket.kcmclib.migration.MigrationException;
+import net.kccricket.kcmclib.migration.Store;
+import net.kccricket.kcmclib.migration.ValueMigration;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
@@ -26,14 +32,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import static net.kccricket.clicksorted.migration.Migration.*;
+import static net.kccricket.kcmclib.migration.Migration.*;
 
 /**
  * Owns the full catalog of <em>what is stored where</em> and <em>which rules apply</em>, and
  * exposes one entry point per store. Callers pass only the store; the loader/store has no
  * knowledge of which settings get migrated.
  *
- * <h3>Rule hierarchy</h3>
+ * <h2>Rule hierarchy</h2>
  * <ol>
  *   <li><b>Config-only structural transforms</b> ({@link ConfigTransform}) — derive new config
  *       state from old values in place before any removal pass. Adding a future transform is a
@@ -54,7 +60,7 @@ import static net.kccricket.clicksorted.migration.Migration.*;
  *       logged and skipped rather than fatal, since a lang hiccup must not block plugin enable.</li>
  * </ol>
  *
- * <h3>NONE migration</h3>
+ * <h2>NONE migration</h2>
  * {@code ClickMethod.NONE} (disabled state) has been replaced by a dedicated boolean
  * {@code enabled} preference. A player or admin with {@code click_mode=NONE} is migrated to
  * {@code enabled=false} and {@code click_mode=SWAP}. This is expressed as a pure data rule in
@@ -101,7 +107,8 @@ public final class Migrations {
      * To add a future structural migration, append here.
      */
     private static final List<ConfigTransform> CONFIG_TRANSFORMS = List.of(
-            Migrations::migrateSortBounds);
+            Migrations::migrateSortBounds,
+            Migrations::migrateSortableInventories);
 
     /**
      * Root-level config paths to drop. These are not in {@code defaults.*} so they fall outside
@@ -251,6 +258,29 @@ public final class Migrations {
 
         Log.debug("migrateSortBounds: player_sort_min=" + min + ", player_sort_max=" + max
                 + " → locked " + sorted);
+        return true;
+    }
+
+    /**
+     * {@code CHEST_MINECART}/{@code HOPPER_MINECART} never resolved to a real Bukkit
+     * {@code InventoryType} — a minecart chest/hopper's inventory reports as plain
+     * {@code CHEST}/{@code HOPPER}, already in the default list — so they were dead entries on
+     * every server that had them. Dropped from the bundled default; this strips them from any
+     * already-deployed {@code sortable_inventories} that still lists them.
+     */
+    private static final List<String> DEAD_SORTABLE_INVENTORY_TYPES = List.of("CHEST_MINECART", "HOPPER_MINECART");
+
+    private static boolean migrateSortableInventories(ConfigurationSection config) {
+        if (!config.contains("sortable_inventories")) {
+            return false;
+        }
+        List<String> current = config.getStringList("sortable_inventories");
+        List<String> filtered = new ArrayList<>(current);
+        if (!filtered.removeAll(DEAD_SORTABLE_INVENTORY_TYPES)) {
+            return false;
+        }
+        config.set("sortable_inventories", filtered);
+        Log.debug("migrateSortableInventories: dropped dead entries " + DEAD_SORTABLE_INVENTORY_TYPES);
         return true;
     }
 

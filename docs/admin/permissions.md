@@ -1,6 +1,6 @@
 # Permissions
 
-Out of the box, all players can click-sort everything and change their own preferences. Only ops can reload configs, print config values, change the debug level, run the benchmark, or bypass the action throttle.
+Out of the box, all players can click-sort everything and change their own preferences. Only ops can reload configs, print config values, change the debug level, run the benchmark, run the self-test, or bypass the action throttle.
 
 ## Static permission nodes
 
@@ -25,7 +25,8 @@ Out of the box, all players can click-sort everything and change their own prefe
 | `clicksorted.admin.commands.reload` | `op` | Use `/clicksorted admin reload`. |
 | `clicksorted.admin.commands.config` | `op` | Use `/clicksorted admin config`. |
 | `clicksorted.admin.commands.debug` | `op` | Use `/clicksorted admin debug`. |
-| `clicksorted.admin.commands.benchmark` | `op` | Use `/clicksorted admin benchmark`. |
+| `clicksorted.admin.commands.benchmark` | `op` | Use `/clicksorted admin benchmark`. Also requires `enable_benchmark: true` in `config.yml` (default `false`). |
+| `clicksorted.admin.commands.selftest` | `op` | Use `/clicksorted admin selftest`. Also requires `enable_selftest: true` in `config.yml` (default `false`). |
 | `clicksorted.throttle.bypass` | `op` | Exempt from the per-player action throttle (`action_cooldown_ms`). |
 | `clicksorted.sort` | `true` | Allow click-sorting all inventory types. Parent of the three nodes below. |
 | `clicksorted.sort.player` | `true` | Allow sorting the player's own main inventory (excluding hotbar). |

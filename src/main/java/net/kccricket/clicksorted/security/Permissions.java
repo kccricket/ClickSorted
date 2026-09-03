@@ -1,9 +1,13 @@
 package net.kccricket.clicksorted.security;
 
-import net.kccricket.clicksorted.logging.Log;
 import org.bukkit.command.CommandSender;
 import org.bukkit.permissions.Permissible;
 
+/**
+ * ClickSorted's permission-node constants. The generic checks ({@link #isAllowedTo},
+ * {@link #isExplicitlyGranted}) delegate to the store-neutral, plugin-agnostic helpers in
+ * {@link net.kccricket.kcmclib.security.Permissions}.
+ */
 public class Permissions {
 
     // -------------------------------------------------------------------------
@@ -17,6 +21,21 @@ public class Permissions {
      * is gated independently by {@code clicksorted.admin.commands.*}.
      */
     public static final String PERM_MASTER = "clicksorted";
+
+    // -------------------------------------------------------------------------
+    // /clicksorted admin subcommand nodes
+    // -------------------------------------------------------------------------
+
+    /** Allow use of {@code /clicksorted admin reload}. */
+    public static final String PERM_ADMIN_RELOAD = "clicksorted.admin.commands.reload";
+    /** Allow use of {@code /clicksorted admin config}. */
+    public static final String PERM_ADMIN_CONFIG = "clicksorted.admin.commands.config";
+    /** Allow use of {@code /clicksorted admin debug}. */
+    public static final String PERM_ADMIN_DEBUG = "clicksorted.admin.commands.debug";
+    /** Allow use of {@code /clicksorted admin benchmark} (also requires {@code enable_benchmark} in config.yml). */
+    public static final String PERM_ADMIN_BENCHMARK = "clicksorted.admin.commands.benchmark";
+    /** Allow use of {@code /clicksorted admin selftest} (also requires {@code enable_selftest} in config.yml). */
+    public static final String PERM_ADMIN_SELFTEST = "clicksorted.admin.commands.selftest";
 
     // -------------------------------------------------------------------------
     // Admin-enforced "do not touch" blacklist permission-node prefixes
@@ -62,7 +81,7 @@ public class Permissions {
      * first to ensure only explicitly-granted nodes trigger the check.
      */
     public static boolean isExplicitlyGranted(Permissible who, String node) {
-        return who.isPermissionSet(node) && who.hasPermission(node);
+        return net.kccricket.kcmclib.security.Permissions.isExplicitlyGranted(who, node);
     }
 
     /**
@@ -73,12 +92,6 @@ public class Permissions {
      * @return true if the player has the permission node, false otherwise
      */
     public static boolean isAllowedTo(CommandSender sender, String node) {
-        if (sender == null) {
-            return true;
-        }
-        boolean allowed = sender.hasPermission(node);
-        Log.debug("Permission check: player=" + sender.getName() + ", node=" + node
-                + ", allowed=" + allowed);
-        return allowed;
+        return net.kccricket.kcmclib.security.Permissions.isAllowedTo(sender, node);
     }
 }

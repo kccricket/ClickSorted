@@ -1,5 +1,7 @@
 package net.kccricket.clicksorted.model;
 
+import net.kccricket.kcmclib.util.EnumParse;
+
 /*
  This file is part of ClickSorted
 

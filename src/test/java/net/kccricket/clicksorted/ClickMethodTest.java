@@ -41,4 +41,23 @@ class ClickMethodTest {
         assertTrue(ClickMethod.SHIFT_LEFT_CLICK.requiredSortOverItems().isEmpty());
         assertTrue(ClickMethod.SHIFT_RIGHT_CLICK.requiredSortOverItems().isEmpty());
     }
+
+    @Test
+    void effectiveSortOverItems_governedMethodsIgnorePlayerPref() {
+        // SINGLE_CLICK/CONTROL_DROP force their value regardless of what the player has set.
+        assertFalse(ClickMethod.SINGLE_CLICK.effectiveSortOverItems(true));
+        assertFalse(ClickMethod.SINGLE_CLICK.effectiveSortOverItems(false));
+        assertTrue(ClickMethod.CONTROL_DROP.effectiveSortOverItems(true));
+        assertTrue(ClickMethod.CONTROL_DROP.effectiveSortOverItems(false));
+    }
+
+    @Test
+    void effectiveSortOverItems_hoverNeutralMethodsPassThroughPlayerPref() {
+        // SWAP/DOUBLE_CLICK/shift-click leave hover to the player's own preference.
+        for (ClickMethod method : new ClickMethod[]{
+                ClickMethod.SWAP, ClickMethod.DOUBLE_CLICK, ClickMethod.SHIFT_LEFT_CLICK, ClickMethod.SHIFT_RIGHT_CLICK}) {
+            assertTrue(method.effectiveSortOverItems(true), method + " should pass through true");
+            assertFalse(method.effectiveSortOverItems(false), method + " should pass through false");
+        }
+    }
 }

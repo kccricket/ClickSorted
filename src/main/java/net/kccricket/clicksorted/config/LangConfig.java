@@ -1,10 +1,11 @@
 package net.kccricket.clicksorted.config;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.Log;
-import net.kccricket.clicksorted.text.lang.Localized;
-import net.kccricket.clicksorted.text.lang.LocaleMessages;
-import net.kccricket.clicksorted.text.lang.MessageSource;
+import net.kccricket.kcmclib.config.ManagedConfig;
+import net.kccricket.kcmclib.logging.Log;
+import net.kccricket.kcmclib.text.lang.Localized;
+import net.kccricket.kcmclib.text.lang.LocaleMessages;
+import net.kccricket.kcmclib.text.lang.MessageSource;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -27,7 +28,8 @@ import java.util.Map;
  * Loads and swaps the plugin's {@link LocaleMessages} snapshot: internal (jar-bundled) defaults
  * under {@code lang/<locale>.yml} plus sparse on-disk overrides under
  * {@code plugins/ClickSorted/lang/<locale>.yml}. Unlike {@code groups.yml}/{@code items.yml}, lang
- * loading deliberately does <em>not</em> go through {@link ResourceUpdater}'s add-only merge — that
+ * loading deliberately does <em>not</em> go through {@link net.kccricket.kcmclib.config.ResourceUpdater}'s
+ * add-only merge — that
  * merge bakes every default onto disk, which would shadow future default changes forever. Instead
  * on-disk files stay sparse and missing keys always fall through to the internal default.
  *
@@ -43,7 +45,7 @@ public class LangConfig implements ManagedConfig, MessageSource {
     private static final String DIR = "lang";
 
     private final ClickSortedPlugin plugin;
-    // Reassigned on load/reload; read on Folia region threads via getMessage/getColoredMessage,
+    // Reassigned on load/reload; read on Folia region threads via raw/render,
     // so publish via volatile (matches GroupsConfig/ItemsConfig).
     private volatile LocaleMessages messages = new LocaleMessages(Map.of(), Map.of(), Locale.US);
 
@@ -139,13 +141,13 @@ public class LangConfig implements ManagedConfig, MessageSource {
     }
 
     @Override
-    public String getMessage(Locale locale, String path) {
-        return messages.getMessage(locale, path);
+    public String raw(Locale locale, String path) {
+        return messages.raw(locale, path);
     }
 
     @Override
-    public Component getColoredMessage(Locale locale, String path, TagResolver... resolvers) {
-        return messages.getColoredMessage(locale, path, resolvers);
+    public Component render(Locale locale, String path, TagResolver... resolvers) {
+        return messages.render(locale, path, resolvers);
     }
 
     @Override

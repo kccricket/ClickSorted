@@ -18,7 +18,7 @@ class LangConfigTest extends AbstractClickSortedTest {
 
     @Test
     void setSortOverItemsStatus_substitutesStatus() {
-        Component c = plugin.getConfigManager().lang().getColoredMessage("setSortOverItemsStatus",
+        Component c = plugin.getConfigManager().lang().render("setSortOverItemsStatus",
                 Placeholder.unparsed("status", "ENABLED"));
         assertTrue(PLAIN.serialize(c).contains("ENABLED"),
                 "Expected <status> placeholder to be substituted");
@@ -26,7 +26,7 @@ class LangConfigTest extends AbstractClickSortedTest {
 
     @Test
     void setClickMethodTo_substitutesMethodAndInstruction() {
-        Component c = plugin.getConfigManager().lang().getColoredMessage("setClickMethodTo",
+        Component c = plugin.getConfigManager().lang().render("setClickMethodTo",
                 Placeholder.unparsed("method", "SWAP"),
                 Placeholder.unparsed("instruction", "Press the offhand-swap key to sort."));
         String plain = PLAIN.serialize(c);
@@ -49,9 +49,9 @@ class LangConfigTest extends AbstractClickSortedTest {
         plugin.getConfigManager().reloadAll();
 
         assertEquals("OVERRIDDEN-PREFIX",
-                plugin.getConfigManager().lang().getMessage("prefix"),
+                plugin.getConfigManager().lang().raw("prefix"),
                 "The overridden key must resolve to the override value");
-        assertTrue(plugin.getConfigManager().lang().getMessage("notFromConsole")
+        assertTrue(plugin.getConfigManager().lang().raw("notFromConsole")
                         .contains("player"),
                 "A key absent from the override must fall through to the internal default");
     }
@@ -63,7 +63,7 @@ class LangConfigTest extends AbstractClickSortedTest {
         new YamlConfiguration().save(langOverrideFile("en_us"));
         plugin.getConfigManager().reloadAll();
 
-        assertTrue(plugin.getConfigManager().lang().getMessage("notFromConsole").contains("player"),
+        assertTrue(plugin.getConfigManager().lang().raw("notFromConsole").contains("player"),
                 "With an empty on-disk override, every key must resolve to the internal default");
     }
 
@@ -77,13 +77,13 @@ class LangConfigTest extends AbstractClickSortedTest {
         PlayerMock germanPlayer = addOpPlayer("Hans");
         germanPlayer.setLocale(Locale.GERMANY);
         assertEquals("DE-PREFIX",
-                plugin.getConfigManager().lang(germanPlayer.locale()).getMessage("prefix"),
+                plugin.getConfigManager().lang(germanPlayer.locale()).raw("prefix"),
                 "A player with a matching override locale must see that override");
 
         PlayerMock spanishPlayer = addOpPlayer("Pablo");
         spanishPlayer.setLocale(Locale.of("es", "ES"));
         assertNotEquals("DE-PREFIX",
-                plugin.getConfigManager().lang(spanishPlayer.locale()).getMessage("prefix"),
+                plugin.getConfigManager().lang(spanishPlayer.locale()).raw("prefix"),
                 "A player whose locale has no matching file must fall back to default_locale, not another locale's override");
     }
 }

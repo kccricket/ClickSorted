@@ -14,7 +14,7 @@ package net.kccricket.clicksorted.sort;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import net.kccricket.clicksorted.gui.ClickSortedHolder;
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.security.Permissions;
@@ -72,14 +72,15 @@ public class InventoryClickListener implements Listener {
                 return;
             }
             // "Sort over items" gate: unless enabled, sorting only fires on an empty slot. Some click
-            // methods override the player's preference via ClickMethod.requiredSortOverItems():
+            // methods override the player's preference via ClickMethod.effectiveSortOverItems():
             // SINGLE_CLICK forces it off (with it on, every empty-cursor LEFT click on an occupied slot
             // would sort instead of letting the player pick the item up, making the inventory unusable),
             // and CONTROL_DROP forces it on (a ctrl-drop only ever fires on an occupied slot, so it could
-            // never sort otherwise).
+            // never sort otherwise). ClickMethod.getInstruction reads this same method, so the trigger
+            // instruction shown to the player can never drift from what actually sorts.
             ItemStack current = event.getCurrentItem();
             boolean slotOccupied = current != null && current.getType() != Material.AIR;
-            boolean sortOverItems = clickMethod.requiredSortOverItems().orElseGet(() -> prefs.getSortOverItems(player));
+            boolean sortOverItems = clickMethod.effectiveSortOverItems(prefs.getSortOverItems(player));
             if (slotOccupied && !sortOverItems) {
                 return;
             }

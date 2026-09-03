@@ -22,7 +22,7 @@ ClickSorted turns any inventory into a tidy one with a single click. Open a ches
 
 ## Installation
 
-**Requirements:** Paper or Folia 1.21.5 or newer. No other plugins required.
+**Requirements:** Paper or Folia 1.20.6 or newer. No other plugins required. The `/clicksorted menu` dialog UI additionally requires 1.21.6+ (Paper's Dialog API) and is automatically unavailable below that.
 
 1. Download `ClickSorted.jar` from [Releases](https://github.com/kccricket/clicksorted/releases).
 2. Drop the JAR into your server's `plugins/` folder.

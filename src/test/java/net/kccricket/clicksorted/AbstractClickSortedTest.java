@@ -13,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
-import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 
 import java.io.File;
 import java.io.InputStream;
@@ -131,7 +130,7 @@ abstract class AbstractClickSortedTest {
      * any sync tasks those async tasks may have queued.
      */
     protected void waitForJoinHandler() {
-        ((BukkitSchedulerMock) server.getScheduler()).waitAsyncTasksFinished();
+        server.getScheduler().waitAsyncTasksFinished();
         server.getScheduler().performTicks(1);
     }
 

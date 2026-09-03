@@ -14,6 +14,7 @@ import org.bukkit.inventory.meta.BundleMeta;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataType;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +40,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link SortEngine} pipeline (so stacks are merged/name-sorted exactly as in production), then
  * inspects the slot→stack placement. Extends {@link AbstractClickSortedTest} because ItemStack/meta
  * and item-name lookup are server-side.
+ *
+ * <p>{@code nonDurableCustomModelDataItemGetsSeparateBlockFromPlain} self-skips (via
+ * {@code Assumptions}, not a hard failure) on this MockBukkit version — it doesn't round-trip
+ * {@code ItemMeta.hasCustomModelDataComponent()}'s presence flag at all after
+ * {@code setCustomModelDataComponent}, the same kind of MockBukkit-vs-live-server gap already
+ * documented in {@code BundlePackerTest} for bee-filled beehives. The branch it covers is verified
+ * live instead, via the {@code auto-treemap-*} self-test AUTO cases and the
+ * {@code custom-model-data-component} capability probe.
  */
 class TreemapPackerTest extends AbstractClickSortedTest {
 
@@ -354,6 +363,17 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         return stack;
     }
 
+    /** Creates a max-size stack with custom-model-data (via the modern component API) so multiple copies remain distinct cells after SortEngine merge. */
+    private ItemStack withCustomModelData(Material mat, float value) {
+        ItemStack stack = new ItemStack(mat, 64);
+        ItemMeta meta = stack.getItemMeta();
+        CustomModelDataComponent cmd = meta.getCustomModelDataComponent();
+        cmd.setFloats(List.of(value));
+        meta.setCustomModelDataComponent(cmd);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
     private ItemStack withDamage(Material mat, int damage) {
         ItemStack stack = new ItemStack(mat);
         Damageable meta = (Damageable) stack.getItemMeta();
@@ -492,6 +512,51 @@ class TreemapPackerTest extends AbstractClickSortedTest {
         Set<Integer> all = new TreeSet<>(slotsA);
         all.retainAll(slotsB);
         assertTrue(all.isEmpty(), "custom-A and custom-B blocks do not overlap");
+    }
+
+    @Test
+    void nonDurableCustomModelDataItemGetsSeparateBlockFromPlain() {
+        // A non-durable item carrying only custom-model-data (no lore/enchants/PDC) must still get
+        // its own block, distinct from the plain material block — exercises isCustomNonDurable's
+        // hasCustomModelDataComponent()/hasCustomModelData() branch directly. Deliberately a single
+        // custom variant rather than two distinct ones: MockBukkit's simulated ItemMeta doesn't
+        // distinguish different CustomModelDataComponent content from each other.
+        //
+        // Self-skips (Assumptions, not a hard failure) if this MockBukkit version doesn't round-trip
+        // the presence flag at all — confirmed true for the version pinned in build.gradle.kts, which
+        // returns hasCustomModelDataComponent() == false even right after setCustomModelDataComponent()
+        // with a non-empty component. Same kind of MockBukkit-vs-live-server gap already documented for
+        // bee-filled beehives in BundlePackerTest; verified for real instead via the live self-test
+        // (`auto-treemap-*` AUTO cases plus the `custom-model-data-component` capability probe).
+        ItemStack custom = withCustomModelData(Material.FEATHER, 1.0f);
+        org.junit.jupiter.api.Assumptions.assumeTrue(custom.getItemMeta().hasCustomModelDataComponent(),
+                "MockBukkit does not round-trip CustomModelDataComponent presence in this version");
+        ItemStack plain = new ItemStack(Material.FEATHER, 64);
+
+        List<ItemStack> raw = new ArrayList<>();
+        for (int i = 0; i < 5; i++) raw.add(custom.clone());
+        for (int i = 0; i < 5; i++) raw.add(plain.clone());
+        raw.addAll(fullStacks(Material.DIRT, 8));
+
+        List<ItemStack> sortedStacks = sorted(raw);
+        Map<Integer, ItemStack> placement =
+                TreemapPacker.pack(sortedStacks, chestSlots(), 0, WIDTH, ROWS, StartCorner.TOP_LEFT, FillAxis.HORIZONTAL);
+
+        assertEquals(sortedStacks.size(), placement.size(), "every stack placed");
+
+        Set<Integer> slotsCustom = slotsMatching(placement, item ->
+                item.getType() == Material.FEATHER && item.hasItemMeta() && item.getItemMeta().hasCustomModelDataComponent());
+        Set<Integer> slotsPlain = slotsMatching(placement, item ->
+                item.getType() == Material.FEATHER && !(item.hasItemMeta() && item.getItemMeta().hasCustomModelDataComponent()));
+
+        assertEquals(5, slotsCustom.size(), "5 custom-model-data feather stacks placed");
+        assertEquals(5, slotsPlain.size(), "5 plain feather stacks placed");
+        assertTrue(isContiguous(slotsCustom), "custom-model-data feathers form one contiguous block");
+        assertTrue(isContiguous(slotsPlain),  "plain feathers form one contiguous block");
+
+        Set<Integer> overlap = new TreeSet<>(slotsCustom);
+        overlap.retainAll(slotsPlain);
+        assertTrue(overlap.isEmpty(), "custom and plain blocks do not overlap");
     }
 
     @Test

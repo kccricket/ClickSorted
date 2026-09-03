@@ -329,12 +329,34 @@ public final class TreemapPacker {
         return stack.getType(); // plain non-durable: by material
     }
 
+    /**
+     * Whether {@link ItemMeta#hasCustomModelDataComponent()} exists on this server's API surface —
+     * added in Paper 1.21.2 alongside the {@code CustomModelDataComponent} class. Mirrors the
+     * {@code Class.forName} capability-probe idiom in {@code InventorySortService#detectFolia()}:
+     * evaluated once at class-load and cached, not probed per call. Below 1.21.2 the deprecated but
+     * still-present {@link ItemMeta#hasCustomModelData()} is used instead — a complete substitute
+     * there, since the component representation this heuristic would otherwise check for cannot
+     * exist on a server old enough to lack the class in the first place.
+     */
+    private static final boolean CUSTOM_MODEL_DATA_COMPONENT_AVAILABLE = detectCustomModelDataComponent();
+
+    private static boolean detectCustomModelDataComponent() {
+        try {
+            Class.forName("org.bukkit.inventory.meta.components.CustomModelDataComponent");
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
+    }
+
     private static boolean isCustomNonDurable(ItemStack stack) {
         ItemMeta meta = stack.getItemMeta();
-        return meta != null && (meta.hasEnchants()
-                || meta.hasLore()
-                || meta.hasCustomModelDataComponent()
-                || !meta.getPersistentDataContainer().isEmpty());
+        if (meta == null) return false;
+        boolean customModelData = CUSTOM_MODEL_DATA_COMPONENT_AVAILABLE
+                ? meta.hasCustomModelDataComponent()
+                : meta.hasCustomModelData();
+        return meta.hasEnchants() || meta.hasLore() || customModelData
+                || !meta.getPersistentDataContainer().isEmpty();
     }
 
     /** One rectangle in the treemap: an item type with its stacks. {@link #cells} is filled by {@link #shelfPack}. */

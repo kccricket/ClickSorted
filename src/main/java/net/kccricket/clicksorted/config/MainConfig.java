@@ -1,8 +1,9 @@
 package net.kccricket.clicksorted.config;
 
 import net.kccricket.clicksorted.ClickSortedPlugin;
-import net.kccricket.clicksorted.logging.DebugLevel;
-import net.kccricket.clicksorted.logging.Log;
+import net.kccricket.kcmclib.config.ManagedConfig;
+import net.kccricket.kcmclib.logging.DebugLevel;
+import net.kccricket.kcmclib.logging.Log;
 import net.kccricket.clicksorted.model.ClickMethod;
 import net.kccricket.clicksorted.model.FillAxis;
 import net.kccricket.clicksorted.model.SortingMethod;
@@ -15,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Wraps {@code config.yml} via Bukkit's built-in {@code JavaPlugin} config machinery.
@@ -59,10 +61,33 @@ public class MainConfig implements ManagedConfig {
         // On first load the config is already in memory (from disk or from MockBukkit in tests).
         // Just ensure defaults are applied and the file is written, then parse the values.
         applyDefaults();
+        warnUnknownKeys();
         normalizeValues();
         plugin.getMigrations().migrate(plugin.getConfig());
         plugin.saveConfig();
         applyToRuntime();
+    }
+
+    /**
+     * Warns (once, in a single line) about any on-disk {@code config.yml} key not present in the
+     * bundled default — e.g. a leftover key from an old config scheme, or a plain typo. Neither
+     * {@code copyDefaults(true)} nor {@code applyComments} ever removes or flags an unrecognized
+     * key, so without this an admin gets no signal that a key they set is being silently ignored.
+     * Ported from BestestTool's {@code MainConfig}.
+     */
+    private void warnUnknownKeys() {
+        // getDefaults() can be null under MockBukkit's loadWithConfig(plugin, customStream) test
+        // harness, which injects an already-parsed config with no bundled-resource defaults wired
+        // up — nothing to diff against in that case, so just skip the check.
+        org.bukkit.configuration.Configuration defaults = plugin.getConfig().getDefaults();
+        if (defaults == null) {
+            return;
+        }
+        Set<String> onDisk = new TreeSet<>(plugin.getConfig().getKeys(true));
+        onDisk.removeAll(defaults.getKeys(true));
+        if (!onDisk.isEmpty()) {
+            Log.warning("Unknown key(s) in config.yml — these are ignored: " + String.join(", ", onDisk));
+        }
     }
 
     @Override
@@ -174,6 +199,14 @@ public class MainConfig implements ManagedConfig {
                 "clicksorted.throttle.bypass permission (default op) are exempt.",
                 "Lower values feel snappier but may clip rapid legitimate lock-GUI clicking.",
                 "Set to 0 to disable throttling entirely."));
+        cfg.setComments("enable_benchmark", List.of(
+                "Master switch for /clicksorted admin benchmark, an in-situ sort/repack timing test —",
+                "it runs synchronously on the main thread and briefly pauses the server. Requires",
+                "clicksorted.admin.commands.benchmark as well. Leave this false on production servers."));
+        cfg.setComments("enable_selftest", List.of(
+                "Master switch for /clicksorted admin selftest, an in-game correctness self-test that",
+                "stages and restores the tester's real inventory and preferences. Requires",
+                "clicksorted.admin.commands.selftest as well. Leave this false on production servers."));
         cfg.setComments("sortable_inventories", List.of(
                 "Inventory types that players are allowed to sort.",
                 "Values must be valid Bukkit InventoryType names (case-sensitive).",
@@ -324,6 +357,24 @@ public class MainConfig implements ManagedConfig {
      */
     public int getActionCooldownMs() {
         return plugin.getConfig().getInt("action_cooldown_ms", 150);
+    }
+
+    /**
+     * Master switch for {@code /clicksorted admin benchmark} — off by default, since a run pauses
+     * the server on the main thread. An admin has to opt in on top of holding
+     * {@code clicksorted.admin.commands.benchmark}.
+     */
+    public boolean getEnableBenchmark() {
+        return plugin.getConfig().getBoolean("enable_benchmark", false);
+    }
+
+    /**
+     * Master switch for {@code /clicksorted admin selftest} — off by default, since a run stages
+     * and restores the tester's real inventory. An admin has to opt in on top of holding
+     * {@code clicksorted.admin.commands.selftest}.
+     */
+    public boolean getEnableSelftest() {
+        return plugin.getConfig().getBoolean("enable_selftest", false);
     }
 
     /**

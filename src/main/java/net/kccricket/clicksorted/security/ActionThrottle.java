@@ -15,23 +15,11 @@ package net.kccricket.clicksorted.security;
 import net.kccricket.clicksorted.ClickSortedPlugin;
 import org.bukkit.entity.Player;
 
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.LongSupplier;
-
 /**
- * Global per-player rate limiter. A single transient cooldown clock per player gates <em>every</em>
- * plugin-driven action (sort, bundle-pack, prefs cycle, lock toggles, commands), capping how fast a
- * scripted or hacked client can force main-thread work regardless of which feature is invoked.
- *
- * <p>The minimum interval between actions is read from {@code action_cooldown_ms} on each call, so
- * {@code /clicksorted reload} takes effect live. A value ≤ 0 disables throttling entirely. Players
- * holding {@code clicksorted.throttle.bypass} (default op) are never throttled.
- *
- * <p>State is in-memory only — never persisted. The map is keyed by {@link UUID} so it is unaffected
- * by name changes and bounded by the online player count in practice.
+ * Thin ClickSorted wrapper around the store-neutral {@link net.kccricket.kcmclib.security.ActionThrottle}:
+ * supplies the bypass node and a live cooldown reader from {@code action_cooldown_ms}, and adds the
+ * rate-limited {@code actionTooFast} chat notice ({@link #throttled(Player)}) that the library
+ * throttle deliberately has no messaging/lang dependency to send itself.
  */
 public class ActionThrottle {
 
@@ -39,24 +27,23 @@ public class ActionThrottle {
     public static final String BYPASS_NODE = "clicksorted.throttle.bypass";
 
     private final ClickSortedPlugin plugin;
-    private final Map<UUID, Long> lastAction = new ConcurrentHashMap<>();
-
-    /** Time source, overridable in tests to avoid real sleeps. */
-    private LongSupplier clock = System::currentTimeMillis;
+    private final net.kccricket.kcmclib.security.ActionThrottle delegate;
 
     public ActionThrottle(ClickSortedPlugin plugin) {
         this.plugin = plugin;
+        this.delegate = new net.kccricket.kcmclib.security.ActionThrottle(
+                BYPASS_NODE, () -> plugin.getConfigManager().main().getActionCooldownMs());
     }
 
     /**
      * Record an action attempt for {@code player} and decide whether it may proceed, using the
      * configured cooldown.
      *
-     * @return {@code true} if the action is allowed (and the player's clock is advanced);
-     *         {@code false} if it falls within the cooldown window and should be dropped.
+     * @return {@code true} if the action is allowed; {@code false} if it falls within the cooldown
+     *         window and should be dropped.
      */
     public boolean allow(Player player) {
-        return allow(player, plugin.getConfigManager().main().getActionCooldownMs());
+        return delegate.allow(player);
     }
 
     /**
@@ -70,41 +57,7 @@ public class ActionThrottle {
         if (allow(player)) {
             return false;
         }
-        plugin.getMessenger().message(player, "throttle", 3,
-                plugin.getConfigManager().lang(player.locale()).getColoredMessage("actionTooFast"));
+        plugin.messages().to(player).error().throttle("throttle", 3).send("actionTooFast");
         return true;
-    }
-
-    /**
-     * Core throttle decision against an explicit cooldown. Exposed (package-private) for tests.
-     *
-     * <p>On denial the player's timestamp is intentionally <em>not</em> updated, so a sustained flood
-     * does not keep sliding the window forward — the next allowed action is still measured from the
-     * last action that actually ran.
-     */
-    boolean allow(Player player, int cooldownMs) {
-        if (cooldownMs <= 0) {
-            return true;
-        }
-        if (Permissions.isAllowedTo(player, BYPASS_NODE)) {
-            return true;
-        }
-        long now = clock.getAsLong();
-        // Atomic check-then-act: a single compute() decides and conditionally advances the
-        // window so concurrent callers for the same player can't both pass the gate.
-        AtomicBoolean allowed = new AtomicBoolean(false);
-        lastAction.compute(player.getUniqueId(), (id, last) -> {
-            if (last == null || now - last >= cooldownMs) {
-                allowed.set(true);
-                return now;          // allowed: advance the window
-            }
-            return last;             // denied: leave the timestamp untouched
-        });
-        return allowed.get();
-    }
-
-    /** Test seam: override the time source. */
-    void setClock(LongSupplier clock) {
-        this.clock = clock;
     }
 }

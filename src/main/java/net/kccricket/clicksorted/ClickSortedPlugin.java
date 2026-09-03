@@ -15,34 +15,41 @@ package net.kccricket.clicksorted;
 import net.kccricket.clicksorted.commands.ClickSortedCommands;
 import net.kccricket.clicksorted.config.ConfigManager;
 import net.kccricket.clicksorted.gui.BlacklistGuiListener;
+import net.kccricket.clicksorted.gui.DialogSupport;
 import net.kccricket.clicksorted.gui.LockGuiListener;
 import net.kccricket.clicksorted.gui.PreferencesDialogService;
-import net.kccricket.clicksorted.logging.Log;
-import net.kccricket.clicksorted.migration.MigrationException;
+import net.kccricket.kcmclib.logging.Log;
+import net.kccricket.kcmclib.migration.MigrationException;
 import net.kccricket.clicksorted.migration.Migrations;
 import net.kccricket.clicksorted.migration.PlayerMigrationListener;
 import net.kccricket.clicksorted.model.PlayerSortingPrefs;
 import net.kccricket.clicksorted.security.ActionThrottle;
+import net.kccricket.clicksorted.selftest.SelfTestListener;
+import net.kccricket.clicksorted.selftest.SelfTestManager;
 import net.kccricket.clicksorted.sort.InventoryClickListener;
 import net.kccricket.clicksorted.sort.InventorySortService;
-import net.kccricket.clicksorted.text.CooldownMessenger;
-import net.kccricket.clicksorted.text.MessageUtil;
-import net.kccricket.clicksorted.update.UpdateChecker;
+import net.kccricket.kcmclib.text.Messenger;
+import net.kccricket.kcmclib.update.ModrinthUpdateChecker;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bstats.bukkit.Metrics;
+import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.List;
+
 public class ClickSortedPlugin extends JavaPlugin {
-    private final CooldownMessenger messenger = new CooldownMessenger();
+    private Messenger messenger;
     private Metrics metrics;
     private PlayerSortingPrefs sortingPrefs;
     private ConfigManager configManager;
     private InventorySortService sortService;
     private ActionThrottle actionThrottle;
     private Migrations migrations;
-    private UpdateChecker updateChecker;
+    private ModrinthUpdateChecker updateChecker;
     private PreferencesDialogService preferencesDialogService;
+    private SelfTestManager selfTestManager;
+    private SelfTestListener selfTestListener;
 
     private static ClickSortedPlugin instance = null;
 
@@ -64,7 +71,7 @@ public class ClickSortedPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        MessageUtil.init(configManager);
+        messenger = new Messenger(configManager);
 
         if (getConfig().getBoolean("enable_metrics", true)) {
             metrics = new Metrics(this, 31833);
@@ -73,25 +80,66 @@ public class ClickSortedPlugin extends JavaPlugin {
         sortingPrefs = new PlayerSortingPrefs(this);
         actionThrottle = new ActionThrottle(this);
 
-        updateChecker = new UpdateChecker(this);
+        updateChecker = new ModrinthUpdateChecker(this, "clicksorted",
+                () -> configManager.main().getCheckForUpdates(),
+                () -> configManager.main().getUpdateCheckIntervalHours(),
+                (latest, current) -> List.of(
+                        "A new version of ClickSorted is available: " + latest
+                                + " (you are running " + current + ").",
+                        "Download: https://modrinth.com/plugin/clicksorted | "
+                                + "https://hangar.papermc.io/kccricket/ClickSorted | "
+                                + "https://github.com/kccricket/ClickSorted/releases"));
         updateChecker.restart();
 
         sortService = new InventorySortService(this);
-        preferencesDialogService = new PreferencesDialogService(this);
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new InventoryClickListener(this, sortService), this);
         pm.registerEvents(new LockGuiListener(this), this);
         pm.registerEvents(new BlacklistGuiListener(this), this);
         pm.registerEvents(new PlayerMigrationListener(this), this);
-        pm.registerEvents(preferencesDialogService, this);
+
+        // Dialog API (io.papermc.paper.dialog.Dialog) post-dates this plugin's api-version floor —
+        // see DialogSupport. Not constructed/registered at all on a server too old for it; /clicksorted
+        // menu is separately gated the same way in ClickSortedCommands.
+        if (DialogSupport.AVAILABLE) {
+            preferencesDialogService = new PreferencesDialogService(this);
+            pm.registerEvents(preferencesDialogService, this);
+        }
+
+        refreshSelfTest();
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(ClickSortedCommands.build(this), "Manage the ClickSorted plugin"));
     }
 
+    /**
+     * Lazily constructs/tears down the self-test subsystem ({@link SelfTestManager} +
+     * {@link SelfTestListener}) to match the current {@code enable_selftest} config value — off by
+     * default, since a run stages and restores the tester's real inventory, so most servers should
+     * never even load this code. Called once from {@link #onEnable} and again after every
+     * {@code /clicksorted admin reload} (the flag can change at runtime); idempotent when the
+     * subsystem is already in the desired state.
+     */
+    public void refreshSelfTest() {
+        boolean shouldRun = configManager.main().getEnableSelftest();
+        if (shouldRun && selfTestManager == null) {
+            selfTestManager = new SelfTestManager(this);
+            selfTestListener = new SelfTestListener(this, selfTestManager);
+            getServer().getPluginManager().registerEvents(selfTestListener, this);
+        } else if (!shouldRun && selfTestManager != null) {
+            selfTestManager.abortAll();
+            HandlerList.unregisterAll(selfTestListener);
+            selfTestListener = null;
+            selfTestManager = null;
+        }
+    }
+
     @Override
     public void onDisable() {
+        if (selfTestManager != null) {
+            selfTestManager.abortAll();
+        }
         if (updateChecker != null) {
             updateChecker.stop();
         }
@@ -101,7 +149,6 @@ public class ClickSortedPlugin extends JavaPlugin {
         if (configManager != null) {
             configManager.saveAll();
         }
-        MessageUtil.init(null);
         instance = null;
     }
 
@@ -109,7 +156,12 @@ public class ClickSortedPlugin extends JavaPlugin {
         return instance;
     }
 
-    public CooldownMessenger getMessenger() {
+    /**
+     * The single entry point for sending a message to a player or console — see
+     * {@link Messenger}'s class javadoc. Built in {@link #onEnable} once {@link #configManager}
+     * exists (it reads lang live through it, so there is nothing to re-init on reload).
+     */
+    public Messenger messages() {
         return messenger;
     }
 
@@ -134,12 +186,29 @@ public class ClickSortedPlugin extends JavaPlugin {
         return migrations;
     }
 
-    public UpdateChecker getUpdateChecker() {
+    public ModrinthUpdateChecker getUpdateChecker() {
         return updateChecker;
     }
 
-    /** @return the stash/restore service backing the {@code /clicksorted menu} preferences dialog */
+    /**
+     * @return the stash/restore service backing the {@code /clicksorted menu} preferences dialog,
+     *         or {@code null} on a server without the Dialog API ({@link DialogSupport#AVAILABLE}
+     *         false) — every caller of this getter is itself only reachable from inside an
+     *         already-open dialog, which can't happen on such a server since {@code menu} is gated
+     *         the same way.
+     */
     public PreferencesDialogService getPreferencesDialogService() {
         return preferencesDialogService;
+    }
+
+    /**
+     * @return the self-test manager, or {@code null} when {@code enable_selftest} is off (the
+     *         default) — see {@link #refreshSelfTest()}. Every {@code /clicksorted admin selftest}
+     *         subcommand is gated behind the same flag (see {@code canSelftest} in
+     *         {@code ClickSortedCommands}), so this is only reachable non-null there; callers
+     *         outside that gated subtree must null-check.
+     */
+    public SelfTestManager getSelfTestManager() {
+        return selfTestManager;
     }
 }
