@@ -68,7 +68,7 @@ jobs:
         continue-on-error: true
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-        run: ./gradlew modrinth
+        run: ./gradlew modrinth modrinthSyncBody
 
       - name: Publish to Hangar
         id: hangar
